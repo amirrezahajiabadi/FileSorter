@@ -2,7 +2,7 @@
 
 A lightweight desktop application for automatically organizing files into categorized folders — with customizable rules, smart pre-sort analysis, full bilingual support, and Dark/Light themes.
 
-**Developed by HajAmir**
+**Developed by Theamirreza**
 
 ---
 
