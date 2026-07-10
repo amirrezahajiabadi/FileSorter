@@ -32,7 +32,7 @@ makensis installer.nsi
 
 ```nsi
 !define APP_NAME "FileSorter"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "3.0.0"
 !define PUBLISHER "Dr. Hajiabadi"
 !define EXE_NAME "FileSorter.exe"
 !define INSTALL_DIR "$PROGRAMFILES\FileSorter"

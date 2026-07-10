@@ -3,4 +3,4 @@
 #
 # To build a standalone .exe with PyInstaller:
 #   pip install pyinstaller
-#   pyinstaller --onefile --windowed --name "FileSorter" file_sorter_app.py
+#   pyinstaller --onefile --windowed --clean --name "FileSorter" file_sorter_app.py
