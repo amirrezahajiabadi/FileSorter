@@ -259,8 +259,3 @@ class SettingsWindow:
     def _save(self) -> None:
         self.on_save(self.categories)
         self.win.destroy()
-
-
-# ══════════════════════════════════════════════════════════════════
-#  Analysis Window
-# ══════════════════════════════════════════════════════════════════

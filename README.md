@@ -33,7 +33,7 @@ A lightweight desktop application for automatically organizing files into catego
 ```bash
 git clone https://github.com/amirrezahajiabadi/FileSorter.git
 cd FileSorter
-python file_sorter_app.py
+python main.py
 ```
 
 No third-party packages required — built entirely with the Python standard library.
@@ -41,6 +41,46 @@ No third-party packages required — built entirely with the Python standard lib
 ### Download the installer (Windows)
 
 Go to the [Releases](https://github.com/amirrezahajiabadi/FileSorter/releases) page and download the latest `FileSorter.exe`.
+
+---
+
+## 🗂 Project Structure
+
+As of v3.1.0, the app is organized as a proper Python package instead of one large file:
+
+```
+FileSorter/
+├── main.py                      # entry point — run this
+├── app/
+│   ├── constants.py              # APP_VERSION, default categories, thresholds
+│   ├── settings_manager.py       # load/save ~/.filesorter_settings.json
+│   ├── sorter.py                 # pure sorting logic (no UI) — get_category, analyze_folder...
+│   ├── i18n.py                   # STRINGS (fa/en) + language helpers
+│   ├── themes.py                 # THEMES (dark/light) + ttk styling
+│   └── ui/
+│       ├── splash.py             # startup splash screen
+│       ├── settings_window.py    # category/extension editor
+│       ├── analysis_window.py    # pre-sort report window
+│       └── main_window.py        # FileSorterApp — the main window
+├── tests/
+│   └── test_sorter.py            # pytest suite for app/sorter.py
+├── requirements.txt
+├── build_installer.md
+└── README.md
+```
+
+`app/sorter.py` has no Tkinter dependency, so its logic is fully unit-tested — see [Running Tests](#-running-tests).
+
+---
+
+## 🧪 Running Tests
+
+```bash
+pip install pytest
+pytest
+```
+
+Tests cover `app/sorter.py` (categorization, folder analysis, suggestions, size formatting) since it's pure logic with no UI dependency.
 
 ---
 
@@ -68,7 +108,7 @@ your-folder/
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --windowed --clean --name "FileSorter" file_sorter_app.py
+pyinstaller --onefile --windowed --clean --name "FileSorter" main.py
 ```
 
 The `.exe` will be in the `dist/` folder.
@@ -77,6 +117,8 @@ The `.exe` will be in the `dist/` folder.
 
 ## 📌 Version History
 
+- **v3.2.0** — Added a pytest suite for `app/sorter.py` (23 tests); fixed a few stray leftover comments from the v3.1.0 refactor; restored docs that had reverted to the old `file_sorter_app.py` filename during a merge
+- **v3.1.0** — Refactored from a single 1200-line file into a proper package (`app/`, `app/ui/`) with clear module boundaries; entry point moved to `main.py`; no functional/UI changes
 - **v3.0.0** — Bilingual UI (Persian/English), Dark/Light theme system with tuned palettes, full widget rebuild on toggle, settings now persist language & theme
 - **v2.0.0** — Settings panel, Smart Analysis & Suggestions, modern light theme, more categories
 - **v1.0.0** — Initial release: basic sorting, dark theme, splash screen

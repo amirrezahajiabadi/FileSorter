@@ -9,7 +9,7 @@ pip install pyinstaller
 ## Step 2 — Build the .exe
 
 ```bash
-pyinstaller --onefile --windowed --name "FileSorter" file_sorter_app.py
+pyinstaller --onefile --windowed --name "FileSorter" main.py
 ```
 
 - `--onefile` → single .exe file (no extra DLLs)
@@ -32,7 +32,7 @@ makensis installer.nsi
 
 ```nsi
 !define APP_NAME "FileSorter"
-!define APP_VERSION "3.0.0"
+!define APP_VERSION "3.2.0"
 !define PUBLISHER "Dr. Hajiabadi"
 !define EXE_NAME "FileSorter.exe"
 !define INSTALL_DIR "$PROGRAMFILES\FileSorter"

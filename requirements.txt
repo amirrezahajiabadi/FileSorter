@@ -1,6 +1,10 @@
-# File Sorter uses only Python standard library modules.
+# File Sorter uses only Python standard library modules to run.
 # No third-party packages are required to run the application.
 #
 # To build a standalone .exe with PyInstaller:
 #   pip install pyinstaller
-#   pyinstaller --onefile --windowed --clean --name "FileSorter" file_sorter_app.py
+#   pyinstaller --onefile --windowed --clean --name "FileSorter" main.py
+#
+# To run the test suite (dev-only dependency):
+#   pip install pytest
+#   pytest
