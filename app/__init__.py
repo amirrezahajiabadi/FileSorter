@@ -1,0 +1,1 @@
+"""File Sorter application package."""
