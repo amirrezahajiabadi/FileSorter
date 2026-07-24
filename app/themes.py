@@ -73,8 +73,3 @@ def configure_ttk_style(theme: dict) -> None:
         background=theme["BG3"], troughcolor=theme["BG"],
         bordercolor=theme["BG"], arrowcolor=theme["FG_DIM"],
     )
-
-
-# ══════════════════════════════════════════════════════════════════
-#  Settings Manager
-# ══════════════════════════════════════════════════════════════════

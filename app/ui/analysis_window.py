@@ -120,8 +120,3 @@ class AnalysisWindow:
     def _proceed(self) -> None:
         self.win.destroy()
         self.on_proceed()
-
-
-# ══════════════════════════════════════════════════════════════════
-#  Main Application
-# ══════════════════════════════════════════════════════════════════

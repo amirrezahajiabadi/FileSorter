@@ -27,8 +27,3 @@ def save_settings(settings: dict) -> None:
             json.dump(settings, f, indent=2, ensure_ascii=False)
     except Exception:
         pass
-
-
-# ══════════════════════════════════════════════════════════════════
-#  Core Logic (unchanged from v2.0)
-# ══════════════════════════════════════════════════════════════════

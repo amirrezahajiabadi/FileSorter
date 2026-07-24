@@ -90,8 +90,3 @@ def format_size(bytes_val: float) -> str:
             return f"{bytes_val:.1f} {unit}"
         bytes_val /= 1024
     return f"{bytes_val:.1f} TB"
-
-
-# ══════════════════════════════════════════════════════════════════
-#  Splash Screen
-# ══════════════════════════════════════════════════════════════════
