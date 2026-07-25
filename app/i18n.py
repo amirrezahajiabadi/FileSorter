@@ -86,6 +86,13 @@ STRINGS = {
         "suggestion_unknown": "❓  Unknown extensions found: {exts}. Add them to Settings → Categories.",
         "suggestion_others": "📁  {n} file(s) will go to 'others'. Open Settings to assign their extensions.",
 
+        "move_checkbox_label": "Move files instead of copying",
+        "move_warning": "⚠  Original files will be removed from their current location. This cannot be undone.",
+        "move_confirm_title": "Confirm Move",
+        "move_confirm_msg": "You're about to MOVE {total} file(s) instead of copying. The originals will no longer be in this folder. Continue?",
+        "moved_label": "✅  Moved:",
+        "moved_log": "✅  Moved:   {name}   →   {category}/",
+
         "lang_toggle_to": "فا",
         "theme_toggle_to_dark": "🌙",
         "theme_toggle_to_light": "☀",
@@ -162,6 +169,13 @@ STRINGS = {
         "suggestion_old": "📅  {n} فایل قدیمی‌تر از ۱ سال پیدا شد. بهتر است آرشیو یا حذف شوند.",
         "suggestion_unknown": "❓  پسوندهای ناشناخته پیدا شد: {exts}. آن‌ها را در تنظیمات → دسته‌بندی‌ها اضافه کنید.",
         "suggestion_others": "📁  {n} فایل به دسته «others» می‌روند. برای دسته‌بندی آن‌ها به تنظیمات مراجعه کنید.",
+
+        "move_checkbox_label": "انتقال فایل‌ها به‌جای کپی",
+        "move_warning": "⚠  فایل‌های اصلی از مکان فعلی‌شان حذف می‌شوند. این عملیات قابل بازگشت نیست.",
+        "move_confirm_title": "تأیید انتقال",
+        "move_confirm_msg": "می‌خواهید {total} فایل را به‌جای کپی، منتقل (Move) کنید. نسخه‌ی اصلی دیگر در این پوشه نخواهد بود. ادامه می‌دهید؟",
+        "moved_label": "✅  منتقل‌شده:",
+        "moved_log": "✅  منتقل شد:   {name}   ←   {category}/",
 
         "lang_toggle_to": "EN",
         "theme_toggle_to_dark": "🌙",

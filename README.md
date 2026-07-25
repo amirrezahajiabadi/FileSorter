@@ -14,6 +14,7 @@ A lightweight desktop application for automatically organizing files into catego
 - Sorts files into categories: `images`, `documents`, `videos`, `audio`, `archives`, `code`, `data`, `ebooks`, `executables`, `fonts`, `others`
 - **⚙ Settings panel** — fully customize categories and file extensions
 - **🔍 Smart Analysis** — see a full report before sorting: file counts, total size, category breakdown
+- **📦 Copy or Move** — sorts by copying (default, safe) or optionally moving files, with a clear warning and confirmation before anything irreversible happens
 - **💡 Smart Suggestions** — flags large files (>100MB), old files (>1 year), and unknown extensions
 - **🌐 Bilingual UI** — full Persian (فارسی) and English support, toggle anytime with one click
 - **🎨 Dark / Light theme** — each mode has its own tuned color palette (Catppuccin Mocha-inspired dark mode) so every button and badge stays legible and "belongs" to that mode
@@ -124,6 +125,7 @@ The `.exe` will be in the `dist/` folder.
 
 ## 📌 Version History
 
+- **v3.4.0** — Added an optional "Move instead of copy" mode in the Analysis window (unchecked/Copy by default), with a warning and a confirmation dialog before any irreversible move happens
 - **v3.3.0** — Added GitHub Actions CI: `pytest` now runs automatically on every push and pull request to `main`, with a status badge in this README
 - **v3.2.0** — Added a pytest suite for `app/sorter.py` (23 tests); fixed a few stray leftover comments from the v3.1.0 refactor; restored docs that had reverted to the old `file_sorter_app.py` filename during a merge
 - **v3.1.0** — Refactored from a single 1200-line file into a proper package (`app/`, `app/ui/`) with clear module boundaries; entry point moved to `main.py`; no functional/UI changes
