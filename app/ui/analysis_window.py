@@ -1,7 +1,7 @@
 """Shows folder analysis report with smart suggestions before sorting."""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from app.i18n import STRINGS, get_font, anchor_for, justify_for
 from app.sorter import format_size, build_suggestions
@@ -15,17 +15,19 @@ class AnalysisWindow:
         self.theme = theme
         self.lang = lang
         self.T = STRINGS[lang]
+        self.report = report
+        self.move_var = tk.BooleanVar(value=False)
 
         self.win = tk.Toplevel(parent)
         self.win.title(self.T["analysis_window_title"])
-        self.win.geometry("580x520")
+        self.win.geometry("580x580")
         self.win.resizable(False, False)
         self.win.configure(bg=theme["BG"])
         self.win.grab_set()
 
         x = parent.winfo_x() + (parent.winfo_width() - 580) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - 520) // 2
-        self.win.geometry(f"580x520+{x}+{y}")
+        y = parent.winfo_y() + (parent.winfo_height() - 580) // 2
+        self.win.geometry(f"580x580+{x}+{y}")
 
         self._build_ui(report)
 
@@ -81,6 +83,29 @@ class AnalysisWindow:
             tk.Label(row, text=T["files_count_suffix"].format(count=count),
                      font=get_font(lang, 9, "bold"), bg=theme["BG3"], fg=color).pack(side="left")
 
+        # ── Move vs Copy option ───────────────────────────────────
+        move_frame = tk.Frame(content, bg=theme["BG"])
+        move_frame.pack(fill="x", pady=(0, 12))
+
+        self.warning_label = tk.Label(
+            move_frame, text=T["move_warning"], font=get_font(lang, 9),
+            bg=theme["BG"], fg=theme["RED"], wraplength=500, justify=justify, anchor=anchor
+        )
+
+        def on_toggle():
+            if self.move_var.get():
+                self.warning_label.pack(fill="x", pady=(4, 0), anchor=anchor)
+            else:
+                self.warning_label.pack_forget()
+
+        move_check = tk.Checkbutton(
+            move_frame, text=T["move_checkbox_label"], variable=self.move_var,
+            command=on_toggle, font=get_font(lang, 10), bg=theme["BG"], fg=theme["FG"],
+            selectcolor=theme["BG3"], activebackground=theme["BG"], activeforeground=theme["FG"],
+            anchor=anchor
+        )
+        move_check.pack(anchor=anchor, fill="x")
+
         # ── Smart suggestions ─────────────────────────────────────
         suggestions = build_suggestions(report, T)
         if suggestions:
@@ -118,5 +143,14 @@ class AnalysisWindow:
                   ).pack(side="right", padx=(0, 8))
 
     def _proceed(self) -> None:
+        move = self.move_var.get()
+        if move:
+            confirmed = messagebox.askyesno(
+                self.T["move_confirm_title"],
+                self.T["move_confirm_msg"].format(total=self.report["total"]),
+                parent=self.win,
+            )
+            if not confirmed:
+                return
         self.win.destroy()
-        self.on_proceed()
+        self.on_proceed(move)

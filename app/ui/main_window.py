@@ -137,6 +137,7 @@ class FileSorterApp:
 
         cbar = tk.Frame(bottom, bg=theme["BG"])
         cbar.pack(fill="x", pady=(0, 8))
+        self.processed_label_widget = None
         for label, var, color in [
             (T["copied_label"],  self.count_ok,   theme["GREEN"]),
             (T["skipped_label"], self.count_skip, theme["YELLOW"]),
@@ -144,8 +145,11 @@ class FileSorterApp:
         ]:
             cell = tk.Frame(cbar, bg=theme["BG2"], padx=12, pady=6)
             cell.pack(side="left", expand=True, fill="x", padx=(0, 6))
-            tk.Label(cell, text=label, font=get_font(lang, 9),
-                     bg=theme["BG2"], fg=theme["FG_DIM"]).pack(side="left")
+            label_widget = tk.Label(cell, text=label, font=get_font(lang, 9),
+                     bg=theme["BG2"], fg=theme["FG_DIM"])
+            label_widget.pack(side="left")
+            if label == T["copied_label"]:
+                self.processed_label_widget = label_widget
             tk.Label(cell, textvariable=var, font=get_font(lang, 11, "bold"),
                      bg=theme["BG2"], fg=color).pack(side="right")
 
@@ -256,22 +260,32 @@ class FileSorterApp:
             self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
             self.root.after(0, lambda: AnalysisWindow(
                 self.root, report, self.theme, self.lang,
-                on_proceed=lambda: self._start_sort(path)
+                on_proceed=lambda move: self._start_sort(path, move)
             ))
 
         threading.Thread(target=run_analysis, daemon=True).start()
 
-    def _start_sort(self, path: str) -> None:
+    def _start_sort(self, path: str, move: bool = False) -> None:
         self.clear_log()
         self.count_ok.set(0)
         self.count_skip.set(0)
         self.count_err.set(0)
+        if self.processed_label_widget is not None:
+            self.processed_label_widget.config(
+                text=self.T["moved_label"] if move else self.T["copied_label"]
+            )
         self.sort_btn.configure(state="disabled", text=self.T["sorting_btn"])
         self.progress.start(10)
-        threading.Thread(target=self.run_sort, args=(path,), daemon=True).start()
+        threading.Thread(target=self.run_sort, args=(path, move), daemon=True).start()
 
-    def run_sort(self, path_str: str) -> None:
-        """Sort files into category subfolders inside a 'sorted' directory."""
+    def run_sort(self, path_str: str, move: bool = False) -> None:
+        """Sort files into category subfolders inside a 'sorted' directory.
+
+        Args:
+            path_str: The folder to sort.
+            move: If True, files are moved (removed from source). If False
+                (default), files are copied and the originals are kept.
+        """
         T = self.T
         base_dir   = Path(path_str)
         target_dir = base_dir / "sorted"
@@ -297,8 +311,12 @@ class FileSorterApp:
                     continue
 
                 try:
-                    shutil.copy2(file, dest)
-                    self.log("ok", T["copied_log"].format(name=file.name, category=category))
+                    if move:
+                        shutil.move(str(file), str(dest))
+                        self.log("ok", T["moved_log"].format(name=file.name, category=category))
+                    else:
+                        shutil.copy2(file, dest)
+                        self.log("ok", T["copied_log"].format(name=file.name, category=category))
                     copied += 1
                     self.count_ok.set(copied)
                 except Exception as e:
