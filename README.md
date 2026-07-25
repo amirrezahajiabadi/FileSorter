@@ -1,5 +1,7 @@
 # 📁 File Sorter
 
+[![Tests](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml/badge.svg)](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml)
+
 A lightweight desktop application for automatically organizing files into categorized folders — with customizable rules, smart pre-sort analysis, full bilingual support, and Dark/Light themes.
 
 **Developed by Theamirreza**
@@ -50,6 +52,9 @@ As of v3.1.0, the app is organized as a proper Python package instead of one lar
 
 ```
 FileSorter/
+├── .github/
+│   └── workflows/
+│       └── tests.yml             # CI — runs pytest on every push/PR
 ├── main.py                      # entry point — run this
 ├── app/
 │   ├── constants.py              # APP_VERSION, default categories, thresholds
@@ -81,6 +86,8 @@ pytest
 ```
 
 Tests cover `app/sorter.py` (categorization, folder analysis, suggestions, size formatting) since it's pure logic with no UI dependency.
+
+These same tests run automatically on every push and pull request via [GitHub Actions](.github/workflows/tests.yml) — see the badge at the top of this page.
 
 ---
 
@@ -117,6 +124,7 @@ The `.exe` will be in the `dist/` folder.
 
 ## 📌 Version History
 
+- **v3.3.0** — Added GitHub Actions CI: `pytest` now runs automatically on every push and pull request to `main`, with a status badge in this README
 - **v3.2.0** — Added a pytest suite for `app/sorter.py` (23 tests); fixed a few stray leftover comments from the v3.1.0 refactor; restored docs that had reverted to the old `file_sorter_app.py` filename during a merge
 - **v3.1.0** — Refactored from a single 1200-line file into a proper package (`app/`, `app/ui/`) with clear module boundaries; entry point moved to `main.py`; no functional/UI changes
 - **v3.0.0** — Bilingual UI (Persian/English), Dark/Light theme system with tuned palettes, full widget rebuild on toggle, settings now persist language & theme
