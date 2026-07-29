@@ -90,3 +90,84 @@ def format_size(bytes_val: float) -> str:
             return f"{bytes_val:.1f} {unit}"
         bytes_val /= 1024
     return f"{bytes_val:.1f} TB"
+
+
+def resolve_duplicate(dest: Path, mode: str, reserved: set) -> tuple:
+    """Decide what should happen to a destination path that may collide.
+
+    This is the single source of truth for duplicate handling, used by
+    both the dry-run preview (plan_sort) and the real sort (run_sort) —
+    so the preview can never show something different from what actually
+    happens.
+
+    Args:
+        dest: The destination path a file would normally be copied/moved to.
+        mode: One of "skip", "rename", "overwrite".
+        reserved: A set of Paths already claimed during this run (so two
+            different source files that collide on the same category
+            don't get assigned the same renamed destination).
+
+    Returns:
+        A (action, final_dest) tuple where action is one of:
+        "ok" (no conflict), "skip", "rename", or "overwrite".
+    """
+    if dest not in reserved and not dest.exists():
+        reserved.add(dest)
+        return "ok", dest
+
+    if mode == "skip":
+        return "skip", dest
+
+    if mode == "overwrite":
+        reserved.add(dest)
+        return "overwrite", dest
+
+    # mode == "rename": find the first free "name (1).ext", "name (2).ext", ...
+    stem, suffix = dest.stem, dest.suffix
+    i = 1
+    candidate = dest
+    while candidate in reserved or candidate.exists():
+        candidate = dest.with_name(f"{stem} ({i}){suffix}")
+        i += 1
+    reserved.add(candidate)
+    return "rename", candidate
+
+
+def plan_sort(base_dir: Path, categories: dict, duplicate_mode: str = "skip") -> list:
+    """Compute what a real sort would do, without touching the filesystem.
+
+    Args:
+        base_dir: The folder to sort.
+        categories: Category -> extensions mapping.
+        duplicate_mode: "skip", "rename", or "overwrite" (see resolve_duplicate).
+
+    Returns:
+        A list of dicts, one per file found, each with:
+        source (full Path), final_dest (full Path), name, category,
+        action ("ok"/"skip"/"rename"/"overwrite"), and final_name (the
+        name it would actually be saved as).
+    """
+    target_dir = base_dir / "sorted"
+    reserved = set()
+    plan = []
+
+    for file in sorted(base_dir.rglob("*")):
+        if target_dir in file.parents:
+            continue
+        if not file.is_file():
+            continue
+
+        category = get_category(file.suffix, categories)
+        dest = target_dir / category / file.name
+        action, final_dest = resolve_duplicate(dest, duplicate_mode, reserved)
+
+        plan.append({
+            "source": file,
+            "final_dest": final_dest,
+            "name": file.name,
+            "category": category,
+            "action": action,
+            "final_name": final_dest.name,
+        })
+
+    return plan

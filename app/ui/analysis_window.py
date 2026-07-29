@@ -2,32 +2,38 @@
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+from pathlib import Path
 
 from app.i18n import STRINGS, get_font, anchor_for, justify_for
-from app.sorter import format_size, build_suggestions
+from app.sorter import format_size, build_suggestions, plan_sort
+from app.ui.preview_window import PreviewWindow
 
 
 class AnalysisWindow:
     """Shows folder analysis report with smart suggestions before sorting."""
 
-    def __init__(self, parent: tk.Tk, report: dict, theme: dict, lang: str, on_proceed):
+    def __init__(self, parent: tk.Tk, report: dict, theme: dict, lang: str,
+                 base_dir: Path, categories: dict, on_proceed):
         self.on_proceed = on_proceed
         self.theme = theme
         self.lang = lang
         self.T = STRINGS[lang]
         self.report = report
+        self.base_dir = base_dir
+        self.categories = categories
         self.move_var = tk.BooleanVar(value=False)
+        self.duplicate_mode_var = tk.StringVar(value="skip")
 
         self.win = tk.Toplevel(parent)
         self.win.title(self.T["analysis_window_title"])
-        self.win.geometry("580x580")
+        self.win.geometry("580x660")
         self.win.resizable(False, False)
         self.win.configure(bg=theme["BG"])
         self.win.grab_set()
 
         x = parent.winfo_x() + (parent.winfo_width() - 580) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - 580) // 2
-        self.win.geometry(f"580x580+{x}+{y}")
+        y = parent.winfo_y() + (parent.winfo_height() - 660) // 2
+        self.win.geometry(f"580x660+{x}+{y}")
 
         self._build_ui(report)
 
@@ -106,6 +112,36 @@ class AnalysisWindow:
         )
         move_check.pack(anchor=anchor, fill="x")
 
+        # ── Duplicate handling option ──────────────────────────────
+        dup_frame = tk.Frame(content, bg=theme["BG"])
+        dup_frame.pack(fill="x", pady=(0, 12))
+
+        tk.Label(dup_frame, text=T["duplicate_mode_label"], font=get_font(lang, 10, "bold"),
+                 bg=theme["BG"], fg=theme["FG_DIM"], anchor=anchor).pack(anchor=anchor, fill="x")
+
+        dup_options = tk.Frame(dup_frame, bg=theme["BG"])
+        dup_options.pack(anchor=anchor, fill="x", pady=(2, 0))
+
+        for value, label_key in [
+            ("skip", "duplicate_mode_skip"),
+            ("rename", "duplicate_mode_rename"),
+            ("overwrite", "duplicate_mode_overwrite"),
+        ]:
+            tk.Radiobutton(
+                dup_options, text=T[label_key], value=value, variable=self.duplicate_mode_var,
+                font=get_font(lang, 9), bg=theme["BG"], fg=theme["FG"],
+                selectcolor=theme["BG3"], activebackground=theme["BG"], activeforeground=theme["FG"],
+                anchor=anchor
+            ).pack(anchor=anchor, fill="x")
+
+        # ── Dry run preview button ─────────────────────────────────
+        tk.Button(
+            content, text=T["dry_run_btn"], command=self._show_preview,
+            font=get_font(lang, 9, "bold"), bg=theme["BG2"], fg=theme["CYAN"],
+            relief="flat", padx=10, pady=6, cursor="hand2",
+            activebackground=theme["BG3"], activeforeground=theme["CYAN"]
+        ).pack(anchor=anchor, pady=(0, 12))
+
         # ── Smart suggestions ─────────────────────────────────────
         suggestions = build_suggestions(report, T)
         if suggestions:
@@ -142,8 +178,13 @@ class AnalysisWindow:
                   activebackground=theme["BG"], activeforeground=theme["FG"]
                   ).pack(side="right", padx=(0, 8))
 
+    def _show_preview(self) -> None:
+        plan = plan_sort(self.base_dir, self.categories, self.duplicate_mode_var.get())
+        PreviewWindow(self.win, plan, self.theme, self.lang)
+
     def _proceed(self) -> None:
         move = self.move_var.get()
+        duplicate_mode = self.duplicate_mode_var.get()
         if move:
             confirmed = messagebox.askyesno(
                 self.T["move_confirm_title"],
@@ -153,4 +194,4 @@ class AnalysisWindow:
             if not confirmed:
                 return
         self.win.destroy()
-        self.on_proceed(move)
+        self.on_proceed(move, duplicate_mode)

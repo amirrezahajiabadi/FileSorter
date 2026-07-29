@@ -8,7 +8,7 @@ import threading
 
 from app.constants import APP_VERSION, DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings
-from app.sorter import get_category, analyze_folder
+from app.sorter import analyze_folder, plan_sort
 from app.i18n import STRINGS, get_font, anchor_for, justify_for
 from app.themes import THEMES, configure_ttk_style
 from app.ui.splash import SplashScreen
@@ -34,6 +34,7 @@ class FileSorterApp:
         self.count_ok     = tk.IntVar(value=0)
         self.count_skip   = tk.IntVar(value=0)
         self.count_err    = tk.IntVar(value=0)
+        self.last_sort_log = []  # for Undo: list of {"action": "moved"/"copied", "source": Path, "final_dest": Path}
 
         configure_ttk_style(self.theme)
         self.root.configure(bg=self.theme["BG"])
@@ -164,6 +165,15 @@ class FileSorterApp:
         )
         self.sort_btn.pack(fill="x")
 
+        self.undo_btn = tk.Button(
+            bottom, text=T["undo_btn"], command=self.undo_last_sort,
+            font=get_font(lang, 9), bg=theme["BG3"], fg=theme["FG_DIM"],
+            relief="flat", pady=6, cursor="hand2",
+            activebackground=theme["BG"], activeforeground=theme["FG"],
+            state="normal" if self.last_sort_log else "disabled"
+        )
+        self.undo_btn.pack(fill="x", pady=(6, 0))
+
         # Folder selector
         dir_frame = tk.Frame(self.root, bg=theme["BG"], pady=14, padx=24)
         dir_frame.pack(fill="x", side="top")
@@ -259,13 +269,13 @@ class FileSorterApp:
             self.progress.stop()
             self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
             self.root.after(0, lambda: AnalysisWindow(
-                self.root, report, self.theme, self.lang,
-                on_proceed=lambda move: self._start_sort(path, move)
+                self.root, report, self.theme, self.lang, Path(path), self.categories,
+                on_proceed=lambda move, duplicate_mode: self._start_sort(path, move, duplicate_mode)
             ))
 
         threading.Thread(target=run_analysis, daemon=True).start()
 
-    def _start_sort(self, path: str, move: bool = False) -> None:
+    def _start_sort(self, path: str, move: bool = False, duplicate_mode: str = "skip") -> None:
         self.clear_log()
         self.count_ok.set(0)
         self.count_skip.set(0)
@@ -275,62 +285,109 @@ class FileSorterApp:
                 text=self.T["moved_label"] if move else self.T["copied_label"]
             )
         self.sort_btn.configure(state="disabled", text=self.T["sorting_btn"])
+        self.undo_btn.configure(state="disabled")
         self.progress.start(10)
-        threading.Thread(target=self.run_sort, args=(path, move), daemon=True).start()
+        threading.Thread(target=self.run_sort, args=(path, move, duplicate_mode), daemon=True).start()
 
-    def run_sort(self, path_str: str, move: bool = False) -> None:
+    def run_sort(self, path_str: str, move: bool = False, duplicate_mode: str = "skip") -> None:
         """Sort files into category subfolders inside a 'sorted' directory.
+
+        Uses plan_sort() to decide what happens to every file (including
+        duplicate handling) — the exact same function the Dry Run preview
+        uses — so execution can never diverge from what was previewed.
 
         Args:
             path_str: The folder to sort.
             move: If True, files are moved (removed from source). If False
                 (default), files are copied and the originals are kept.
+            duplicate_mode: "skip" (default), "rename", or "overwrite" —
+                what to do when a destination file already exists.
         """
         T = self.T
         base_dir   = Path(path_str)
         target_dir = base_dir / "sorted"
+        sort_log = []  # for Undo
         try:
             for category in self.categories:
                 (target_dir / category).mkdir(parents=True, exist_ok=True)
 
+            plan = plan_sort(base_dir, self.categories, duplicate_mode)
+
             copied = skipped = errors = 0
 
-            for file in base_dir.rglob("*"):
-                if target_dir in file.parents:
-                    continue
-                if not file.is_file():
-                    continue
+            for item in plan:
+                source, final_dest = item["source"], item["final_dest"]
+                action, category = item["action"], item["category"]
 
-                category = get_category(file.suffix, self.categories)
-                dest = target_dir / category / file.name
-
-                if dest.exists():
-                    self.log("skip", T["skipped_log"].format(name=file.name))
+                if action == "skip":
+                    self.log("skip", T["skipped_log"].format(name=item["name"]))
                     skipped += 1
                     self.count_skip.set(skipped)
                     continue
 
                 try:
                     if move:
-                        shutil.move(str(file), str(dest))
-                        self.log("ok", T["moved_log"].format(name=file.name, category=category))
+                        shutil.move(str(source), str(final_dest))
+                        self.log("ok", T["moved_log"].format(name=item["final_name"], category=category))
+                        sort_log.append({"action": "moved", "source": source, "final_dest": final_dest})
                     else:
-                        shutil.copy2(file, dest)
-                        self.log("ok", T["copied_log"].format(name=file.name, category=category))
+                        shutil.copy2(source, final_dest)
+                        self.log("ok", T["copied_log"].format(name=item["final_name"], category=category))
+                        sort_log.append({"action": "copied", "source": source, "final_dest": final_dest})
                     copied += 1
                     self.count_ok.set(copied)
                 except Exception as e:
-                    self.log("error", T["error_log"].format(name=file.name, error=e))
+                    self.log("error", T["error_log"].format(name=item["name"], error=e))
                     errors += 1
                     self.count_err.set(errors)
 
             self.log("done", T["done_log"].format(copied=copied, skipped=skipped, errors=errors, target=target_dir))
+
+            self.last_sort_log = sort_log
+            self.root.after(0, lambda: self.undo_btn.configure(
+                state="normal" if sort_log else "disabled"
+            ))
 
         except Exception as e:
             self.log("error", T["fatal_error_log"].format(error=e))
         finally:
             self.progress.stop()
             self.sort_btn.configure(state="normal", text=T["analyze_btn"])
+
+    def undo_last_sort(self) -> None:
+        """Reverse the last sort: move files back, delete copies made by this app."""
+        T = self.T
+        if not self.last_sort_log:
+            messagebox.showinfo(T["undo_nothing_title"], T["undo_nothing_msg"])
+            return
+
+        confirmed = messagebox.askyesno(T["undo_confirm_title"], T["undo_confirm_msg"])
+        if not confirmed:
+            return
+
+        self.clear_log()
+        restored = removed = failed = 0
+
+        for entry in reversed(self.last_sort_log):
+            source, final_dest = entry["source"], entry["final_dest"]
+            try:
+                if entry["action"] == "moved":
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(final_dest), str(source))
+                    self.log("ok", T["undo_restored_log"].format(name=source.name))
+                    restored += 1
+                else:  # "copied"
+                    if final_dest.exists():
+                        final_dest.unlink()
+                    self.log("skip", T["undo_removed_log"].format(name=final_dest.name))
+                    removed += 1
+            except Exception as e:
+                self.log("error", T["undo_failed_log"].format(name=final_dest.name, error=e))
+                failed += 1
+
+        self.log("done", T["undo_done_log"].format(restored=restored, removed=removed, failed=failed))
+        self.last_sort_log = []
+        self.undo_btn.configure(state="disabled")
 
     def log(self, tag: str, message: str) -> None:
         self.log_box.configure(state="normal")
