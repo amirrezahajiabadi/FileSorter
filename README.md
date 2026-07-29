@@ -58,7 +58,8 @@ As of v3.1.0, the app is organized as a proper Python package instead of one lar
 FileSorter/
 ├── .github/
 │   └── workflows/
-│       └── tests.yml             # CI — runs pytest on every push/PR
+│       ├── tests.yml             # CI — runs pytest on every push/PR
+│       └── release.yml           # builds .exe + publishes a Release on version tags
 ├── main.py                      # entry point — run this
 ├── app/
 │   ├── constants.py              # APP_VERSION, default categories, thresholds
@@ -126,10 +127,28 @@ pyinstaller --onefile --windowed --clean --name "FileSorter" main.py
 
 The `.exe` will be in the `dist/` folder.
 
+This manual build is mainly useful for local testing. For an official release, see below — it's automated.
+
+---
+
+## 🚀 Releasing a New Version
+
+Pushing a version tag builds `FileSorter.exe` and publishes a GitHub Release automatically — no manual PyInstaller build or file upload needed.
+
+```bash
+git checkout main
+git pull origin main
+git tag v3.6.0
+git push origin v3.6.0
+```
+
+**The tag must exactly match `v` + three dot-separated numbers** (e.g. `v3.6.0`) — anything else (`V.3.6`, `v3.6`, `version1`) will not trigger the [Build & Release workflow](.github/workflows/release.yml). Check progress under the repo's **Actions** tab; when it finishes, the new release with `FileSorter.exe` attached appears under **Releases**.
+
 ---
 
 ## 📌 Version History
 
+- **v3.6.0** — Added an automated Build & Release workflow: pushing a version tag (e.g. `v3.6.0`) runs the tests, builds `FileSorter.exe`, and publishes a GitHub Release with the exe attached — no more manual PyInstaller builds or file uploads
 - **v3.5.0** — Added duplicate-handling modes (Skip/Rename/Overwrite), a Dry Run preview that shows the exact planned outcome before sorting, and an Undo button that reverses the last sort. Preview and real execution now share one function (`plan_sort`) so they can never disagree.
 - **v3.4.0** — Added an optional "Move instead of copy" mode in the Analysis window (unchecked/Copy by default), with a warning and a confirmation dialog before any irreversible move happens
 - **v3.3.0** — Added GitHub Actions CI: `pytest` now runs automatically on every push and pull request to `main`, with a status badge in this README

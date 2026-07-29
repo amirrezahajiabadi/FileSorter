@@ -1,0 +1,44 @@
+name: Build & Release
+
+# Runs whenever a tag like v3.6.0 is pushed. Tag MUST follow this exact
+# lowercase "v" + three dot-separated numbers pattern (semantic
+# versioning) or the workflow will not trigger.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# Needed so this workflow is allowed to create a Release.
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build Windows executable
+        run: pyinstaller --onefile --windowed --clean --name "FileSorter" main.py
+
+      - name: Create GitHub Release with the .exe attached
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/FileSorter.exe
+          generate_release_notes: true
