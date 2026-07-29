@@ -15,6 +15,9 @@ A lightweight desktop application for automatically organizing files into catego
 - **⚙ Settings panel** — fully customize categories and file extensions
 - **🔍 Smart Analysis** — see a full report before sorting: file counts, total size, category breakdown
 - **📦 Copy or Move** — sorts by copying (default, safe) or optionally moving files, with a clear warning and confirmation before anything irreversible happens
+- **🔁 Duplicate handling** — choose Skip (default), Rename (keeps both), or Overwrite when a destination file already exists
+- **🔍 Dry Run preview** — see exactly what a sort would do (including duplicate resolution) before anything is touched
+- **↩ Undo last sort** — reverses the previous sort: restores moved files, deletes copies made by the app (files overwritten as duplicates can't be restored)
 - **💡 Smart Suggestions** — flags large files (>100MB), old files (>1 year), and unknown extensions
 - **🌐 Bilingual UI** — full Persian (فارسی) and English support, toggle anytime with one click
 - **🎨 Dark / Light theme** — each mode has its own tuned color palette (Catppuccin Mocha-inspired dark mode) so every button and badge stays legible and "belongs" to that mode
@@ -67,9 +70,11 @@ FileSorter/
 │       ├── splash.py             # startup splash screen
 │       ├── settings_window.py    # category/extension editor
 │       ├── analysis_window.py    # pre-sort report window
+│       ├── preview_window.py     # dry-run preview window
 │       └── main_window.py        # FileSorterApp — the main window
 ├── tests/
 │   └── test_sorter.py            # pytest suite for app/sorter.py
+│   └── test_duplicate_handling.py # pytest suite for resolve_duplicate/plan_sort
 ├── requirements.txt
 ├── build_installer.md
 └── README.md
@@ -125,6 +130,7 @@ The `.exe` will be in the `dist/` folder.
 
 ## 📌 Version History
 
+- **v3.5.0** — Added duplicate-handling modes (Skip/Rename/Overwrite), a Dry Run preview that shows the exact planned outcome before sorting, and an Undo button that reverses the last sort. Preview and real execution now share one function (`plan_sort`) so they can never disagree.
 - **v3.4.0** — Added an optional "Move instead of copy" mode in the Analysis window (unchecked/Copy by default), with a warning and a confirmation dialog before any irreversible move happens
 - **v3.3.0** — Added GitHub Actions CI: `pytest` now runs automatically on every push and pull request to `main`, with a status badge in this README
 - **v3.2.0** — Added a pytest suite for `app/sorter.py` (23 tests); fixed a few stray leftover comments from the v3.1.0 refactor; restored docs that had reverted to the old `file_sorter_app.py` filename during a merge
