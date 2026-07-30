@@ -3,6 +3,8 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from pathlib import Path
+import threading
+import queue
 
 from app.i18n import STRINGS, get_font, anchor_for, justify_for
 from app.sorter import format_size, build_suggestions, plan_sort
@@ -135,12 +137,13 @@ class AnalysisWindow:
             ).pack(anchor=anchor, fill="x")
 
         # ── Dry run preview button ─────────────────────────────────
-        tk.Button(
+        self.dry_run_btn = tk.Button(
             content, text=T["dry_run_btn"], command=self._show_preview,
             font=get_font(lang, 9, "bold"), bg=theme["BG2"], fg=theme["CYAN"],
             relief="flat", padx=10, pady=6, cursor="hand2",
             activebackground=theme["BG3"], activeforeground=theme["CYAN"]
-        ).pack(anchor=anchor, pady=(0, 12))
+        )
+        self.dry_run_btn.pack(anchor=anchor, pady=(0, 12))
 
         # ── Smart suggestions ─────────────────────────────────────
         suggestions = build_suggestions(report, T)
@@ -179,7 +182,29 @@ class AnalysisWindow:
                   ).pack(side="right", padx=(0, 8))
 
     def _show_preview(self) -> None:
-        plan = plan_sort(self.base_dir, self.categories, self.duplicate_mode_var.get())
+        self.dry_run_btn.configure(state="disabled")
+        base_dir = self.base_dir
+        categories = self.categories
+        duplicate_mode = self.duplicate_mode_var.get()
+        result_queue = queue.Queue()
+
+        def compute():
+            plan = plan_sort(base_dir, categories, duplicate_mode)
+            result_queue.put(plan)
+
+        threading.Thread(target=compute, daemon=True).start()
+        self.win.after(50, lambda: self._poll_preview_queue(result_queue))
+
+    def _poll_preview_queue(self, q: "queue.Queue") -> None:
+        """Runs on the main thread only — see FileSorterApp._poll_sort_queue()
+        for why the worker thread never touches Tkinter directly.
+        """
+        try:
+            plan = q.get_nowait()
+        except queue.Empty:
+            self.win.after(50, lambda: self._poll_preview_queue(q))
+            return
+        self.dry_run_btn.configure(state="normal")
         PreviewWindow(self.win, plan, self.theme, self.lang)
 
     def _proceed(self) -> None:
