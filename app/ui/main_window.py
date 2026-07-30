@@ -5,6 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 import shutil
 import threading
+import queue
 
 from app.constants import APP_VERSION, DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings
@@ -264,16 +265,29 @@ class FileSorterApp:
         self.sort_btn.configure(state="disabled", text=self.T["analyzing_btn"])
         self.progress.start(10)
 
-        def run_analysis():
-            report = analyze_folder(Path(path), self.categories)
-            self.progress.stop()
-            self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
-            self.root.after(0, lambda: AnalysisWindow(
-                self.root, report, self.theme, self.lang, Path(path), self.categories,
-                on_proceed=lambda move, duplicate_mode: self._start_sort(path, move, duplicate_mode)
-            ))
+        analysis_queue = queue.Queue()
 
-        threading.Thread(target=run_analysis, daemon=True).start()
+        def analysis_worker():
+            report = analyze_folder(Path(path), self.categories)
+            analysis_queue.put(report)
+
+        threading.Thread(target=analysis_worker, daemon=True).start()
+        self.root.after(50, lambda: self._poll_analysis_queue(analysis_queue, path))
+
+    def _poll_analysis_queue(self, q: queue.Queue, path: str) -> None:
+        """Runs on the main thread only. See _poll_sort_queue()."""
+        try:
+            report = q.get_nowait()
+        except queue.Empty:
+            self.root.after(50, lambda: self._poll_analysis_queue(q, path))
+            return
+
+        self.progress.stop()
+        self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
+        AnalysisWindow(
+            self.root, report, self.theme, self.lang, Path(path), self.categories,
+            on_proceed=lambda move, duplicate_mode: self._start_sort(path, move, duplicate_mode)
+        )
 
     def _start_sort(self, path: str, move: bool = False, duplicate_mode: str = "skip") -> None:
         self.clear_log()
@@ -287,10 +301,21 @@ class FileSorterApp:
         self.sort_btn.configure(state="disabled", text=self.T["sorting_btn"])
         self.undo_btn.configure(state="disabled")
         self.progress.start(10)
-        threading.Thread(target=self.run_sort, args=(path, move, duplicate_mode), daemon=True).start()
 
-    def run_sort(self, path_str: str, move: bool = False, duplicate_mode: str = "skip") -> None:
+        sort_queue = queue.Queue()
+        threading.Thread(target=self._sort_worker, args=(path, move, duplicate_mode, sort_queue), daemon=True).start()
+        self.root.after(50, lambda: self._poll_sort_queue(sort_queue))
+
+    def _sort_worker(self, path_str: str, move: bool, duplicate_mode: str, q: queue.Queue) -> None:
         """Sort files into category subfolders inside a 'sorted' directory.
+
+        Runs entirely on a background thread and NEVER touches Tkinter —
+        not even via root.after() — since that turned out to be unsafe to
+        call from a non-main thread in practice (observed to silently stop
+        after a single file on larger folders). Instead, every update is
+        put on a thread-safe queue.Queue and only ever read by the main
+        thread in _poll_sort_queue(), which is the one place actually
+        allowed to touch widgets.
 
         Uses plan_sort() to decide what happens to every file (including
         duplicate handling) — the exact same function the Dry Run preview
@@ -302,6 +327,7 @@ class FileSorterApp:
                 (default), files are copied and the originals are kept.
             duplicate_mode: "skip" (default), "rename", or "overwrite" —
                 what to do when a destination file already exists.
+            q: Queue this worker reports progress on.
         """
         T = self.T
         base_dir   = Path(path_str)
@@ -320,42 +346,74 @@ class FileSorterApp:
                 action, category = item["action"], item["category"]
 
                 if action == "skip":
-                    self.log("skip", T["skipped_log"].format(name=item["name"]))
+                    q.put(("log", "skip", T["skipped_log"].format(name=item["name"])))
                     skipped += 1
-                    self.count_skip.set(skipped)
+                    q.put(("count_skip", skipped))
                     continue
 
                 try:
                     if move:
                         shutil.move(str(source), str(final_dest))
-                        self.log("ok", T["moved_log"].format(name=item["final_name"], category=category))
+                        q.put(("log", "ok", T["moved_log"].format(name=item["final_name"], category=category)))
                         sort_log.append({"action": "moved", "source": source, "final_dest": final_dest})
                     else:
                         shutil.copy2(source, final_dest)
-                        self.log("ok", T["copied_log"].format(name=item["final_name"], category=category))
+                        q.put(("log", "ok", T["copied_log"].format(name=item["final_name"], category=category)))
                         sort_log.append({"action": "copied", "source": source, "final_dest": final_dest})
                     copied += 1
-                    self.count_ok.set(copied)
+                    q.put(("count_ok", copied))
                 except Exception as e:
-                    self.log("error", T["error_log"].format(name=item["name"], error=e))
+                    q.put(("log", "error", T["error_log"].format(name=item["name"], error=e)))
                     errors += 1
-                    self.count_err.set(errors)
+                    q.put(("count_err", errors))
 
-            self.log("done", T["done_log"].format(copied=copied, skipped=skipped, errors=errors, target=target_dir))
-
-            self.last_sort_log = sort_log
-            self.root.after(0, lambda: self.undo_btn.configure(
-                state="normal" if sort_log else "disabled"
-            ))
+            q.put(("log", "done", T["done_log"].format(copied=copied, skipped=skipped, errors=errors, target=target_dir)))
+            q.put(("sort_log", sort_log))
 
         except Exception as e:
-            self.log("error", T["fatal_error_log"].format(error=e))
+            q.put(("log", "error", T["fatal_error_log"].format(error=e)))
         finally:
+            q.put(("finished", None))
+
+    def _poll_sort_queue(self, q: queue.Queue) -> None:
+        """Runs on the main thread only. Drains messages the worker put on
+        the queue and applies them to widgets, then reschedules itself
+        until the worker signals it's finished.
+        """
+        finished = False
+        try:
+            while True:
+                msg = q.get_nowait()
+                kind = msg[0]
+                if kind == "log":
+                    self.log(msg[1], msg[2])
+                elif kind == "count_ok":
+                    self.count_ok.set(msg[1])
+                elif kind == "count_skip":
+                    self.count_skip.set(msg[1])
+                elif kind == "count_err":
+                    self.count_err.set(msg[1])
+                elif kind == "sort_log":
+                    self.last_sort_log = msg[1]
+                elif kind == "finished":
+                    finished = True
+        except queue.Empty:
+            pass
+
+        if finished:
             self.progress.stop()
-            self.sort_btn.configure(state="normal", text=T["analyze_btn"])
+            self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
+            self.undo_btn.configure(state="normal" if self.last_sort_log else "disabled")
+        else:
+            self.root.after(50, lambda: self._poll_sort_queue(q))
 
     def undo_last_sort(self) -> None:
-        """Reverse the last sort: move files back, delete copies made by this app."""
+        """Reverse the last sort: move files back, delete copies made by this app.
+
+        Runs on a background thread for the same reason _sort_worker does —
+        undoing a large batch could otherwise freeze the window — and uses
+        the same queue.Queue pattern to stay Tkinter-safe.
+        """
         T = self.T
         if not self.last_sort_log:
             messagebox.showinfo(T["undo_nothing_title"], T["undo_nothing_msg"])
@@ -366,28 +424,60 @@ class FileSorterApp:
             return
 
         self.clear_log()
+        self.undo_btn.configure(state="disabled")
+        self.sort_btn.configure(state="disabled")
+        self.progress.start(10)
+
+        entries = list(self.last_sort_log)
+        undo_queue = queue.Queue()
+        threading.Thread(target=self._undo_worker, args=(entries, undo_queue), daemon=True).start()
+        self.root.after(50, lambda: self._poll_undo_queue(undo_queue))
+
+    def _undo_worker(self, entries: list, q: queue.Queue) -> None:
+        """Background-thread body for undo_last_sort(). Never touches Tkinter."""
+        T = self.T
         restored = removed = failed = 0
 
-        for entry in reversed(self.last_sort_log):
+        for entry in reversed(entries):
             source, final_dest = entry["source"], entry["final_dest"]
             try:
                 if entry["action"] == "moved":
                     source.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(final_dest), str(source))
-                    self.log("ok", T["undo_restored_log"].format(name=source.name))
+                    q.put(("log", "ok", T["undo_restored_log"].format(name=source.name)))
                     restored += 1
                 else:  # "copied"
                     if final_dest.exists():
                         final_dest.unlink()
-                    self.log("skip", T["undo_removed_log"].format(name=final_dest.name))
+                    q.put(("log", "skip", T["undo_removed_log"].format(name=final_dest.name)))
                     removed += 1
             except Exception as e:
-                self.log("error", T["undo_failed_log"].format(name=final_dest.name, error=e))
+                q.put(("log", "error", T["undo_failed_log"].format(name=final_dest.name, error=e)))
                 failed += 1
 
-        self.log("done", T["undo_done_log"].format(restored=restored, removed=removed, failed=failed))
-        self.last_sort_log = []
-        self.undo_btn.configure(state="disabled")
+        q.put(("log", "done", T["undo_done_log"].format(restored=restored, removed=removed, failed=failed)))
+        q.put(("finished", None))
+
+    def _poll_undo_queue(self, q: queue.Queue) -> None:
+        """Runs on the main thread only. See _poll_sort_queue()."""
+        finished = False
+        try:
+            while True:
+                msg = q.get_nowait()
+                if msg[0] == "log":
+                    self.log(msg[1], msg[2])
+                elif msg[0] == "finished":
+                    finished = True
+        except queue.Empty:
+            pass
+
+        if finished:
+            self.last_sort_log = []
+            self.undo_btn.configure(state="disabled")
+            self.progress.stop()
+            self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
+        else:
+            self.root.after(50, lambda: self._poll_undo_queue(q))
 
     def log(self, tag: str, message: str) -> None:
         self.log_box.configure(state="normal")
