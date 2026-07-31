@@ -10,7 +10,8 @@ A lightweight desktop application for automatically organizing files into catego
 
 ## ✨ Features
 
-- Browse and select any folder with a single click
+- Browse and select any folder with a single click, or **drag & drop a folder** onto the window
+- **🕘 Recent folders** — quickly re-pick one of your last 8 sorted folders
 - Sorts files into categories: `images`, `documents`, `videos`, `audio`, `archives`, `code`, `data`, `ebooks`, `executables`, `fonts`, `others`
 - **⚙ Settings panel** — fully customize categories and file extensions
 - **🔍 Smart Analysis** — see a full report before sorting: file counts, total size, category breakdown
@@ -25,7 +26,7 @@ A lightweight desktop application for automatically organizing files into catego
 - Live counter for copied / skipped / error files
 - Skips duplicate files safely (no overwriting)
 - Preserves file metadata (`copy2`)
-- Settings (categories, language, theme) persisted across sessions (`~/.filesorter_settings.json`)
+- Settings (categories, language, theme, recent folders) persisted across sessions (`~/.filesorter_settings.json`)
 - Splash screen with fade-in/out animation
 
 ---
@@ -39,10 +40,13 @@ A lightweight desktop application for automatically organizing files into catego
 ```bash
 git clone https://github.com/amirrezahajiabadi/FileSorter.git
 cd FileSorter
+pip install -r requirements.txt
 python main.py
 ```
 
-No third-party packages required — built entirely with the Python standard library.
+The app is built mostly with the Python standard library. The one dependency,
+[`tkinterdnd2`](https://pypi.org/project/tkinterdnd2/), enables drag & drop —
+it's optional: without it, the app runs the same, just without drag & drop.
 
 ### Download the installer (Windows)
 
@@ -76,6 +80,7 @@ FileSorter/
 ├── tests/
 │   └── test_sorter.py            # pytest suite for app/sorter.py
 │   └── test_duplicate_handling.py # pytest suite for resolve_duplicate/plan_sort
+│   └── test_recent_folders.py    # pytest suite for the recent-folders helper
 ├── requirements.txt
 ├── build_installer.md
 └── README.md
@@ -150,6 +155,7 @@ git push origin v3.6.0
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
 
+- **v3.7.0** — Added drag & drop folder selection and a Recent Folders list (last 8, persisted). First release with a runtime dependency (`tkinterdnd2`, optional — the app still works without it, just without drag & drop)
 - **v3.6.1** — Fixed a bug where sorting large or numerous files could silently stop after processing only a few (or one) file — background operations now communicate with the UI exclusively through a thread-safe queue instead of touching Tkinter directly from a worker thread, which turned out to be unreliable under load. Affects sorting, Undo, and the Dry Run preview.
 - **v3.6.0** — Added an automated Build & Release workflow: pushing a version tag (e.g. `v3.6.0`) runs the tests, builds `FileSorter.exe`, and publishes a GitHub Release with the exe attached — no more manual PyInstaller builds or file uploads
 - **v3.5.0** — Added duplicate-handling modes (Skip/Rename/Overwrite), a Dry Run preview that shows the exact planned outcome before sorting, and an Undo button that reverses the last sort. Preview and real execution now share one function (`plan_sort`) so they can never disagree.

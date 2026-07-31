@@ -6,9 +6,10 @@ from pathlib import Path
 import shutil
 import threading
 import queue
+import os
 
 from app.constants import APP_VERSION, DEFAULT_CATEGORIES
-from app.settings_manager import load_settings, save_settings
+from app.settings_manager import load_settings, save_settings, add_recent_folder
 from app.sorter import analyze_folder, plan_sort
 from app.i18n import STRINGS, get_font, anchor_for, justify_for
 from app.themes import THEMES, configure_ttk_style
@@ -20,16 +21,18 @@ from app.ui.analysis_window import AnalysisWindow
 class FileSorterApp:
     """Main GUI window for the File Sorter application."""
 
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, dnd_available: bool = False):
         self.root = root
+        self.dnd_available = dnd_available
         self.root.resizable(False, False)
         self.root.withdraw()
 
-        # Load persisted settings (categories, language, theme)
-        self.settings   = load_settings()
-        self.categories = self.settings.get("categories", DEFAULT_CATEGORIES.copy())
-        self.lang       = self.settings.get("language", "fa")
-        self.theme_name = self.settings.get("theme", "light")
+        # Load persisted settings (categories, language, theme, recent folders)
+        self.settings       = load_settings()
+        self.categories     = self.settings.get("categories", DEFAULT_CATEGORIES.copy())
+        self.lang           = self.settings.get("language", "fa")
+        self.theme_name     = self.settings.get("theme", "light")
+        self.recent_folders = self.settings.get("recent_folders", [])
 
         self.selected_dir = tk.StringVar(value="")
         self.count_ok     = tk.IntVar(value=0)
@@ -195,11 +198,24 @@ class FileSorterApp:
         self.path_label.pack(side="left", fill="x", expand=True)
 
         tk.Button(
+            path_row, text=T["recent_folders_btn"], command=self._show_recent_folders,
+            font=get_font(lang, 10), bg=theme["BG3"], fg=theme["FG_DIM"],
+            relief="flat", padx=10, pady=9, cursor="hand2",
+            activebackground=theme["BG"], activeforeground=theme["FG"]
+        ).pack(side="right", padx=(6, 0))
+
+        tk.Button(
             path_row, text=T["browse_btn"], command=self.browse_directory,
             font=get_font(lang, 10, "bold"), bg=theme["BLUE"], fg=theme["ON_ACCENT"],
             relief="flat", padx=14, pady=9, cursor="hand2",
             activebackground=theme["ACCENT_HOVER"], activeforeground=theme["ON_ACCENT"]
         ).pack(side="right", padx=(10, 0))
+
+        if self.dnd_available:
+            tk.Label(dir_frame, text=T["drop_zone_hint"],
+                     font=get_font(lang, 8), bg=theme["BG"], fg=theme["FG_DIM"],
+                     anchor=anchor).pack(anchor=anchor, fill="x", pady=(4, 0))
+            self._register_drop_target(self.path_label)
 
         tk.Frame(self.root, bg=theme["BG2"], height=1).pack(fill="x", padx=24, side="top")
 
@@ -244,8 +260,61 @@ class FileSorterApp:
     def browse_directory(self) -> None:
         directory = filedialog.askdirectory(title=self.T["browse_btn"])
         if directory:
-            self.selected_dir.set(directory)
-            self.log("info", self.T["folder_selected_log"].format(path=directory))
+            self._set_folder(directory)
+
+    def _set_folder(self, directory: str) -> None:
+        """Set the selected folder (from Browse, drag & drop, or Recent Folders)
+        and record it in the recent-folders list.
+        """
+        self.selected_dir.set(directory)
+        self.log("info", self.T["folder_selected_log"].format(path=directory))
+        add_recent_folder(self.settings, directory)
+        self.recent_folders = self.settings["recent_folders"]
+        save_settings(self.settings)
+
+    def _register_drop_target(self, widget: tk.Widget) -> None:
+        """Register a widget as a drag & drop target for folders.
+
+        Only called when main.py detected tkinterdnd2 is installed and
+        created the root window as a TkinterDnD.Tk() (dnd_available=True) —
+        the drop_target_register/dnd_bind methods only exist on widgets
+        belonging to that kind of root.
+        """
+        from tkinterdnd2 import DND_FILES
+        widget.drop_target_register(DND_FILES)
+        widget.dnd_bind("<<Drop>>", self._on_drop)
+
+    def _on_drop(self, event) -> None:
+        """Handle a folder being dragged onto the drop zone.
+
+        event.data may contain multiple space-separated paths, and paths
+        with spaces are wrapped in braces (e.g. "{C:/My Folder}") — Tk's
+        splitlist() is the documented way to parse that correctly.
+        """
+        paths = self.root.tk.splitlist(event.data)
+        if not paths:
+            return
+        path = paths[0]
+        if not os.path.isdir(path):
+            messagebox.showwarning(self.T["invalid_drop_title"], self.T["invalid_drop_msg"])
+            return
+        self._set_folder(path)
+
+    def _show_recent_folders(self) -> None:
+        """Show a small popup menu of recently used folders."""
+        menu = tk.Menu(self.root, tearoff=0)
+        if not self.recent_folders:
+            menu.add_command(label=self.T["recent_folders_empty"], state="disabled")
+        else:
+            for path in self.recent_folders:
+                menu.add_command(label=path, command=lambda p=path: self._set_folder(p))
+
+        x = self.root.winfo_pointerx()
+        y = self.root.winfo_pointery()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
 
     def open_settings(self) -> None:
         SettingsWindow(self.root, self.categories, self.theme, self.lang, self._on_settings_save)
