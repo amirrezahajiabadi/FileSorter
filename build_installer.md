@@ -1,8 +1,9 @@
 # Build Guide — FileSorter
 
-## Step 1 — Install PyInstaller
+## Step 1 — Install dependencies
 
 ```bash
+pip install -r requirements.txt
 pip install pyinstaller
 ```
 
@@ -32,7 +33,7 @@ makensis installer.nsi
 
 ```nsi
 !define APP_NAME "FileSorter"
-!define APP_VERSION "3.6.1"
+!define APP_VERSION "3.7.0"
 !define PUBLISHER "Dr. Hajiabadi"
 !define EXE_NAME "FileSorter.exe"
 !define INSTALL_DIR "$PROGRAMFILES\FileSorter"

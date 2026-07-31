@@ -122,6 +122,12 @@ STRINGS = {
         "undo_nothing_title": "Nothing to Undo",
         "undo_nothing_msg": "There's no previous sort to undo.",
 
+        "drop_zone_hint": "or drag & drop a folder here",
+        "recent_folders_btn": "🕘",
+        "recent_folders_empty": "No recent folders yet",
+        "invalid_drop_title": "Invalid Drop",
+        "invalid_drop_msg": "Please drop a single folder (not a file).",
+
         "lang_toggle_to": "فا",
         "theme_toggle_to_dark": "🌙",
         "theme_toggle_to_light": "☀",
@@ -234,6 +240,12 @@ STRINGS = {
         "undo_failed_log": "❌  قابل برگشت نبود:   {name}\n    {error}",
         "undo_nothing_title": "چیزی برای برگردوندن نیست",
         "undo_nothing_msg": "هیچ مرتب‌سازی قبلی‌ای برای برگردوندن وجود نداره.",
+
+        "drop_zone_hint": "یا یک پوشه رو اینجا بکش و رها کن",
+        "recent_folders_btn": "🕘",
+        "recent_folders_empty": "هنوز پوشه‌ی اخیری نیست",
+        "invalid_drop_title": "رها‌سازی نامعتبر",
+        "invalid_drop_msg": "لطفاً فقط یک پوشه رها کنید (نه فایل).",
 
         "lang_toggle_to": "EN",
         "theme_toggle_to_dark": "🌙",
