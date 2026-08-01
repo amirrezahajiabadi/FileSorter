@@ -44,14 +44,84 @@ class AnalysisWindow:
         anchor, justify = anchor_for(lang), justify_for(lang)
 
         header = tk.Frame(self.win, bg=theme["BG2"], pady=12)
-        header.pack(fill="x")
+        header.pack(fill="x", side="top")
         tk.Label(header, text=T["analysis_header"],
                  font=get_font(lang, 14, "bold"), bg=theme["BG2"], fg=theme["FG"]).pack()
         tk.Label(header, text=T["analysis_subheader"],
                  font=get_font(lang, 9), bg=theme["BG2"], fg=theme["FG_DIM"]).pack(pady=(2, 0))
 
-        content = tk.Frame(self.win, bg=theme["BG"], padx=20, pady=14)
-        content.pack(fill="both", expand=True)
+        # ── Bottom buttons ────────────────────────────────────────
+        # Packed BEFORE the scrollable content area (with side="bottom") so
+        # this bar always keeps its space reserved and stays visible, no
+        # matter how tall the content above it grows (e.g. many smart
+        # suggestions). Packing order matters here: an earlier "expand"
+        # widget can otherwise claim all the space before a later sibling
+        # gets a chance to reserve its own.
+        bottom = tk.Frame(self.win, bg=theme["BG2"], pady=10, padx=20)
+        bottom.pack(fill="x", side="bottom")
+
+        tk.Button(bottom, text=T["proceed_btn"],
+                  command=self._proceed,
+                  font=get_font(lang, 11, "bold"), bg=theme["ACCENT"], fg=theme["ON_ACCENT"],
+                  relief="flat", padx=16, pady=9, cursor="hand2",
+                  activebackground=theme["ACCENT_HOVER"], activeforeground=theme["ON_ACCENT"]
+                  ).pack(side="right")
+
+        tk.Button(bottom, text=T["cancel_btn"],
+                  command=self.win.destroy,
+                  font=get_font(lang, 9), bg=theme["BG3"], fg=theme["FG_DIM"],
+                  relief="flat", padx=12, pady=9, cursor="hand2",
+                  activebackground=theme["BG"], activeforeground=theme["FG"]
+                  ).pack(side="right", padx=(0, 8))
+
+        # ── Scrollable content area ─────────────────────────────────
+        # Everything below (stats, categories, move/duplicate options, dry
+        # run button, suggestions) goes inside this canvas instead of
+        # directly in the window, since its total height is unbounded —
+        # it grows with however many suggestions/categories there are.
+        canvas_container = tk.Frame(self.win, bg=theme["BG"])
+        canvas_container.pack(fill="both", expand=True, side="top")
+
+        canvas = tk.Canvas(canvas_container, bg=theme["BG"], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(canvas_container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        content = tk.Frame(canvas, bg=theme["BG"], padx=20, pady=14)
+        content_window = canvas.create_window((0, 0), window=content, anchor="nw")
+
+        def on_content_resize(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        content.bind("<Configure>", on_content_resize)
+
+        def on_canvas_resize(event):
+            canvas.itemconfig(content_window, width=event.width)
+        canvas.bind("<Configure>", on_canvas_resize)
+
+        def on_mousewheel(event):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+            else:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)   # Windows / macOS
+            canvas.bind_all("<Button-4>", on_mousewheel)      # Linux scroll up
+            canvas.bind_all("<Button-5>", on_mousewheel)      # Linux scroll down
+
+        def unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+
+        # Only capture the mouse wheel while the cursor is actually over
+        # this window's scroll area, so it doesn't hijack scrolling
+        # elsewhere in the app.
+        canvas.bind("<Enter>", bind_mousewheel)
+        canvas.bind("<Leave>", unbind_mousewheel)
 
         # ── Summary stats ─────────────────────────────────────────
         stats_row = tk.Frame(content, bg=theme["BG"])
@@ -162,24 +232,6 @@ class AnalysisWindow:
             tk.Label(content, text=T["no_issues"],
                      font=get_font(lang, 10), bg=theme["BG"], fg=theme["GREEN"],
                      anchor=anchor).pack(anchor=anchor, fill="x", pady=8)
-
-        # ── Bottom buttons ────────────────────────────────────────
-        bottom = tk.Frame(self.win, bg=theme["BG2"], pady=10, padx=20)
-        bottom.pack(fill="x", side="bottom")
-
-        tk.Button(bottom, text=T["proceed_btn"],
-                  command=self._proceed,
-                  font=get_font(lang, 11, "bold"), bg=theme["ACCENT"], fg=theme["ON_ACCENT"],
-                  relief="flat", padx=16, pady=9, cursor="hand2",
-                  activebackground=theme["ACCENT_HOVER"], activeforeground=theme["ON_ACCENT"]
-                  ).pack(side="right")
-
-        tk.Button(bottom, text=T["cancel_btn"],
-                  command=self.win.destroy,
-                  font=get_font(lang, 9), bg=theme["BG3"], fg=theme["FG_DIM"],
-                  relief="flat", padx=12, pady=9, cursor="hand2",
-                  activebackground=theme["BG"], activeforeground=theme["FG"]
-                  ).pack(side="right", padx=(0, 8))
 
     def _show_preview(self) -> None:
         self.dry_run_btn.configure(state="disabled")
