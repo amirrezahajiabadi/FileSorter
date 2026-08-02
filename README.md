@@ -24,6 +24,7 @@ A lightweight desktop application for automatically organizing files into catego
 - **🎨 Dark / Light theme** — each mode has its own tuned color palette (Catppuccin Mocha-inspired dark mode) so every button and badge stays legible and "belongs" to that mode
 - Real-time operation log with color-coded status messages
 - Live counter for copied / skipped / error files
+- **Real progress bar** during Sort and Undo — shows percentage and file count, not just a spinner
 - Skips duplicate files safely (no overwriting)
 - Preserves file metadata (`copy2`)
 - Settings (categories, language, theme, recent folders) persisted across sessions (`~/.filesorter_settings.json`)
@@ -155,6 +156,7 @@ git push origin v3.6.0
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
 
+- **v3.8.0** — Replaced the indeterminate "spinning" progress bar with a real one during Sort and Undo: shows an actual percentage and "X / Y files" count, updated live as each file is processed
 - **v3.7.1** — Fixed the Analysis window: when there were enough smart suggestions or categories to exceed the window's fixed height, the "Proceed with Sort" / "Cancel" buttons could get pushed out of view with no way to reach them. The content area now scrolls (mouse wheel supported) while those buttons stay permanently visible at the bottom.
 - **v3.7.0** — Added drag & drop folder selection and a Recent Folders list (last 8, persisted). First release with a runtime dependency (`tkinterdnd2`, optional — the app still works without it, just without drag & drop)
 - **v3.6.1** — Fixed a bug where sorting large or numerous files could silently stop after processing only a few (or one) file — background operations now communicate with the UI exclusively through a thread-safe queue instead of touching Tkinter directly from a worker thread, which turned out to be unreliable under load. Affects sorting, Undo, and the Dry Run preview.

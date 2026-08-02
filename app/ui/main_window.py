@@ -158,6 +158,12 @@ class FileSorterApp:
             tk.Label(cell, textvariable=var, font=get_font(lang, 11, "bold"),
                      bg=theme["BG2"], fg=color).pack(side="right")
 
+        self.progress_label = tk.Label(
+            bottom, text="", font=get_font(lang, 8),
+            bg=theme["BG"], fg=theme["FG_DIM"], anchor=anchor
+        )
+        self.progress_label.pack(fill="x")
+
         self.progress = ttk.Progressbar(bottom, mode="indeterminate")
         self.progress.pack(fill="x", pady=(0, 8))
 
@@ -332,7 +338,9 @@ class FileSorterApp:
             return
 
         self.sort_btn.configure(state="disabled", text=self.T["analyzing_btn"])
+        self.progress.configure(mode="indeterminate")
         self.progress.start(10)
+        self.progress_label.configure(text="")
 
         analysis_queue = queue.Queue()
 
@@ -369,6 +377,7 @@ class FileSorterApp:
             )
         self.sort_btn.configure(state="disabled", text=self.T["sorting_btn"])
         self.undo_btn.configure(state="disabled")
+        self.progress.configure(mode="indeterminate")
         self.progress.start(10)
 
         sort_queue = queue.Queue()
@@ -407,8 +416,9 @@ class FileSorterApp:
                 (target_dir / category).mkdir(parents=True, exist_ok=True)
 
             plan = plan_sort(base_dir, self.categories, duplicate_mode)
+            q.put(("total", len(plan)))
 
-            copied = skipped = errors = 0
+            copied = skipped = errors = processed = 0
 
             for item in plan:
                 source, final_dest = item["source"], item["final_dest"]
@@ -418,23 +428,25 @@ class FileSorterApp:
                     q.put(("log", "skip", T["skipped_log"].format(name=item["name"])))
                     skipped += 1
                     q.put(("count_skip", skipped))
-                    continue
+                else:
+                    try:
+                        if move:
+                            shutil.move(str(source), str(final_dest))
+                            q.put(("log", "ok", T["moved_log"].format(name=item["final_name"], category=category)))
+                            sort_log.append({"action": "moved", "source": source, "final_dest": final_dest})
+                        else:
+                            shutil.copy2(source, final_dest)
+                            q.put(("log", "ok", T["copied_log"].format(name=item["final_name"], category=category)))
+                            sort_log.append({"action": "copied", "source": source, "final_dest": final_dest})
+                        copied += 1
+                        q.put(("count_ok", copied))
+                    except Exception as e:
+                        q.put(("log", "error", T["error_log"].format(name=item["name"], error=e)))
+                        errors += 1
+                        q.put(("count_err", errors))
 
-                try:
-                    if move:
-                        shutil.move(str(source), str(final_dest))
-                        q.put(("log", "ok", T["moved_log"].format(name=item["final_name"], category=category)))
-                        sort_log.append({"action": "moved", "source": source, "final_dest": final_dest})
-                    else:
-                        shutil.copy2(source, final_dest)
-                        q.put(("log", "ok", T["copied_log"].format(name=item["final_name"], category=category)))
-                        sort_log.append({"action": "copied", "source": source, "final_dest": final_dest})
-                    copied += 1
-                    q.put(("count_ok", copied))
-                except Exception as e:
-                    q.put(("log", "error", T["error_log"].format(name=item["name"], error=e)))
-                    errors += 1
-                    q.put(("count_err", errors))
+                processed += 1
+                q.put(("progress", processed))
 
             q.put(("log", "done", T["done_log"].format(copied=copied, skipped=skipped, errors=errors, target=target_dir)))
             q.put(("sort_log", sort_log))
@@ -464,6 +476,10 @@ class FileSorterApp:
                     self.count_err.set(msg[1])
                 elif kind == "sort_log":
                     self.last_sort_log = msg[1]
+                elif kind == "total":
+                    self._set_progress_total(msg[1])
+                elif kind == "progress":
+                    self._set_progress_value(msg[1])
                 elif kind == "finished":
                     finished = True
         except queue.Empty:
@@ -471,10 +487,32 @@ class FileSorterApp:
 
         if finished:
             self.progress.stop()
+            self.progress_label.configure(text="")
             self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
             self.undo_btn.configure(state="normal" if self.last_sort_log else "disabled")
         else:
             self.root.after(50, lambda: self._poll_sort_queue(q))
+
+    def _set_progress_total(self, total: int) -> None:
+        """Switch the progress bar from indeterminate ("working, unknown
+        how long") to determinate ("X of Y done") once the worker knows
+        how many files there are.
+        """
+        self.progress.stop()
+        if total > 0:
+            self.progress.configure(mode="determinate", maximum=total, value=0)
+        self._update_progress_label(0, total)
+
+    def _set_progress_value(self, done: int) -> None:
+        self.progress.configure(value=done)
+        total = int(self.progress.cget("maximum")) or 0
+        self._update_progress_label(done, total)
+
+    def _update_progress_label(self, done: int, total: int) -> None:
+        percent = int(done / total * 100) if total else 0
+        self.progress_label.configure(
+            text=self.T["progress_status"].format(done=done, total=total, percent=percent)
+        )
 
     def undo_last_sort(self) -> None:
         """Reverse the last sort: move files back, delete copies made by this app.
@@ -495,6 +533,7 @@ class FileSorterApp:
         self.clear_log()
         self.undo_btn.configure(state="disabled")
         self.sort_btn.configure(state="disabled")
+        self.progress.configure(mode="indeterminate")
         self.progress.start(10)
 
         entries = list(self.last_sort_log)
@@ -505,7 +544,9 @@ class FileSorterApp:
     def _undo_worker(self, entries: list, q: queue.Queue) -> None:
         """Background-thread body for undo_last_sort(). Never touches Tkinter."""
         T = self.T
-        restored = removed = failed = 0
+        total = len(entries)
+        q.put(("total", total))
+        restored = removed = failed = processed = 0
 
         for entry in reversed(entries):
             source, final_dest = entry["source"], entry["final_dest"]
@@ -524,6 +565,9 @@ class FileSorterApp:
                 q.put(("log", "error", T["undo_failed_log"].format(name=final_dest.name, error=e)))
                 failed += 1
 
+            processed += 1
+            q.put(("progress", processed))
+
         q.put(("log", "done", T["undo_done_log"].format(restored=restored, removed=removed, failed=failed)))
         q.put(("finished", None))
 
@@ -535,6 +579,10 @@ class FileSorterApp:
                 msg = q.get_nowait()
                 if msg[0] == "log":
                     self.log(msg[1], msg[2])
+                elif msg[0] == "total":
+                    self._set_progress_total(msg[1])
+                elif msg[0] == "progress":
+                    self._set_progress_value(msg[1])
                 elif msg[0] == "finished":
                     finished = True
         except queue.Empty:
@@ -544,6 +592,7 @@ class FileSorterApp:
             self.last_sort_log = []
             self.undo_btn.configure(state="disabled")
             self.progress.stop()
+            self.progress_label.configure(text="")
             self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
         else:
             self.root.after(50, lambda: self._poll_undo_queue(q))

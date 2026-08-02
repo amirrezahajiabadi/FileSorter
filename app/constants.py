@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-APP_VERSION = "3.7.1"
+APP_VERSION = "3.8.0"
 
 # ══════════════════════════════════════════════════════════════════
 #  Default categories (user can customize in Settings)

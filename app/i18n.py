@@ -128,6 +128,8 @@ STRINGS = {
         "invalid_drop_title": "Invalid Drop",
         "invalid_drop_msg": "Please drop a single folder (not a file).",
 
+        "progress_status": "{done} / {total}  ({percent}%)",
+
         "lang_toggle_to": "فا",
         "theme_toggle_to_dark": "🌙",
         "theme_toggle_to_light": "☀",
@@ -246,6 +248,8 @@ STRINGS = {
         "recent_folders_empty": "هنوز پوشه‌ی اخیری نیست",
         "invalid_drop_title": "رها‌سازی نامعتبر",
         "invalid_drop_msg": "لطفاً فقط یک پوشه رها کنید (نه فایل).",
+
+        "progress_status": "{done} / {total}  (٪{percent})",
 
         "lang_toggle_to": "EN",
         "theme_toggle_to_dark": "🌙",
