@@ -69,6 +69,7 @@ FileSorter/
 ├── app/
 │   ├── constants.py              # APP_VERSION, default categories, thresholds
 │   ├── settings_manager.py       # load/save ~/.filesorter_settings.json
+│   ├── controller.py             # AppController — all business logic, zero Tkinter
 │   ├── sorter.py                 # pure sorting logic (no UI) — get_category, analyze_folder...
 │   ├── i18n.py                   # STRINGS (fa/en) + language helpers
 │   ├── themes.py                 # THEMES (dark/light) + ttk styling
@@ -82,6 +83,7 @@ FileSorter/
 │   └── test_sorter.py            # pytest suite for app/sorter.py
 │   └── test_duplicate_handling.py # pytest suite for resolve_duplicate/plan_sort
 │   └── test_recent_folders.py    # pytest suite for the recent-folders helper
+│   └── test_controller.py        # pytest suite for AppController (sort/undo/settings)
 ├── requirements.txt
 ├── build_installer.md
 └── README.md
@@ -156,6 +158,7 @@ git push origin v3.6.0
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
 
+- **v3.9.0** — Extracted all business logic (analyze, sort, undo, settings) into `app/controller.py`, a Tkinter-free `AppController` class. `app/ui/main_window.py` is now a thin adapter that builds widgets and translates controller events into UI updates — no functional changes, but this is the foundation for the planned UI overhaul (see [ROADMAP.md](ROADMAP.md)), since a future web-based UI can now drive the exact same logic without touching Tkinter. Added 17 new tests for `AppController` — sort/undo logic is now fully testable without any GUI dependency.
 - **v3.8.0** — Replaced the indeterminate "spinning" progress bar with a real one during Sort and Undo: shows an actual percentage and "X / Y files" count, updated live as each file is processed
 - **v3.7.1** — Fixed the Analysis window: when there were enough smart suggestions or categories to exceed the window's fixed height, the "Proceed with Sort" / "Cancel" buttons could get pushed out of view with no way to reach them. The content area now scrolls (mouse wheel supported) while those buttons stay permanently visible at the bottom.
 - **v3.7.0** — Added drag & drop folder selection and a Recent Folders list (last 8, persisted). First release with a runtime dependency (`tkinterdnd2`, optional — the app still works without it, just without drag & drop)

@@ -3,14 +3,12 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
-import shutil
 import threading
 import queue
 import os
 
-from app.constants import APP_VERSION, DEFAULT_CATEGORIES
-from app.settings_manager import load_settings, save_settings, add_recent_folder
-from app.sorter import analyze_folder, plan_sort
+from app.constants import APP_VERSION
+from app.controller import AppController
 from app.i18n import STRINGS, get_font, anchor_for, justify_for
 from app.themes import THEMES, configure_ttk_style
 from app.ui.splash import SplashScreen
@@ -27,18 +25,20 @@ class FileSorterApp:
         self.root.resizable(False, False)
         self.root.withdraw()
 
-        # Load persisted settings (categories, language, theme, recent folders)
-        self.settings       = load_settings()
-        self.categories     = self.settings.get("categories", DEFAULT_CATEGORIES.copy())
-        self.lang           = self.settings.get("language", "fa")
-        self.theme_name     = self.settings.get("theme", "light")
-        self.recent_folders = self.settings.get("recent_folders", [])
+        # All state and persistence lives behind the controller — this
+        # class only builds widgets and translates user actions into
+        # controller calls (and controller events into widget updates).
+        self.controller = AppController()
+        self.categories     = self.controller.categories
+        self.lang            = self.controller.language
+        self.theme_name      = self.controller.theme_name
+        self.recent_folders  = self.controller.recent_folders
 
         self.selected_dir = tk.StringVar(value="")
         self.count_ok     = tk.IntVar(value=0)
         self.count_skip   = tk.IntVar(value=0)
         self.count_err    = tk.IntVar(value=0)
-        self.last_sort_log = []  # for Undo: list of {"action": "moved"/"copied", "source": Path, "final_dest": Path}
+        self.last_sort_log = []  # cached mirror of self.controller.last_sort_log
 
         configure_ttk_style(self.theme)
         self.root.configure(bg=self.theme["BG"])
@@ -62,15 +62,13 @@ class FileSorterApp:
     def toggle_theme(self) -> None:
         """Switch between dark and light mode and rebuild the UI."""
         self.theme_name = "dark" if self.theme_name == "light" else "light"
-        self.settings["theme"] = self.theme_name
-        save_settings(self.settings)
+        self.controller.set_theme(self.theme_name)
         self._rebuild_ui()
 
     def toggle_lang(self) -> None:
         """Switch between Persian and English and rebuild the UI."""
         self.lang = "en" if self.lang == "fa" else "fa"
-        self.settings["language"] = self.lang
-        save_settings(self.settings)
+        self.controller.set_language(self.lang)
         self._rebuild_ui()
 
     def _rebuild_ui(self) -> None:
@@ -274,9 +272,7 @@ class FileSorterApp:
         """
         self.selected_dir.set(directory)
         self.log("info", self.T["folder_selected_log"].format(path=directory))
-        add_recent_folder(self.settings, directory)
-        self.recent_folders = self.settings["recent_folders"]
-        save_settings(self.settings)
+        self.recent_folders = self.controller.record_recent_folder(directory)
 
     def _register_drop_target(self, widget: tk.Widget) -> None:
         """Register a widget as a drag & drop target for folders.
@@ -327,8 +323,7 @@ class FileSorterApp:
 
     def _on_settings_save(self, new_categories: dict) -> None:
         self.categories = new_categories
-        self.settings["categories"] = new_categories
-        save_settings(self.settings)
+        self.controller.update_categories(new_categories)
         self.log("info", self.T["settings_saved_log"])
 
     def start_analysis(self) -> None:
@@ -345,7 +340,7 @@ class FileSorterApp:
         analysis_queue = queue.Queue()
 
         def analysis_worker():
-            report = analyze_folder(Path(path), self.categories)
+            report = self.controller.analyze(path)
             analysis_queue.put(report)
 
         threading.Thread(target=analysis_worker, daemon=True).start()
@@ -385,101 +380,48 @@ class FileSorterApp:
         self.root.after(50, lambda: self._poll_sort_queue(sort_queue))
 
     def _sort_worker(self, path_str: str, move: bool, duplicate_mode: str, q: queue.Queue) -> None:
-        """Sort files into category subfolders inside a 'sorted' directory.
+        """Runs the sort on a background thread via self.controller.sort().
 
-        Runs entirely on a background thread and NEVER touches Tkinter —
-        not even via root.after() — since that turned out to be unsafe to
-        call from a non-main thread in practice (observed to silently stop
-        after a single file on larger folders). Instead, every update is
-        put on a thread-safe queue.Queue and only ever read by the main
-        thread in _poll_sort_queue(), which is the one place actually
-        allowed to touch widgets.
-
-        Uses plan_sort() to decide what happens to every file (including
-        duplicate handling) — the exact same function the Dry Run preview
-        uses — so execution can never diverge from what was previewed.
-
-        Args:
-            path_str: The folder to sort.
-            move: If True, files are moved (removed from source). If False
-                (default), files are copied and the originals are kept.
-            duplicate_mode: "skip" (default), "rename", or "overwrite" —
-                what to do when a destination file already exists.
-            q: Queue this worker reports progress on.
+        This thread NEVER touches Tkinter — not even via root.after() —
+        since that turned out to be unsafe to call from a non-main thread
+        in practice (observed to silently stop after a single file on
+        larger folders). Instead, every controller event is put on a
+        thread-safe queue.Queue and only ever read by the main thread in
+        _poll_sort_queue(), which is the one place actually allowed to
+        touch widgets.
         """
-        T = self.T
-        base_dir   = Path(path_str)
-        target_dir = base_dir / "sorted"
-        sort_log = []  # for Undo
+        def on_event(kind, payload):
+            q.put((kind, payload))
+
         try:
-            for category in self.categories:
-                (target_dir / category).mkdir(parents=True, exist_ok=True)
-
-            plan = plan_sort(base_dir, self.categories, duplicate_mode)
-            q.put(("total", len(plan)))
-
-            copied = skipped = errors = processed = 0
-
-            for item in plan:
-                source, final_dest = item["source"], item["final_dest"]
-                action, category = item["action"], item["category"]
-
-                if action == "skip":
-                    q.put(("log", "skip", T["skipped_log"].format(name=item["name"])))
-                    skipped += 1
-                    q.put(("count_skip", skipped))
-                else:
-                    try:
-                        if move:
-                            shutil.move(str(source), str(final_dest))
-                            q.put(("log", "ok", T["moved_log"].format(name=item["final_name"], category=category)))
-                            sort_log.append({"action": "moved", "source": source, "final_dest": final_dest})
-                        else:
-                            shutil.copy2(source, final_dest)
-                            q.put(("log", "ok", T["copied_log"].format(name=item["final_name"], category=category)))
-                            sort_log.append({"action": "copied", "source": source, "final_dest": final_dest})
-                        copied += 1
-                        q.put(("count_ok", copied))
-                    except Exception as e:
-                        q.put(("log", "error", T["error_log"].format(name=item["name"], error=e)))
-                        errors += 1
-                        q.put(("count_err", errors))
-
-                processed += 1
-                q.put(("progress", processed))
-
-            q.put(("log", "done", T["done_log"].format(copied=copied, skipped=skipped, errors=errors, target=target_dir)))
-            q.put(("sort_log", sort_log))
-
-        except Exception as e:
-            q.put(("log", "error", T["fatal_error_log"].format(error=e)))
+            self.controller.sort(path_str, move=move, duplicate_mode=duplicate_mode, on_event=on_event)
+        except Exception:
+            pass  # the controller already emitted an "error" event before re-raising
         finally:
             q.put(("finished", None))
 
     def _poll_sort_queue(self, q: queue.Queue) -> None:
-        """Runs on the main thread only. Drains messages the worker put on
-        the queue and applies them to widgets, then reschedules itself
-        until the worker signals it's finished.
+        """Runs on the main thread only. Drains controller events the
+        worker put on the queue, translates each into a localized log
+        line / widget update, then reschedules itself until the worker
+        signals it's finished.
         """
         finished = False
         try:
             while True:
                 msg = q.get_nowait()
-                kind = msg[0]
-                if kind == "log":
-                    self.log(msg[1], msg[2])
-                elif kind == "count_ok":
-                    self.count_ok.set(msg[1])
-                elif kind == "count_skip":
-                    self.count_skip.set(msg[1])
-                elif kind == "count_err":
-                    self.count_err.set(msg[1])
-                elif kind == "sort_log":
-                    self.last_sort_log = msg[1]
-                elif kind == "total":
-                    self._set_progress_total(msg[1])
+                kind, payload = msg[0], (msg[1] if len(msg) > 1 else None)
+                if kind == "total":
+                    self._set_progress_total(payload)
                 elif kind == "progress":
-                    self._set_progress_value(msg[1])
+                    self._set_progress_value(payload)
+                elif kind == "item":
+                    self._log_sort_item(payload)
+                elif kind == "done":
+                    self._log_sort_done(payload)
+                    self.last_sort_log = self.controller.last_sort_log
+                elif kind == "error":
+                    self.log("error", self.T["fatal_error_log"].format(error=payload))
                 elif kind == "finished":
                     finished = True
         except queue.Empty:
@@ -492,6 +434,30 @@ class FileSorterApp:
             self.undo_btn.configure(state="normal" if self.last_sort_log else "disabled")
         else:
             self.root.after(50, lambda: self._poll_sort_queue(q))
+
+    def _log_sort_item(self, payload: dict) -> None:
+        """Translate one AppController.sort() "item" event into a log line
+        and counter update. See AppController.sort() for the payload shape.
+        """
+        T = self.T
+        status = payload["status"]
+        if status == "skip":
+            self.count_skip.set(self.count_skip.get() + 1)
+            self.log("skip", T["skipped_log"].format(name=payload["name"]))
+        elif status == "ok":
+            self.count_ok.set(self.count_ok.get() + 1)
+            key = "moved_log" if payload["action"] == "moved" else "copied_log"
+            self.log("ok", T[key].format(name=payload["name"], category=payload["category"]))
+        elif status == "error":
+            self.count_err.set(self.count_err.get() + 1)
+            self.log("error", T["error_log"].format(name=payload["name"], error=payload["error"]))
+
+    def _log_sort_done(self, result: dict) -> None:
+        T = self.T
+        self.log("done", T["done_log"].format(
+            copied=result["copied"], skipped=result["skipped"],
+            errors=result["errors"], target=result["target_dir"]
+        ))
 
     def _set_progress_total(self, total: int) -> None:
         """Switch the progress bar from indeterminate ("working, unknown
@@ -536,39 +502,18 @@ class FileSorterApp:
         self.progress.configure(mode="indeterminate")
         self.progress.start(10)
 
-        entries = list(self.last_sort_log)
         undo_queue = queue.Queue()
-        threading.Thread(target=self._undo_worker, args=(entries, undo_queue), daemon=True).start()
+        threading.Thread(target=self._undo_worker, args=(undo_queue,), daemon=True).start()
         self.root.after(50, lambda: self._poll_undo_queue(undo_queue))
 
-    def _undo_worker(self, entries: list, q: queue.Queue) -> None:
-        """Background-thread body for undo_last_sort(). Never touches Tkinter."""
-        T = self.T
-        total = len(entries)
-        q.put(("total", total))
-        restored = removed = failed = processed = 0
+    def _undo_worker(self, q: queue.Queue) -> None:
+        """Background-thread body for undo_last_sort(), via self.controller.undo().
+        Never touches Tkinter — see _sort_worker()'s docstring for why.
+        """
+        def on_event(kind, payload):
+            q.put((kind, payload))
 
-        for entry in reversed(entries):
-            source, final_dest = entry["source"], entry["final_dest"]
-            try:
-                if entry["action"] == "moved":
-                    source.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(final_dest), str(source))
-                    q.put(("log", "ok", T["undo_restored_log"].format(name=source.name)))
-                    restored += 1
-                else:  # "copied"
-                    if final_dest.exists():
-                        final_dest.unlink()
-                    q.put(("log", "skip", T["undo_removed_log"].format(name=final_dest.name)))
-                    removed += 1
-            except Exception as e:
-                q.put(("log", "error", T["undo_failed_log"].format(name=final_dest.name, error=e)))
-                failed += 1
-
-            processed += 1
-            q.put(("progress", processed))
-
-        q.put(("log", "done", T["undo_done_log"].format(restored=restored, removed=removed, failed=failed)))
+        self.controller.undo(on_event=on_event)
         q.put(("finished", None))
 
     def _poll_undo_queue(self, q: queue.Queue) -> None:
@@ -577,25 +522,46 @@ class FileSorterApp:
         try:
             while True:
                 msg = q.get_nowait()
-                if msg[0] == "log":
-                    self.log(msg[1], msg[2])
-                elif msg[0] == "total":
-                    self._set_progress_total(msg[1])
-                elif msg[0] == "progress":
-                    self._set_progress_value(msg[1])
-                elif msg[0] == "finished":
+                kind, payload = msg[0], (msg[1] if len(msg) > 1 else None)
+                if kind == "total":
+                    self._set_progress_total(payload)
+                elif kind == "progress":
+                    self._set_progress_value(payload)
+                elif kind == "item":
+                    self._log_undo_item(payload)
+                elif kind == "done":
+                    self._log_undo_done(payload)
+                elif kind == "finished":
                     finished = True
         except queue.Empty:
             pass
 
         if finished:
-            self.last_sort_log = []
+            self.last_sort_log = self.controller.last_sort_log  # now []
             self.undo_btn.configure(state="disabled")
             self.progress.stop()
             self.progress_label.configure(text="")
             self.sort_btn.configure(state="normal", text=self.T["analyze_btn"])
         else:
             self.root.after(50, lambda: self._poll_undo_queue(q))
+
+    def _log_undo_item(self, payload: dict) -> None:
+        T = self.T
+        status = payload["status"]
+        if status == "restored":
+            self.log("ok", T["undo_restored_log"].format(name=payload["name"]))
+        elif status == "removed":
+            self.log("skip", T["undo_removed_log"].format(name=payload["name"]))
+        elif status == "failed":
+            self.log("error", T["undo_failed_log"].format(name=payload["name"], error=payload["error"]))
+
+    def _log_undo_done(self, result: dict) -> None:
+        if result.get("nothing"):
+            return
+        T = self.T
+        self.log("done", T["undo_done_log"].format(
+            restored=result["restored"], removed=result["removed"], failed=result["failed"]
+        ))
 
     def log(self, tag: str, message: str) -> None:
         self.log_box.configure(state="normal")
