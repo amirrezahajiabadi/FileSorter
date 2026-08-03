@@ -65,8 +65,11 @@ Version numbers below are for organization only and can shift. See
   manual test checklist (the actual window rendering needs to be verified
   on Windows, since the automated testing environment has no GTK/Qt
   backend to open a real window with).
-- ⬜ **v4.1** — Design the frontend folder structure (`web/` or `frontend/`:
-  HTML/CSS/JS) and port the current dark/light palette to CSS.
+- ✅ **v4.1.0** — Added the `web/` folder structure (placeholder page,
+  base styles) and `scripts/generate_theme_css.py`, which generates the
+  frontend's color palette directly from `app/themes.py` — verified
+  pixel-for-pixel identical to the real Tkinter theme colors, so the two
+  can never silently drift apart.
 
 **Phase 3 — New UI, screen by screen**
 - ⬜ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
