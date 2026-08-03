@@ -25,7 +25,7 @@ The ideas below are about what comes *after* that foundation is fully settled.
 
 ## 1. UI/UX Overhaul
 
-**Status:** agreed direction, not started.
+**Status:** in progress — Phase 1 complete, Phase 2 underway (see below).
 
 Move the interface from raw Tkinter to an HTML/CSS/JS front end, most likely via
 **PyWebView** or **Eel** — Python still drives the logic, but the UI itself is a
@@ -37,6 +37,52 @@ toward the FastAPI stage of the personal learning roadmap: once the UI talks to
 Python over a local interface instead of directly calling Tkinter widgets, it's
 a much smaller step to eventually put that same logic behind a real FastAPI
 service.
+
+### Planned path: v3.7 → v5.0
+
+Same discipline as always — one focused piece per version, nothing skipped ahead.
+Version numbers below are for organization only and can shift. See
+[README.md](README.md#-version-history) for exact details on completed versions.
+
+**Phase 1 — UX polish (still on Tkinter)** ✅ complete
+- ✅ **v3.7.0** — Drag & drop folder selection, plus a recent-folders list
+- ✅ **v3.7.1** — Fixed the Analysis window overflowing off-screen with enough
+  content (found during Phase 1 testing, not originally planned, but blocked
+  everything else until fixed)
+- ✅ **v3.8.0** — A real progress bar (percentage + file count) instead of the
+  indeterminate one
+
+**Phase 2 — Architecture prep (before any new UI code gets written)** — in progress
+- ✅ **v3.9.0** — *The most important step.* Extracted `app/controller.py`
+  (`AppController`): everything `main_window.py` used to do directly (start
+  sort, undo, analyze, settings) now lives behind a clean class/API with zero
+  Tkinter imports. This is what lets a future web UI drive the exact same
+  logic without a rewrite of the app's brain.
+- ✅ **v4.0.0** — Added `poc/webview_poc.py`: a throwaway PyWebView window
+  wired to the real `AppController`, running *alongside* the existing
+  Tkinter UI (not replacing it). Confirmed the Python ⟷ HTML/JS bridge
+  works and can drive real controller calls — see `poc/README.md` for the
+  manual test checklist (the actual window rendering needs to be verified
+  on Windows, since the automated testing environment has no GTK/Qt
+  backend to open a real window with).
+- ⬜ **v4.1** — Design the frontend folder structure (`web/` or `frontend/`:
+  HTML/CSS/JS) and port the current dark/light palette to CSS.
+
+**Phase 3 — New UI, screen by screen**
+- ⬜ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
+  wired to `AppController`
+- ⬜ **v4.3** — Settings screen (categories)
+- ⬜ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection
+- ⬜ **v4.5** — Undo, bilingual (fa/en), and dark/light in the new UI
+- ⬜ **v4.6** — Final polish: animations, visual details, full bilingual/theme
+  testing
+- ⬜ **v5.0** — 🎉 Old Tkinter UI removed entirely; the new UI is the only
+  interface. Official major release.
+
+Phase 1 is fully independent and was completed without blocking phases 2/3.
+Phases 2 and 3 are sequential — skipping v3.9 would have meant pulling the
+app's logic out of the middle of new UI code later instead of once, cleanly,
+up front.
 
 ## 2. AI-Powered Photo Analysis
 

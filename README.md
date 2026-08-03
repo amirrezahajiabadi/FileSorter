@@ -86,7 +86,10 @@ FileSorter/
 │   └── test_controller.py        # pytest suite for AppController (sort/undo/settings)
 ├── requirements.txt
 ├── build_installer.md
-└── README.md
+├── README.md
+└── poc/                          # throwaway experiments for the roadmap (not shipped)
+    ├── webview_poc.py             # v4.0 — PyWebView + AppController proof of concept
+    └── README.md
 ```
 
 `app/sorter.py` has no Tkinter dependency, so its logic is fully unit-tested — see [Running Tests](#-running-tests).
@@ -158,6 +161,7 @@ git push origin v3.6.0
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
 
+- **v4.0.0** — No user-facing changes. Added a throwaway PyWebView proof-of-concept (`poc/webview_poc.py`, not part of the shipped app) that confirms a real HTML/JS UI can drive the actual `AppController` — the technical foundation for the planned UI overhaul (Phase 2 of [ROADMAP.md](ROADMAP.md)). See `poc/README.md`.
 - **v3.9.0** — Extracted all business logic (analyze, sort, undo, settings) into `app/controller.py`, a Tkinter-free `AppController` class. `app/ui/main_window.py` is now a thin adapter that builds widgets and translates controller events into UI updates — no functional changes, but this is the foundation for the planned UI overhaul (see [ROADMAP.md](ROADMAP.md)), since a future web-based UI can now drive the exact same logic without touching Tkinter. Added 17 new tests for `AppController` — sort/undo logic is now fully testable without any GUI dependency.
 - **v3.8.0** — Replaced the indeterminate "spinning" progress bar with a real one during Sort and Undo: shows an actual percentage and "X / Y files" count, updated live as each file is processed
 - **v3.7.1** — Fixed the Analysis window: when there were enough smart suggestions or categories to exceed the window's fixed height, the "Proceed with Sort" / "Cancel" buttons could get pushed out of view with no way to reach them. The content area now scrolls (mouse wheel supported) while those buttons stay permanently visible at the bottom.
