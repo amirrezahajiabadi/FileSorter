@@ -87,6 +87,15 @@ FileSorter/
 ├── requirements.txt
 ├── build_installer.md
 ├── README.md
+├── scripts/
+│   └── generate_theme_css.py     # regenerates web/css/theme-vars.css from app/themes.py
+├── web/                          # Phase 3 UI overhaul lives here — see web/README.md
+│   ├── index.html                 # placeholder — proves theming works, not a real screen yet
+│   ├── css/
+│   │   ├── theme-vars.css         # AUTO-GENERATED, do not edit by hand
+│   │   └── base.css
+│   └── js/
+│       └── app.js
 └── poc/                          # throwaway experiments for the roadmap (not shipped)
     ├── webview_poc.py             # v4.0 — PyWebView + AppController proof of concept
     └── README.md
@@ -161,6 +170,7 @@ git push origin v3.6.0
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
 
+- **v4.1.0** — No user-facing changes. Added the `web/` folder structure for the planned UI overhaul (Phase 2 of [ROADMAP.md](ROADMAP.md)): a placeholder page, base styles, and — most importantly — `scripts/generate_theme_css.py`, which generates the web frontend's dark/light color palette directly from `app/themes.py` so the two can never drift out of sync. Verified pixel-for-pixel against the real theme colors.
 - **v4.0.0** — No user-facing changes. Added a throwaway PyWebView proof-of-concept (`poc/webview_poc.py`, not part of the shipped app) that confirms a real HTML/JS UI can drive the actual `AppController` — the technical foundation for the planned UI overhaul (Phase 2 of [ROADMAP.md](ROADMAP.md)). See `poc/README.md`.
 - **v3.9.0** — Extracted all business logic (analyze, sort, undo, settings) into `app/controller.py`, a Tkinter-free `AppController` class. `app/ui/main_window.py` is now a thin adapter that builds widgets and translates controller events into UI updates — no functional changes, but this is the foundation for the planned UI overhaul (see [ROADMAP.md](ROADMAP.md)), since a future web-based UI can now drive the exact same logic without touching Tkinter. Added 17 new tests for `AppController` — sort/undo logic is now fully testable without any GUI dependency.
 - **v3.8.0** — Replaced the indeterminate "spinning" progress bar with a real one during Sort and Undo: shows an actual percentage and "X / Y files" count, updated live as each file is processed
