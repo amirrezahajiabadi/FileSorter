@@ -1,0 +1,67 @@
+/* Direction A — "Sorting Line" design tokens.
+   A distinct identity for the new web UI, grounded in what the app
+   actually does: files moving along a line into labeled bins.
+
+   Both themes share the same --signal accent and category colors —
+   the "brand" stays recognizable across modes; only the neutrals
+   (surfaces/text) invert. Set data-theme="dark" or "light" on <html>. */
+
+:root, [data-theme="light"] {
+  /* Surfaces */
+  --ink:    #f3f4f6;   /* page background */
+  --panel:  #ffffff;   /* card / surface */
+  --rail:   #e5e7eb;   /* input / track background */
+  --rail-2: #d7dae0;   /* slightly darker rail, for hover states */
+
+  /* Text */
+  --paper:  #1a1b1e;   /* primary text */
+  --steel:  #6b7280;   /* secondary / dim text */
+  --steel-dim: #9ca3af; /* tertiary text, placeholders */
+
+  /* Status */
+  --ok:   #2f9e5c;
+  --warn: #b8860b;
+  --err:  #d64545;
+}
+
+[data-theme="dark"] {
+  /* Surfaces */
+  --ink:    #16171b;
+  --panel:  #1f2127;
+  --rail:   #2a2d35;
+  --rail-2: #33363f;
+
+  /* Text */
+  --paper:  #edeef2;
+  --steel:  #8a8f9c;
+  --steel-dim: #5b606c;
+
+  /* Status */
+  --ok:   #6fcf97;
+  --warn: #ffc857;
+  --err:  #ff5c5c;
+}
+
+:root {
+  /* Signal (the one accent color, used sparingly) — same in both themes,
+     it's the "brand" color, not a neutral that should invert. */
+  --signal:       #ff6b35;
+  --signal-hover: #ff8659;
+  --on-signal:    #16171b;
+
+  /* Category colors — each category gets its own identity, like
+     labeled bins on a sorting line. Kept identical across themes so
+     "images = sky blue" stays true regardless of light/dark. */
+  --cat-images:      #2f9fdb;
+  --cat-documents:   #8b6fd6;
+  --cat-videos:      #e0457d;
+  --cat-audio:       #1fa8ba;
+  --cat-archives:    #d98a2b;
+  --cat-code:        #4a9e63;
+  --cat-data:        #3a7fd1;
+  --cat-ebooks:      #a557b8;
+  --cat-executables: #c94f4f;
+  --cat-fonts:       #c9a227;
+  --cat-others:      #6c7a85;
+}
+

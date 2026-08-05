@@ -65,11 +65,13 @@ Version numbers below are for organization only and can shift. See
   manual test checklist (the actual window rendering needs to be verified
   on Windows, since the automated testing environment has no GTK/Qt
   backend to open a real window with).
-- ✅ **v4.1.0** — Added the `web/` folder structure (placeholder page,
-  base styles) and `scripts/generate_theme_css.py`, which generates the
-  frontend's color palette directly from `app/themes.py` — verified
-  pixel-for-pixel identical to the real Tkinter theme colors, so the two
-  can never silently drift apart.
+- ✅ **v4.1.0 / v4.1.1** — Added the `web/` folder structure and finalized
+  the visual identity: **"Sorting Line"** — a distinct design grounded in
+  what the app does (files moving into labeled bins on a sorting line),
+  not a port of the Tkinter look. Category colors, a warm safety-orange
+  accent, Space Grotesk/Inter/JetBrains Mono typography (self-hosted, no
+  CDN dependency), and a signature animated progress element. See
+  `web/README.md` for the full rationale.
 
 **Phase 3 — New UI, screen by screen**
 - ⬜ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,

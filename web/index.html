@@ -1,52 +1,82 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
-<title>FileSorter — Web UI (structure preview)</title>
-<link rel="stylesheet" href="css/theme-vars.css">
+<title>FileSorter — Web UI design preview</title>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/design-tokens.css">
 <link rel="stylesheet" href="css/base.css">
-<style>
-  /* Layout for this placeholder page only — real screens (Phase 3) will
-     replace this file's content, not its <head> setup. */
-  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 24px; }
-  .header-row { display: flex; justify-content: space-between; align-items: center; }
-  .badges { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-  .badges span { font-size: 13px; }
-</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header-row">
-      <h1>📁 FileSorter — Web UI structure preview</h1>
-      <button class="secondary" onclick="toggleTheme()">🌙 / ☀️ Toggle theme</button>
-    </div>
-    <p>
-      This page isn't a real screen yet (that's Phase 3 of the roadmap) — it
-      only proves that <code>theme-vars.css</code>, generated from the exact
-      same <code>app/themes.py</code> the Tkinter app uses, actually themes a
-      real web page correctly in both modes.
-    </p>
+<div class="app">
 
-    <div class="card">
-      <h2>Sample card</h2>
-      <p class="text-dim">Secondary text uses --fg-dim, same as Tkinter's FG_DIM.</p>
-      <div class="badges">
-        <span class="badge-green">✅ Copied</span>
-        <span class="badge-yellow">⏭ Skipped</span>
-        <span class="badge-red">❌ Errors</span>
-        <span class="badge-cyan">🔍 Info</span>
-        <span class="badge-purple">💡 Suggestion</span>
-        <span class="badge-peach">📅 Old file</span>
-      </div>
-      <div style="margin-top: 16px;">
-        <button onclick="alert('This will call pywebview.api once Phase 3 wires it up.')">
-          Primary button
-        </button>
-        <button class="secondary">Secondary button</button>
-      </div>
+  <p class="text-dim" style="font-size:12px; margin-bottom:16px;">
+    Design preview — not a real screen yet (Phase 3 builds the real thing).
+    Click 🌙 to try dark mode.
+  </p>
+
+  <div class="header">
+    <div class="title">
+      <h1>📁 FileSorter</h1>
+      <span class="version">v4.1</span>
+    </div>
+    <div class="nav-row">
+      <div class="nav-btn" onclick="toggleTheme()">🌙</div>
+      <div class="nav-btn">🕘</div>
+      <div class="nav-btn">⚙</div>
     </div>
   </div>
 
-  <script src="js/app.js"></script>
+  <div class="drop-zone">
+    <span class="path selected">C:\Users\HajAmir\Downloads</span>
+    <button class="btn-primary">Browse</button>
+  </div>
+
+  <div class="legend">
+    <span class="chip"><span class="dot" style="background:var(--cat-images)"></span>images</span>
+    <span class="chip"><span class="dot" style="background:var(--cat-documents)"></span>documents</span>
+    <span class="chip"><span class="dot" style="background:var(--cat-videos)"></span>videos</span>
+    <span class="chip"><span class="dot" style="background:var(--cat-archives)"></span>archives</span>
+    <span class="chip"><span class="dot" style="background:var(--cat-code)"></span>code</span>
+    <span class="chip"><span class="dot" style="background:var(--cat-others)"></span>others</span>
+  </div>
+
+  <div class="sorting-line">
+    <div class="label">Sorting in progress</div>
+    <div class="track">
+      <div class="fill"></div>
+      <div class="file-chip" style="left:12%; background:var(--cat-images)"></div>
+      <div class="file-chip" style="left:28%; background:var(--cat-documents)"></div>
+      <div class="file-chip" style="left:44%; background:var(--cat-videos)"></div>
+      <div class="file-chip" style="left:58%; background:var(--cat-images)"></div>
+    </div>
+    <div class="bins">
+      <div class="bin" style="background:var(--cat-images)">IMG</div>
+      <div class="bin" style="background:var(--cat-documents)">DOC</div>
+      <div class="bin" style="background:var(--cat-videos)">VID</div>
+      <div class="bin" style="background:var(--cat-archives)">ZIP</div>
+    </div>
+    <div class="progress-text" style="margin-top:14px;">
+      <span><b>372</b> / 600 files</span>
+      <span>62%</span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-primary" style="flex:1;">▶ Analyze &amp; Sort</button>
+    <button class="btn-secondary">↩ Undo</button>
+  </div>
+
+  <div class="log">
+    <div class="line"><span class="time">09:14:02</span><span class="tag ok">copied</span><span class="rest"><b>vacation_photo_014.jpg</b> → images/</span></div>
+    <div class="line"><span class="time">09:14:02</span><span class="tag ok">copied</span><span class="rest"><b>invoice_march.pdf</b> → documents/</span></div>
+    <div class="line"><span class="time">09:14:03</span><span class="tag skip">skipped</span><span class="rest"><b>screenshot.png</b> (duplicate)</span></div>
+    <div class="line"><span class="time">09:14:03</span><span class="tag ok">copied</span><span class="rest"><b>demo_reel.mp4</b> → videos/</span></div>
+    <div class="line"><span class="time">09:14:04</span><span class="tag err">error</span><span class="rest"><b>locked_file.docx</b> — permission denied</span></div>
+  </div>
+
+</div>
+<script src="js/app.js"></script>
 </body>
 </html>
+
