@@ -1,82 +1,203 @@
-/* Base styles shared by every future screen. Uses the CSS custom
-   properties from theme-vars.css exclusively for color — never a
-   hardcoded hex value — so switching data-theme on <html> re-themes
-   everything automatically. */
+*, *::before, *::after { box-sizing: border-box; }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
+html, body { margin: 0; padding: 0; height: 100%; }
 
 body {
-  font-family: "Segoe UI", Tahoma, sans-serif;
-  background: var(--bg);
-  color: var(--fg);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Persian text should default to Tahoma for correct glyph rendering,
-   mirroring get_font()'s logic in app/i18n.py. Set lang="fa" on any
-   element (or <html>) containing Persian text. */
-[lang="fa"] {
-  font-family: Tahoma, "Segoe UI", sans-serif;
+.display, h1, h2, h3, button, .nav-btn {
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
 }
 
-h1, h2, h3 {
-  margin: 0 0 8px 0;
-  font-weight: 600;
+.mono, .log, .path {
+  font-family: "JetBrains Mono", "Consolas", monospace;
 }
 
-p {
-  margin: 0 0 8px 0;
-  color: var(--fg-dim);
+.app {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
 }
 
-button {
-  font-family: inherit;
+/* ── Header ─────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.header .title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.header .version {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--steel-dim);
+}
+
+.nav-btn {
+  background: var(--panel);
+  color: var(--steel);
+  border: 1px solid var(--rail);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 15px;
+}
+.nav-btn:hover { background: var(--rail); color: var(--paper); }
+.nav-row { display: flex; gap: 8px; }
+
+/* ── Drop zone ──────────────────────────────────────────── */
+.drop-zone {
+  background: var(--panel);
+  border: 1.5px dashed var(--rail-2);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.drop-zone .path {
+  color: var(--steel);
   font-size: 13px;
-  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drop-zone .path.selected { color: var(--paper); }
+
+.btn-primary {
+  background: var(--signal);
+  color: var(--on-signal);
   border: none;
   border-radius: 8px;
-  padding: 10px 18px;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 13px;
   cursor: pointer;
-  background: var(--accent);
-  color: var(--on-accent);
-  transition: background-color 0.1s ease;
+  white-space: nowrap;
 }
+.btn-primary:hover { background: var(--signal-hover); }
 
-button:hover {
-  background: var(--accent-hover);
+/* ── Category legend ────────────────────────────────────── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
 }
-
-button.secondary {
-  background: var(--bg3);
-  color: var(--fg-dim);
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 5px 10px 5px 6px;
+  font-size: 11px;
+  color: var(--steel);
 }
+.chip .dot { width: 8px; height: 8px; border-radius: 999px; }
 
-button.secondary:hover {
-  background: var(--bg2);
-  color: var(--fg);
+/* ── Signature: the sorting line ────────────────────────── */
+.sorting-line {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 22px;
 }
-
-.card {
-  background: var(--bg2);
-  border-radius: 10px;
-  padding: 16px;
+.sorting-line .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--steel-dim);
+  margin-bottom: 12px;
 }
-
-.text-dim {
-  color: var(--fg-dim);
+.track {
+  position: relative;
+  height: 3px;
+  background: var(--rail);
+  border-radius: 999px;
+  margin: 22px 0 18px;
 }
+.track .fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  width: 62%;
+  background: var(--signal);
+  border-radius: 999px;
+}
+.file-chip {
+  position: absolute;
+  top: 50%;
+  width: 14px; height: 14px;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 3px var(--panel);
+}
+.bins {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.bin {
+  width: 34px; height: 26px;
+  border-radius: 6px 6px 3px 3px;
+  display: flex; align-items: flex-end; justify-content: center;
+  font-size: 9px; font-weight: 700; color: var(--on-signal);
+  padding-bottom: 3px;
+  opacity: 0.92;
+}
+.progress-text {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px; color: var(--steel);
+}
+.progress-text b { color: var(--paper); font-size: 14px; }
 
-.badge-green  { color: var(--green); }
-.badge-yellow { color: var(--yellow); }
-.badge-red    { color: var(--red); }
-.badge-cyan   { color: var(--cyan); }
-.badge-purple { color: var(--purple); }
-.badge-peach  { color: var(--peach); }
+/* ── Action row ─────────────────────────────────────────── */
+.actions { display: flex; gap: 10px; margin-bottom: 22px; }
+.btn-secondary {
+  background: transparent;
+  color: var(--steel);
+  border: 1px solid var(--rail);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-secondary:hover { border-color: var(--steel); color: var(--paper); }
+
+/* ── Log (ledger style) ─────────────────────────────────── */
+.log {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.log .line { display: flex; gap: 10px; }
+.log .time { color: var(--steel-dim); }
+.log .tag { width: 62px; flex-shrink: 0; }
+.log .tag.ok { color: var(--ok); }
+.log .tag.skip { color: var(--warn); }
+.log .tag.err { color: var(--err); }
+.log .rest { color: var(--steel); }
+.log .rest b { color: var(--paper); font-weight: 500; }
