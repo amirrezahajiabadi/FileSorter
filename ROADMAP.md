@@ -25,7 +25,7 @@ The ideas below are about what comes *after* that foundation is fully settled.
 
 ## 1. UI/UX Overhaul
 
-**Status:** in progress — Phase 1 complete, Phase 2 underway (see below).
+**Status:** in progress — Phases 1 and 2 complete, Phase 3 underway (see below).
 
 Move the interface from raw Tkinter to an HTML/CSS/JS front end, most likely via
 **PyWebView** or **Eel** — Python still drives the logic, but the UI itself is a
@@ -74,8 +74,10 @@ Version numbers below are for organization only and can shift. See
   `web/README.md` for the full rationale.
 
 **Phase 3 — New UI, screen by screen**
-- ⬜ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
-  wired to `AppController`
+- ✅ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
+  wired to `AppController`. Runs via `python main_web.py`, parallel to the
+  Tkinter app. Move mode, duplicate handling, and Settings aren't wired
+  into this screen yet.
 - ⬜ **v4.3** — Settings screen (categories)
 - ⬜ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection
 - ⬜ **v4.5** — Undo, bilingual (fa/en), and dark/light in the new UI

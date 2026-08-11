@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
-<title>FileSorter — Web UI design preview</title>
+<title>FileSorter</title>
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/design-tokens.css">
 <link rel="stylesheet" href="css/base.css">
@@ -10,73 +10,48 @@
 <body>
 <div class="app">
 
-  <p class="text-dim" style="font-size:12px; margin-bottom:16px;">
-    Design preview — not a real screen yet (Phase 3 builds the real thing).
-    Click 🌙 to try dark mode.
-  </p>
-
   <div class="header">
     <div class="title">
       <h1>📁 FileSorter</h1>
-      <span class="version">v4.1</span>
+      <span class="version" id="versionText">v...</span>
     </div>
     <div class="nav-row">
-      <div class="nav-btn" onclick="toggleTheme()">🌙</div>
-      <div class="nav-btn">🕘</div>
-      <div class="nav-btn">⚙</div>
+      <div class="nav-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</div>
+      <div class="nav-btn" id="recentBtn" onclick="toggleRecentMenu()" title="Recent folders">🕘</div>
     </div>
   </div>
+
+  <div id="recentMenu" class="card" style="display:none; margin-bottom:16px; padding:8px;"></div>
 
   <div class="drop-zone">
-    <span class="path selected">C:\Users\HajAmir\Downloads</span>
-    <button class="btn-primary">Browse</button>
+    <span class="path" id="folderPath">No folder selected</span>
+    <button class="btn-primary" onclick="browseFolder()">Browse</button>
   </div>
 
-  <div class="legend">
-    <span class="chip"><span class="dot" style="background:var(--cat-images)"></span>images</span>
-    <span class="chip"><span class="dot" style="background:var(--cat-documents)"></span>documents</span>
-    <span class="chip"><span class="dot" style="background:var(--cat-videos)"></span>videos</span>
-    <span class="chip"><span class="dot" style="background:var(--cat-archives)"></span>archives</span>
-    <span class="chip"><span class="dot" style="background:var(--cat-code)"></span>code</span>
-    <span class="chip"><span class="dot" style="background:var(--cat-others)"></span>others</span>
-  </div>
+  <div class="legend" id="categoryLegend"></div>
 
   <div class="sorting-line">
-    <div class="label">Sorting in progress</div>
+    <div class="label">Progress</div>
     <div class="track">
-      <div class="fill"></div>
-      <div class="file-chip" style="left:12%; background:var(--cat-images)"></div>
-      <div class="file-chip" style="left:28%; background:var(--cat-documents)"></div>
-      <div class="file-chip" style="left:44%; background:var(--cat-videos)"></div>
-      <div class="file-chip" style="left:58%; background:var(--cat-images)"></div>
+      <div class="fill" id="progressFill" style="width:0%"></div>
     </div>
-    <div class="bins">
-      <div class="bin" style="background:var(--cat-images)">IMG</div>
-      <div class="bin" style="background:var(--cat-documents)">DOC</div>
-      <div class="bin" style="background:var(--cat-videos)">VID</div>
-      <div class="bin" style="background:var(--cat-archives)">ZIP</div>
-    </div>
-    <div class="progress-text" style="margin-top:14px;">
-      <span><b>372</b> / 600 files</span>
-      <span>62%</span>
+    <div class="progress-text">
+      <span id="progressCount">Ready</span>
+      <span id="progressPercent"></span>
     </div>
   </div>
 
   <div class="actions">
-    <button class="btn-primary" style="flex:1;">▶ Analyze &amp; Sort</button>
-    <button class="btn-secondary">↩ Undo</button>
+    <button class="btn-primary" id="sortBtn" style="flex:1;" onclick="startSort()" disabled>
+      ▶ Analyze &amp; Sort
+    </button>
   </div>
 
-  <div class="log">
-    <div class="line"><span class="time">09:14:02</span><span class="tag ok">copied</span><span class="rest"><b>vacation_photo_014.jpg</b> → images/</span></div>
-    <div class="line"><span class="time">09:14:02</span><span class="tag ok">copied</span><span class="rest"><b>invoice_march.pdf</b> → documents/</span></div>
-    <div class="line"><span class="time">09:14:03</span><span class="tag skip">skipped</span><span class="rest"><b>screenshot.png</b> (duplicate)</span></div>
-    <div class="line"><span class="time">09:14:03</span><span class="tag ok">copied</span><span class="rest"><b>demo_reel.mp4</b> → videos/</span></div>
-    <div class="line"><span class="time">09:14:04</span><span class="tag err">error</span><span class="rest"><b>locked_file.docx</b> — permission denied</span></div>
+  <div class="log" id="logArea">
+    <div class="line"><span class="rest">Select a folder to get started.</span></div>
   </div>
 
 </div>
 <script src="js/app.js"></script>
 </body>
 </html>
-
