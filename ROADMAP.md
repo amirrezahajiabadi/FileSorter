@@ -76,13 +76,16 @@ Version numbers below are for organization only and can shift. See
 **Phase 3 — New UI, screen by screen**
 - ✅ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
   wired to `AppController`. Runs via `python main_web.py`, parallel to the
-  Tkinter app. Move mode, duplicate handling, and Settings aren't wired
-  into this screen yet.
-- ⬜ **v4.3** — Settings screen (categories)
-- ⬜ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection
-- ⬜ **v4.5** — Undo, bilingual (fa/en), and dark/light in the new UI
-- ⬜ **v4.6** — Final polish: animations, visual details, full bilingual/theme
-  testing
+  Tkinter app. Includes: folder picker, categories grid, sort (copy/move),
+  duplicate handling (skip/rename/overwrite), analysis modal with charts,
+  undo, settings (categories editor), recent folders, theme toggle,
+  bilingual (fa/en), self-hosted fonts, drag & drop, toast notifications,
+  sorting animations, Persian date formatting.
+- ✅ **v4.3** — Settings screen (categories) — fully implemented in v4.2
+- ✅ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection — fully implemented in v4.2
+- ✅ **v4.5** — Undo, bilingual (fa/en), and dark/light — fully implemented in v4.2
+- ✅ **v4.6** — Final polish: animations, visual details, full bilingual/theme
+  testing — completed with toast notifications, drag & drop, self-hosted fonts
 - ⬜ **v5.0** — 🎉 Old Tkinter UI removed entirely; the new UI is the only
   interface. Official major release.
 

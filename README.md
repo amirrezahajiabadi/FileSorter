@@ -60,9 +60,10 @@ pip install pywebview
 python main_web.py
 ```
 
-This is a **separate, parallel** entry point — `main.py` (the Tkinter app
-above) is still the real, shipped app. See [ROADMAP.md](ROADMAP.md) for
-where this is headed and `web/README.md` for the design system.
+This is the **new shipped UI** — a modern HTML/CSS/JS interface served via
+PyWebView, replacing the old Tkinter app. See `web/README.md` for the
+design system and architecture details. `main.py` (the Tkinter app above)
+is kept for backward compatibility.
 
 ---
 
@@ -96,18 +97,21 @@ FileSorter/
 │   └── test_duplicate_handling.py # pytest suite for resolve_duplicate/plan_sort
 │   └── test_recent_folders.py    # pytest suite for the recent-folders helper
 │   └── test_controller.py        # pytest suite for AppController (sort/undo/settings)
+│   └── test_web_api.py           # pytest suite for main_web.py Api class
 ├── requirements.txt
 ├── build_installer.md
 ├── README.md
-├── web/                          # Phase 3 UI overhaul lives here — see web/README.md
-│   ├── index.html                 # design preview ("Sorting Line" identity) — not a real screen yet
+├── web/                          # New Web UI (pywebview) — see web/README.md
+│   ├── index.html                 # Main page — all modals, layout, structure
 │   ├── css/
-│   │   ├── design-tokens.css      # hand-authored colors, see web/README.md
-│   │   ├── fonts.css               # @font-face for the self-hosted fonts
-│   │   └── base.css
-│   ├── fonts/                      # self-hosted .woff2 fonts + OFL licenses
-│   └── js/
-│       └── app.js
+│   │   ├── themes.css             # Light/dark theme CSS variables
+│   │   └── main.css               # Layout, components, modals, responsive
+│   ├── js/
+│   │   ├── data.js                # Category metadata (icons, display names)
+│   │   ├── state.js               # Simple state management (pub/sub)
+│   │   ├── utils.js               # Helpers (formatSize, escapeHtml, etc.)
+│   │   └── app.js                 # Main app: pywebview bridge, event handlers
+│   └── assets/icons/              # (reserved for future use)
 └── poc/                          # throwaway experiments for the roadmap (not shipped)
     ├── webview_poc.py             # v4.0 — PyWebView + AppController proof of concept
     └── README.md
@@ -124,7 +128,11 @@ pip install pytest
 pytest
 ```
 
-Tests cover `app/sorter.py` (categorization, folder analysis, suggestions, size formatting) since it's pure logic with no UI dependency.
+Tests cover:
+- `app/sorter.py` — categorization, folder analysis, suggestions, size formatting (pure logic, no UI dependency)
+- `app/controller.py` — AppController (sort, undo, settings, analyze)
+- `main_web.py` — Web UI API layer (bridges JS ↔ AppController)
+- Duplicate handling and recent folders helpers
 
 These same tests run automatically on every push and pull request via [GitHub Actions](.github/workflows/tests.yml) — see the badge at the top of this page.
 
@@ -182,7 +190,7 @@ git push origin v3.6.0
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
 
-- **v4.2.0** — First *real* Web UI screen (Phase 3 of [ROADMAP.md](ROADMAP.md), still parallel to the Tkinter app — run with `python main_web.py`, requires `pip install pywebview`). Real folder picker, real Sort (copy mode), recent folders, and theme toggle — all live, wired to the actual `AppController`, with progress and log updates pushed to the page in real time as files are processed. Move mode, duplicate handling, Dry Run, Undo, and Settings are not in this screen yet — planned for v4.3/v4.4.
+- **v4.2.0** — First *real* Web UI screen (Phase 3 of [ROADMAP.md](ROADMAP.md), still parallel to the Tkinter app — run with `python main_web.py`, requires `pip install pywebview`). Features include: real folder picker, Sort (copy/move mode), duplicate handling (skip/rename/overwrite), Dry Run preview, Undo, Settings (categories), recent folders, theme toggle (dark/light), bilingual support (fa/en), self-hosted fonts (no CDN dependency), drag & drop, toast notifications, sorting animations, and Persian date formatting — all wired to the actual `AppController`.
 - **v4.1.1** — No user-facing changes. Finalized the web UI's visual identity: "Sorting Line" — a distinct design deliberately grounded in what the app does (files moving into labeled bins), not a port of the Tkinter look. Replaced the auto-generated palette from v4.1.0 with a hand-authored one (colors no longer need to match Tkinter — see `web/README.md` for why), and self-hosted three font families (Space Grotesk, Inter, JetBrains Mono) so the app doesn't depend on internet access to render its own UI.
 - **v4.1.0** — No user-facing changes. Added the `web/` folder structure for the planned UI overhaul (Phase 2 of [ROADMAP.md](ROADMAP.md)): a placeholder page, base styles, and — most importantly — `scripts/generate_theme_css.py`, which generates the web frontend's dark/light color palette directly from `app/themes.py` so the two can never drift out of sync. Verified pixel-for-pixel against the real theme colors.
 - **v4.0.0** — No user-facing changes. Added a throwaway PyWebView proof-of-concept (`poc/webview_poc.py`, not part of the shipped app) that confirms a real HTML/JS UI can drive the actual `AppController` — the technical foundation for the planned UI overhaul (Phase 2 of [ROADMAP.md](ROADMAP.md)). See `poc/README.md`.
