@@ -98,6 +98,19 @@ def test_sort_populates_last_sort_log(controller, tmp_path):
     assert controller.last_sort_log[0]["action"] == "moved"
 
 
+def test_sort_log_entries_include_name_and_category(controller, tmp_path):
+    (tmp_path / "a.jpg").write_bytes(b"x")
+    controller.sort(str(tmp_path), move=True)
+    entry = controller.last_sort_log[0]
+    assert entry["name"] == "a.jpg"
+    assert entry["category"] == "images"
+
+
+def test_update_categories_persists_meta(controller, tmp_path):
+    controller.update_categories({"memes": [".jpg"], "others": []}, meta={"memes": {"icon": "🎭", "nameEn": "Memes", "nameFa": "میم"}})
+    assert controller.category_meta["memes"]["icon"] == "🎭"
+
+
 def test_sort_emits_events_in_order(controller, tmp_path):
     (tmp_path / "a.jpg").write_bytes(b"x")
     (tmp_path / "b.txt").write_bytes(b"x")

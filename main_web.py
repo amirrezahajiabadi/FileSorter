@@ -43,6 +43,7 @@ class Api:
         return {
             "version": APP_VERSION,
             "categories": self.controller.categories,
+            "categoryMeta": self.controller.category_meta,
             "recentFolders": self.controller.recent_folders,
             "theme": self.controller.theme_name,
             "language": self.controller.language,
@@ -165,15 +166,15 @@ class Api:
 
     # ── Settings ───────────────────────────────────────────────
 
-    def save_categories(self, categories: dict) -> bool:
-        """Persist updated categories to settings."""
-        self.controller.update_categories(categories)
+    def save_categories(self, categories: dict, meta: dict = None) -> bool:
+        """Persist updated categories (and optional display metadata) to settings."""
+        self.controller.update_categories(categories, meta)
         return True
 
     def restore_defaults(self) -> dict:
         """Reset categories to defaults and return them."""
         self.controller.update_categories(
-            {k: list(v) for k, v in DEFAULT_CATEGORIES.items()}
+            {k: list(v) for k, v in DEFAULT_CATEGORIES.items()}, meta={}
         )
         return self.controller.categories
 

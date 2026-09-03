@@ -32,6 +32,7 @@ class AppController:
     def __init__(self):
         self.settings = load_settings()
         self.categories = self.settings.get("categories", DEFAULT_CATEGORIES.copy())
+        self.category_meta = self.settings.get("category_meta", {})
         self.language = self.settings.get("language", "fa")
         self.theme_name = self.settings.get("theme", "light")
         self.recent_folders = self.settings.get("recent_folders", [])
@@ -51,9 +52,12 @@ class AppController:
         self.settings["theme"] = theme_name
         save_settings(self.settings)
 
-    def update_categories(self, categories: dict) -> None:
+    def update_categories(self, categories: dict, meta: dict = None) -> None:
         self.categories = categories
         self.settings["categories"] = categories
+        if meta is not None:
+            self.category_meta = meta
+            self.settings["category_meta"] = meta
         save_settings(self.settings)
 
     def record_recent_folder(self, path: str) -> list:
@@ -134,12 +138,14 @@ class AppController:
                     try:
                         if move:
                             shutil.move(str(source), str(final_dest))
-                            sort_log.append({"action": "moved", "source": source, "final_dest": final_dest})
+                            sort_log.append({"action": "moved", "source": source, "final_dest": final_dest,
+                              "name": item["name"], "category": category})
                             emit("item", {"status": "ok", "name": item["final_name"],
                                           "category": category, "action": "moved"})
                         else:
                             shutil.copy2(source, final_dest)
-                            sort_log.append({"action": "copied", "source": source, "final_dest": final_dest})
+                            sort_log.append({"action": "copied", "source": source, "final_dest": final_dest,
+                               "name": item["name"], "category": category})
                             emit("item", {"status": "ok", "name": item["final_name"],
                                           "category": category, "action": "copied"})
                         copied += 1
