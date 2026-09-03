@@ -31,9 +31,13 @@ EVENT_ERROR = "error"
 EVENT_WATCH_ITEM = "watch_item"
 EVENT_WATCH_ERROR = "watch_error"
 
+EVENT_DUP_PROGRESS = "dup_progress"
+EVENT_DUP_DONE = "dup_done"
+
 EVENT_KINDS = frozenset({
     EVENT_TOTAL, EVENT_ITEM, EVENT_PROGRESS, EVENT_DONE, EVENT_ERROR,
     EVENT_WATCH_ITEM, EVENT_WATCH_ERROR,
+    EVENT_DUP_PROGRESS, EVENT_DUP_DONE,
 })
 
 # ── Duplicate-handling modes ────────────────────────────────────
@@ -128,6 +132,44 @@ class UndoDone(TypedDict):
     removed: int
     failed: int
     nothing: bool
+
+
+class DupProgress(TypedDict):
+    """Payload of a dup_progress event while a scan is running."""
+
+    phase: str  # "listing" | "hashing"
+    processed: int
+    total: int
+
+
+class DupFile(TypedDict):
+    """One copy of a duplicate group."""
+
+    path: str
+    size: int
+
+
+class DupGroup(TypedDict):
+    """A set of files with identical content."""
+
+    id: str  # short sha256 prefix
+    size: int  # bytes of one copy
+    files: List[DupFile]
+
+
+class DupDone(TypedDict):
+    """Payload of the dup_done event when a scan finishes."""
+
+    groups: List[DupGroup]
+    wasted_bytes: int
+    files_scanned: int
+
+
+class DupDeleteResult(TypedDict):
+    """Return of Api.delete_duplicates()."""
+
+    deleted: List[str]
+    failed: List[dict]  # [{"path": str, "error": str}, ...]
 
 
 class EventMessage(TypedDict):

@@ -195,7 +195,37 @@ class Api:
         except Exception as e:
             self._push("error", str(e))
 
-    # ── Watch mode (auto-sort folders) ─────────────────────────
+    # ── Duplicate finder ─────────────────────────────────────────
+
+    def find_duplicates(self, path: str) -> bool:
+        """Kick off a duplicate scan on a background thread. Returns
+        immediately; progress and the final groups arrive via
+        window.onSortEvent() (dup_progress / dup_done)."""
+        threading.Thread(
+            target=self._run_dup_scan, args=(path,), daemon=True
+        ).start()
+        return True
+
+    def _run_dup_scan(self, path: str) -> None:
+        def on_event(kind, payload):
+            self._push(kind, payload)
+
+        try:
+            self.controller.scan_duplicates(path, on_event=on_event)
+        except Exception as e:
+            self._push("error", str(e))
+
+    def delete_duplicates(self, paths: list) -> dict:
+        """Permanently delete the given duplicate copies (whitelisted to
+        the last scan). Returns {"deleted": [...], "failed": [...]}."""
+        try:
+            return self.controller.delete_duplicates(paths)
+        except Exception as e:
+            return {
+                "deleted": [],
+                "failed": [{"path": p, "error": str(e)} for p in paths],
+            }
+
 
     def add_watch_folder(self, path: str) -> bool:
         """Add a folder to the watch list and start watching it if the

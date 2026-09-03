@@ -21,6 +21,7 @@ from pathlib import Path
 
 from app.constants import DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings, add_recent_folder
+from app.duplicates import delete_files, scan_duplicates
 from app.sorter import analyze_folder, plan_sort
 
 
@@ -36,6 +37,7 @@ class AppController:
         self.recent_folders = self.settings.get("recent_folders", [])
         self.watch_folders = self.settings.get("watched_folders", [])
         self.last_sort_log = []  # for undo: list of {"action", "source", "final_dest"}
+        self.last_dup_paths = set()  # whitelist of paths the last duplicate scan flagged
 
     # ══════════════════════════════════════════════════════════════
     #  Settings
@@ -99,6 +101,32 @@ class AppController:
     # ══════════════════════════════════════════════════════════════
     #  Sort
     # ══════════════════════════════════════════════════════════════
+
+    def scan_duplicates(self, path: str, on_event=None) -> dict:
+        """Find duplicate files under `path` (identical content), reporting
+        progress through on_event(kind, payload):
+
+        - ("dup_progress", {"phase": "listing"|"hashing",
+                            "processed": int, "total": int}) — repeatedly
+
+        Returns {"groups", "wasted_bytes", "files_scanned"} and records
+        the flagged file paths as the deletion whitelist for
+        delete_duplicates().
+        """
+        result = scan_duplicates(Path(path), on_event=on_event)
+        self.last_dup_paths = {
+            Path(f["path"])
+            for group in result["groups"]
+            for f in group["files"]
+        }
+        return result
+
+    def delete_duplicates(self, paths: list) -> dict:
+        """Delete the given duplicate copies — only paths the last scan
+        flagged are touched (see duplicates.delete_files). Returns
+        {"deleted": [...], "failed": [{"path", "error"}]}.
+        """
+        return delete_files(list(paths), self.last_dup_paths)
 
     def sort(self, path: str, move: bool = False, duplicate_mode: str = "skip", on_event=None) -> dict:
         """Run a real sort, reporting progress through on_event(kind, payload).
