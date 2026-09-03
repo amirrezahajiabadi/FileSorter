@@ -76,6 +76,7 @@ STRINGS = {
         "analysis_window_title": "Folder Analysis",
         "analysis_header": "🔍  Folder Analysis",
         "analysis_subheader": "Review the report below before sorting",
+    "output_dir_label": "Output folder",
         "total_files": "Total Files",
         "total_size": "Total Size",
         "large_files": "Large Files",
@@ -203,6 +204,7 @@ STRINGS = {
 
         "analysis_window_title": "تحلیل پوشه",
         "analysis_header": "🔍  تحلیل پوشه",
+    "output_dir_label": "پوشه خروجی",
         "analysis_subheader": "قبل از مرتب‌سازی، گزارش زیر را بررسی کنید",
         "total_files": "کل فایل‌ها",
         "total_size": "حجم کل",
