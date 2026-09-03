@@ -24,6 +24,7 @@ from app.constants import APP_VERSION, DEFAULT_CATEGORIES
 from app.controller import AppController
 from app.i18n import STRINGS
 from app.protocol import plan_item_wire
+from app.watcher import WatchManager
 
 
 def _base_dir() -> Path:
@@ -69,6 +70,11 @@ class Api:
     def __init__(self):
         self.controller = AppController()
         self.window = None  # set in main() once the window exists
+        self.watch_manager = WatchManager(
+            get_categories=lambda: self.controller.categories,
+            on_event=self._push,
+        )
+        self.watch_manager.update_folders(self.controller.watch_folders)
 
     def get_state(self) -> dict:
         """Everything the page needs on load."""
@@ -77,6 +83,7 @@ class Api:
             "categories": self.controller.categories,
             "categoryMeta": self.controller.category_meta,
             "recentFolders": self.controller.recent_folders,
+            "watchedFolders": self.controller.watch_folders,
             "theme": self.controller.theme_name,
             "language": self.controller.language,
         }
@@ -187,6 +194,33 @@ class Api:
             self.controller.undo(on_event=on_event)
         except Exception as e:
             self._push("error", str(e))
+
+    # ── Watch mode (auto-sort folders) ─────────────────────────
+
+    def add_watch_folder(self, path: str) -> bool:
+        """Add a folder to the watch list and start watching it if the
+        watcher is already running."""
+        if self.controller.add_watch_folder(path):
+            self.watch_manager.update_folders(self.controller.watch_folders)
+        return True
+
+    def remove_watch_folder(self, path: str) -> bool:
+        """Remove a folder from the watch list."""
+        if self.controller.remove_watch_folder(path):
+            self.watch_manager.update_folders(self.controller.watch_folders)
+        return True
+
+    def start_watch(self) -> bool:
+        """Start the background polling thread. Returns immediately; per-file
+        decisions arrive via window.onSortEvent() watch_item/watch_error."""
+        self.watch_manager.update_folders(self.controller.watch_folders)
+        self.watch_manager.start()
+        return True
+
+    def stop_watch(self) -> bool:
+        """Stop the background polling thread."""
+        self.watch_manager.stop()
+        return True
 
     # ── Settings ───────────────────────────────────────────────
 

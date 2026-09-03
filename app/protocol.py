@@ -28,7 +28,13 @@ EVENT_PROGRESS = "progress"
 EVENT_DONE = "done"
 EVENT_ERROR = "error"
 
-EVENT_KINDS = frozenset({EVENT_TOTAL, EVENT_ITEM, EVENT_PROGRESS, EVENT_DONE, EVENT_ERROR})
+EVENT_WATCH_ITEM = "watch_item"
+EVENT_WATCH_ERROR = "watch_error"
+
+EVENT_KINDS = frozenset({
+    EVENT_TOTAL, EVENT_ITEM, EVENT_PROGRESS, EVENT_DONE, EVENT_ERROR,
+    EVENT_WATCH_ITEM, EVENT_WATCH_ERROR,
+})
 
 # ── Duplicate-handling modes ────────────────────────────────────
 MODE_SKIP = "skip"
@@ -64,6 +70,7 @@ class AppState(TypedDict):
     categories: Dict[str, List[str]]
     categoryMeta: Dict[str, CategoryMeta]
     recentFolders: List[str]
+    watchedFolders: List[str]
     theme: str  # "light" | "dark"
     language: str  # "fa" | "en"
 
@@ -95,6 +102,23 @@ class SortDone(TypedDict):
     errors: int
     target_dir: str
     sort_log: List[SortLogEntry]
+
+
+class WatchItem(TypedDict):
+    """One auto-sorted file reported by the watch manager (watch_item)."""
+
+    folder: str
+    name: str
+    category: str
+    action: str  # "moved" | "skipped" | "error"
+    error: str  # present only when action == "error"
+
+
+class WatchError(TypedDict):
+    """Folder-level failure reported by the watch manager (watch_error)."""
+
+    folder: str
+    message: str
 
 
 class UndoDone(TypedDict):

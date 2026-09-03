@@ -34,6 +34,7 @@ class AppController:
         self.language = self.settings.get("language", "fa")
         self.theme_name = self.settings.get("theme", "light")
         self.recent_folders = self.settings.get("recent_folders", [])
+        self.watch_folders = self.settings.get("watched_folders", [])
         self.last_sort_log = []  # for undo: list of {"action", "source", "final_dest"}
 
     # ══════════════════════════════════════════════════════════════
@@ -63,6 +64,23 @@ class AppController:
         add_recent_folder(self.settings, path)
         self.recent_folders = self.settings["recent_folders"]
         return self.recent_folders
+
+
+    def add_watch_folder(self, path: str) -> list:
+        """Add `path` to the watched-folder list (persisted). Returns the list."""
+        if path not in self.watch_folders:
+            self.watch_folders.append(path)
+            self.settings["watched_folders"] = self.watch_folders
+            save_settings(self.settings)
+        return self.watch_folders
+
+    def remove_watch_folder(self, path: str) -> list:
+        """Remove `path` from the watched-folder list (persisted). Returns the list."""
+        if path in self.watch_folders:
+            self.watch_folders.remove(path)
+            self.settings["watched_folders"] = self.watch_folders
+            save_settings(self.settings)
+        return self.watch_folders
 
     # ══════════════════════════════════════════════════════════════
     #  Analysis / planning — pure, synchronous, safe on any thread
