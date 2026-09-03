@@ -20,6 +20,7 @@ import type {
   PlanItem,
   SortDone,
   SortItemEvent,
+  SpaceDone,
   ThemeName,
   UndoDone,
   WatchError,
@@ -112,6 +113,12 @@ export interface UIState {
   dupProcessed: number;
   dupTotal: number;
   dupGroups: DupGroupRow[];
+  diskOpen: boolean;
+  diskScanning: boolean;
+  diskScanFolder: string | null;
+  diskProcessed: number;
+  diskBytes: number;
+  diskReport: SpaceDone | null;
   notice: Notice | null;
 }
 
@@ -151,6 +158,12 @@ const initial: UIState = {
   dupProcessed: 0,
   dupTotal: 0,
   dupGroups: [],
+  diskOpen: false,
+  diskScanning: false,
+  diskScanFolder: null,
+  diskProcessed: 0,
+  diskBytes: 0,
+  diskReport: null,
   notice: null,
 };
 
@@ -412,6 +425,24 @@ function handleEvent(msg: SortEvent): void {
         })),
       }));
       set({ dupScanning: false, dupPhase: 'idle', dupGroups: rows });
+      break;
+    }
+    case 'space_progress': {
+      const p = payload as { phase: 'scanning'; processed: number; bytes: number };
+      set({
+        diskScanning: true,
+        diskProcessed: p.processed,
+        diskBytes: p.bytes,
+      });
+      break;
+    }
+    case 'space_done': {
+      set({
+        diskScanning: false,
+        diskProcessed: 0,
+        diskBytes: 0,
+        diskReport: payload as SpaceDone,
+      });
       break;
     }
     case 'error': {
@@ -889,6 +920,56 @@ export async function deleteSelectedDupes(): Promise<void> {
   } catch (err) {
     showNotice('error', String(err));
   }
+}
+
+// ── Disk space analysis ────────────────────────────────────────
+
+export function openDiskPanel(): void {
+  set({ diskOpen: true });
+}
+
+export function closeDiskPanel(): void {
+  set({
+    diskOpen: false,
+    diskScanning: false,
+    diskScanFolder: null,
+    diskProcessed: 0,
+    diskBytes: 0,
+    diskReport: null,
+  });
+}
+
+async function startDiskScan(path: string): Promise<void> {
+  set({
+    diskScanning: true,
+    diskScanFolder: path,
+    diskProcessed: 0,
+    diskBytes: 0,
+    diskReport: null,
+  });
+  try {
+    await bridge.scan_disk(path);
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ diskScanning: false });
+  }
+}
+
+export async function diskScanCurrent(): Promise<void> {
+  if (!state.folder) return;
+  await startDiskScan(state.folder);
+}
+
+export async function diskScanBrowse(): Promise<void> {
+  const path = await bridge.browse_folder();
+  if (!path) return;
+  await startDiskScan(path);
+}
+
+export async function diskScanFolder(): Promise<void> {
+  const path = state.diskScanFolder ?? state.folder;
+  if (!path) return;
+  await startDiskScan(path);
 }
 
 // React bindings: components re-render on any store change.

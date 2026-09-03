@@ -26,6 +26,7 @@ import type {
   PlanItem,
   SortDone,
   SortItemEvent,
+  SpaceDone,
   ThemeName,
   UndoDone,
   WatchError,
@@ -51,6 +52,7 @@ export interface BridgeApi {
   undo_sort(): Promise<boolean>;
   find_duplicates(path: string): Promise<boolean>;
   delete_duplicates(paths: string[]): Promise<DupDeleteResult>;
+  scan_disk(path: string): Promise<boolean>;
   add_watch_folder(path: string): Promise<boolean>;
   remove_watch_folder(path: string): Promise<boolean>;
   start_watch(): Promise<boolean>;
@@ -122,7 +124,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.2.0',
+  version: '5.3.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   recentFolders: [],
@@ -354,6 +356,43 @@ function createMockBridge(): BridgeApi {
         }
       }
       return { deleted, failed };
+    },
+    async scan_disk(): Promise<boolean> {
+      // Simulate a live disk scan: stream counters, then report a
+      // deterministic sample breakdown (bytes kept consistent between
+      // category totals, the total, and the largest files).
+      const MB = 1024 * 1024;
+      const SAMPLE_SPACE: SpaceDone = {
+        by_category: {
+          videos: { files: 4, bytes: 1280 * MB },
+          images: { files: 12, bytes: 348 * MB },
+          archives: { files: 9, bytes: 380 * MB },
+          documents: { files: 86, bytes: 41 * MB },
+          others: { files: 23, bytes: 18 * MB },
+        },
+        top_files: [
+          { path: 'D:/Sample Folder/videos/holiday-2023.mp4', size: 890 * MB },
+          { path: 'D:/Sample Folder/videos/screen-rec-12.mp4', size: 390 * MB },
+          { path: 'D:/Sample Folder/archives/backup-2024.zip', size: 380 * MB },
+          { path: 'D:/Sample Folder/images/wallpaper-4k.png', size: 212 * MB },
+          { path: 'D:/Sample Folder/documents/annual-report.pdf', size: 24 * MB },
+          { path: 'D:/Sample Folder/others/disk-image.img', size: 18 * MB },
+        ],
+        files_scanned: 134,
+        total_bytes: 2067 * MB,
+      };
+      const steps = 6;
+      for (let i = 1; i <= steps; i++) {
+        await sleep(140);
+        const frac = i / steps;
+        emit('space_progress', {
+          phase: 'scanning',
+          processed: Math.round(SAMPLE_SPACE.files_scanned * frac),
+          bytes: Math.round(SAMPLE_SPACE.total_bytes * frac),
+        });
+      }
+      emit('space_done', SAMPLE_SPACE);
+      return true;
     },
     async undo_sort(): Promise<boolean> {
       const items: SortItemEvent[] = [

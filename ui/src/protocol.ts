@@ -18,7 +18,9 @@ export type EventKind =
   | 'watch_item'
   | 'watch_error'
   | 'dup_progress'
-  | 'dup_done';
+  | 'dup_done'
+  | 'space_progress'
+  | 'space_done';
 
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
@@ -34,6 +36,8 @@ export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
   'watch_error',
   'dup_progress',
   'dup_done',
+  'space_progress',
+  'space_done',
 ]);
 
 // ── Wire shapes ─────────────────────────────────────────────────
@@ -132,6 +136,31 @@ export interface DupDone {
 export interface DupDeleteResult {
   deleted: string[];
   failed: { path: string; error: string }[];
+}
+
+// ── Disk space analysis (Api.scan_disk) ──────────────────────────
+
+export interface SpaceCategory {
+  files: number;
+  bytes: number;
+}
+
+export interface SpaceTopFile {
+  path: string;
+  size: number;
+}
+
+export interface SpaceProgress {
+  phase: 'scanning';
+  processed: number;
+  bytes: number;
+}
+
+export interface SpaceDone {
+  by_category: Record<string, SpaceCategory>;
+  top_files: SpaceTopFile[];
+  files_scanned: number;
+  total_bytes: number;
 }
 
 // ── Analysis report (Api.analyze_folder) ────────────────────────
