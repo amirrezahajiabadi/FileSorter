@@ -1,0 +1,165 @@
+/* ============================================================
+   Design tokens + base styles
+   Identical palette/fonts to the previous UI (themes.css), so the
+   visual identity carries over to the new React app unchanged.
+   ============================================================ */
+
+@import './assets/fonts/fonts.css';
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ---------- Light theme (default) ---------- */
+
+:root {
+  --bg-primary: #f7f7fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f0f5;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f7f7fa;
+  --bg-input: #f7f7fa;
+  --bg-input-hover: #f0f0f5;
+  --bg-input-focus: #ffffff;
+
+  --accent-primary: #6c63ff;
+  --accent-primary-hover: #5a52e0;
+  --accent-primary-active: #4a43c4;
+  --accent-primary-light: #eeedff;
+
+  --accent-secondary: #00d4aa;
+  --accent-secondary-hover: #00c896;
+  --accent-secondary-light: #e6fff7;
+
+  --text-primary: #1a1a1e;
+  --text-secondary: #6b6b7a;
+  --text-muted: #9a9aab;
+  --text-disabled: #b8b8c5;
+  --text-inverse: #ffffff;
+
+  --border-default: #e4e4ec;
+  --border-hover: #c8c8d4;
+  --border-focus: #6c63ff;
+
+  --status-success: #00c896;
+  --status-success-bg: #e6fff7;
+  --status-warning: #f59e0b;
+  --status-warning-bg: #fff8e6;
+  --status-error: #ef4444;
+  --status-error-bg: #ffe6e6;
+  --status-info: #3b82f6;
+  --status-info-bg: #e6f0ff;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- Dark theme ---------- */
+
+[data-theme='dark'] {
+  --bg-primary: #0d0d0f;
+  --bg-secondary: #1a1a1e;
+  --bg-tertiary: #232329;
+  --bg-card: #1a1a1e;
+  --bg-card-hover: #232329;
+  --bg-input: #232329;
+  --bg-input-hover: #2c2c33;
+  --bg-input-focus: #1a1a1e;
+
+  --accent-primary: #7c73ff;
+  --accent-primary-hover: #6c63ff;
+  --accent-primary-active: #5a52e0;
+  --accent-primary-light: #2a2850;
+
+  --accent-secondary: #00e6b8;
+  --accent-secondary-hover: #00d4aa;
+  --accent-secondary-light: #0a3328;
+
+  --text-primary: #ededf0;
+  --text-secondary: #8a8a99;
+  --text-muted: #5a5a6a;
+  --text-disabled: #3d3d4a;
+  --text-inverse: #0d0d0f;
+
+  --border-default: #2c2c33;
+  --border-hover: #3d3d4a;
+  --border-focus: #7c73ff;
+
+  --status-success: #00e6b8;
+  --status-success-bg: #0a3328;
+  --status-warning: #fbbf24;
+  --status-warning-bg: #332a0a;
+  --status-error: #f87171;
+  --status-error-bg: #331a1a;
+  --status-info: #60a5fa;
+  --status-info-bg: #1a2a40;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Theme transition ---------- */
+
+body,
+#app,
+button,
+section {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* ---------- Scrollbar ---------- */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
