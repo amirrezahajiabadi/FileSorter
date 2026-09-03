@@ -12,7 +12,7 @@ var app, themeBtn, langBtn, langLabel, settingsBtn;
 var folderPath, browseBtn, primaryBtn, fileCount;
 var categoryGrid, logList;
 var progressSection, progressFill, progressPercent, progressDetails;
-var resultsSection, undoBtn, viewFullLog;
+var resultsSection, undoBtn;
 var recentBtn, recentDropdown;
 var addCategoryBtn;
 
@@ -31,19 +31,26 @@ function openModal(el) { el.classList.add('visible'); }
 function closeModal(el) { el.classList.remove('visible'); }
 
 // Convert Python categories dict {"images": [".jpg", ".png"]} to display array
-function buildCategoriesArray(categoriesDict, lang) {
+function buildCategoriesArray(categoriesDict, lang, metaMap) {
     var arr = [];
     var keys = Object.keys(categoriesDict);
     for (var i = 0; i < keys.length; i++) {
         var id = keys[i];
         var exts = categoriesDict[id];
-        var meta = CATEGORY_META[id] || { icon: '📁', nameEn: id, nameFa: id };
+        var saved = (metaMap && metaMap[id]) || {};
+        var meta = saved.icon || saved.nameEn || saved.nameFa
+            ? saved
+            : (CATEGORY_META[id] || { icon: '📁', nameEn: id, nameFa: id });
+        var fallback = CATEGORY_META[id] || {};
+        var icon = meta.icon || fallback.icon || '📁';
+        var nameEn = meta.nameEn || fallback.nameEn || id;
+        var nameFa = meta.nameFa || fallback.nameFa || id;
         arr.push({
             id: id,
-            icon: meta.icon,
-            name: lang === 'fa' ? meta.nameFa : meta.nameEn,
-            nameEn: meta.nameEn,
-            nameFa: meta.nameFa,
+            icon: icon,
+            name: lang === 'fa' ? nameFa : nameEn,
+            nameEn: nameEn,
+            nameFa: nameFa,
             extensions: exts.map(function(e) { return e.replace('.', ''); }),
             count: 0,
             size: '0 B',
@@ -84,11 +91,7 @@ window.addEventListener('pywebviewready', async function() {
     progressPercent = $('#progressPercent');
     progressDetails = $('#progressDetails');
     resultsSection = $('#resultsSection');
-    resetBtn = $('#resetBtn');
-    redoBtn = $('#redoBtn');
     undoBtn = $('#undoBtn');
-    viewLogBtn = $('#viewLogBtn');
-    viewFullLog = $('#viewFullLog');
     recentBtn = $('#recentBtn');
     recentDropdown = $('#recentDropdown');
     addCategoryBtn = $('#addCategoryBtn');
@@ -146,7 +149,8 @@ window.addEventListener('pywebviewready', async function() {
         applyLanguage();
 
         // Build categories from Python data
-        State.categories = buildCategoriesArray(state.categories, State.lang);
+        State.categoryMeta = state.categoryMeta || {};
+        State.categories = buildCategoriesArray(state.categories, State.lang, State.categoryMeta);
 
         // Render everything
         renderCategories();
@@ -172,9 +176,6 @@ window.addEventListener('pywebviewready', async function() {
         console.error('Failed to initialize:', e);
     }
 
-    // Setup drag & drop
-    setupDragDrop();
-
     // Hide splash
     var splash = document.getElementById('splash');
     if (splash) {
@@ -182,45 +183,6 @@ window.addEventListener('pywebviewready', async function() {
         setTimeout(function() { splash.remove(); }, 500);
     }
 });
-
-
-// ── Drag & Drop ──────────────────────────────────────────────
-function setupDragDrop() {
-    var folderSelector = document.querySelector('.folder-selector');
-    if (!folderSelector) return;
-    
-    folderSelector.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        folderSelector.classList.add('drag-over');
-    });
-    
-    folderSelector.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        folderSelector.classList.remove('drag-over');
-    });
-    
-    folderSelector.addEventListener('drop', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        folderSelector.classList.remove('drag-over');
-        
-        var items = e.dataTransfer.items;
-        if (items && items.length > 0) {
-            // Try to get the path from the first item
-            var item = items[0];
-            if (item.getAsEntry) {
-                var entry = item.getAsEntry();
-                if (entry && entry.isDirectory) {
-                    // We can't get the full path from web browser for security
-                    // but we can show a message
-                    log('info', (State.lang === 'fa' ? 'پوشه رها شد: ' : 'Folder dropped: ') + entry.name);
-                }
-            }
-        }
-    });
-}
 
 
 // ── Toast Notifications ──────────────────────────────────────
@@ -250,24 +212,6 @@ function showToast(message, type) {
     }, 3000);
 }
 
-
-// ── Cancel Sort ──────────────────────────────────────────────
-function cancelSort() {
-    var msg = State.lang === 'fa' 
-        ? 'آیا مطمئن هستید؟ عملیات در حال انجام است.'
-        : 'Are you sure? Operation is in progress.';
-    if (confirm(msg)) {
-        showToast(State.lang === 'fa' ? 'لغو درخواست شد' : 'Cancel requested', 'warning');
-    }
-}
-
-// Show/hide cancel button based on processing state
-function updateCancelButton() {
-    var cancelBtn = document.getElementById('cancelSortBtn');
-    if (cancelBtn) {
-        cancelBtn.style.display = State.isProcessing ? 'inline-flex' : 'none';
-    }
-}
 
 // ── Theme ────────────────────────────────────────────────────
 
@@ -299,7 +243,7 @@ async function toggleLang() {
     for (var i = 0; i < State.categories.length; i++) {
         catsDict[State.categories[i].id] = State.categories[i].extensions;
     }
-    State.categories = buildCategoriesArray(catsDict, newLang);
+    State.categories = buildCategoriesArray(catsDict, newLang, State.categoryMeta || {});
 
     applyLanguage();
     renderCategories();
@@ -476,9 +420,6 @@ function updateUI() {
         }
     }
 
-    // Cancel button
-    updateCancelButton();
-
     // Undo button
     if (undoBtn) {
         undoBtn.style.display = State.hasUndoLog ? 'inline-flex' : 'none';
@@ -526,7 +467,13 @@ function renderSettingsList() {
 
 async function saveSettings() {
     var dict = buildCategoriesDict(State.categories);
-    await pywebview.api.save_categories(dict);
+    var meta = {};
+    for (var i = 0; i < State.categories.length; i++) {
+        var cat = State.categories[i];
+        meta[cat.id] = { icon: cat.icon, nameEn: cat.nameEn, nameFa: cat.nameFa };
+    }
+    State.categoryMeta = meta;
+    await pywebview.api.save_categories(dict, meta);
     closeModal(settingsModal);
     log('info', '✅ ' + (State.lang === 'fa' ? 'تنظیمات ذخیره شد' : 'Settings saved'));
 }
@@ -534,6 +481,7 @@ async function saveSettings() {
 async function restoreDefaults() {
     if (!confirm(State.lang === 'fa' ? 'بازگردانی به حالت پیش‌فرض؟' : 'Restore defaults?')) return;
     var dict = await pywebview.api.restore_defaults();
+    State.categoryMeta = {};
     State.categories = buildCategoriesArray(dict, State.lang);
     renderSettingsList();
     renderCategories();
@@ -594,6 +542,9 @@ function saveEdit() {
         cat.name = name;
         cat.icon = icon;
         cat.extensions = exts;
+        if (State.lang === 'fa') { cat.nameFa = name; } else { cat.nameEn = name; }
+        if (!cat.nameEn) cat.nameEn = name;
+        if (!cat.nameFa) cat.nameFa = name;
     }
     renderSettingsList();
     renderCategories();
@@ -991,6 +942,13 @@ window.onSortEvent = function(event) {
                 summaryHtml += '<div class="summary-item error"><div class="value">' + errors + '</div><div class="label">' + (State.lang === 'fa' ? 'خطا' : 'Errors') + '</div></div>';
                 summaryHtml += '<div class="summary-item info"><div class="value">' + State.totalFiles + '</div><div class="label">' + (State.lang === 'fa' ? 'کل' : 'Total') + '</div></div>';
                 resultsSummaryEl.innerHTML = summaryHtml;
+            }
+
+            // Results subtitle (output folder)
+            var resultsSubtitle = document.getElementById('resultsSubtitle');
+            if (resultsSubtitle) {
+                var outDir = payload.target_dir || '';
+                resultsSubtitle.textContent = (State.lang === 'fa' ? 'خروجی در پوشه: ' : 'Output folder: ') + outDir;
             }
         }
 

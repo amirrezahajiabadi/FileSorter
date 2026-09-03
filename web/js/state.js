@@ -8,6 +8,7 @@ const State = {
     screen: 'idle',       // 'idle' | 'progress' | 'completed'
     folder: '',
     categories: [],       // Populated from pywebview.api.get_state() on init
+    categoryMeta: {},     // Persisted display metadata (icon, names) per category
     recentFolders: [],
     logs: [],
     totalFiles: 0,

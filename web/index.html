@@ -111,7 +111,6 @@
                     <span class="percentage" id="progressPercent">0%</span>
                     <span id="progressDetails"></span>
                 </div>
-                <button class="btn-cancel-sort" id="cancelSortBtn" onclick="cancelSort()" style="display:none;">✖ لغو</button>
             </div>
 
             <!-- Results -->
@@ -129,10 +128,10 @@
                 </div>
 
                 <div class="results-actions">
-                    <button class="btn" onclick="resetApp()" data-i18n="undo_btn">↩ بازگشت</button>
+                    <button class="btn" onclick="resetApp()" data-i18n="start_over_btn">↩ شروع دوباره</button>
                     <button class="btn" onclick="viewFullLog()" data-i18n="log_header">📋 لاگ کامل</button>
                     <button class="btn" onclick="redoSort()" data-i18n="redo_btn">🔄 مرتب‌سازی مجدد</button>
-                    <button class="btn btn-danger" onclick="showUndoModal()" id="undoBtn" style="display:none;">↩ Undo</button>
+                    <button class="btn btn-danger" id="undoBtn" style="display:none;" data-i18n="undo_btn" onclick="showUndoModal()">↩ Undo Last Sort</button>
                 </div>
             </div>
 

@@ -173,23 +173,6 @@ body {
 .folder-selector:hover {
     border-color: var(--border-focus);
 }
-/* Drag & Drop */
-.folder-selector.drag-over {
-    border-color: var(--accent-secondary);
-    background: var(--accent-secondary-light);
-    transform: scale(1.02);
-}
-
-.folder-selector.drag-over .icon {
-    animation: bounce 0.5s ease;
-}
-
-@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-}
-
-
 .folder-selector .icon {
     font-size: 20px;
     flex-shrink: 0;
@@ -1495,27 +1478,4 @@ body {
 @keyframes sortingLine {
     0% { left: -50%; }
     100% { left: 100%; }
-}
-
-/* Cancel Sort Button */
-.btn-cancel-sort {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 20px;
-    border: 1.5px solid var(--status-error);
-    border-radius: 10px;
-    background: transparent;
-    color: var(--status-error);
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    margin-top: 8px;
-}
-
-.btn-cancel-sort:hover {
-    background: var(--status-error);
-    color: white;
 }

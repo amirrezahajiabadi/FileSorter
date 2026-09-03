@@ -119,6 +119,7 @@ STRINGS = {
 
         "undo_btn": "↩  Undo Last Sort",
         "redo_btn": "🔄  Redo Sort",
+        "start_over_btn": "↩  Start Over",
         "undo_confirm_title": "Undo Last Sort",
         "undo_confirm_msg": "This will reverse the last sort: moved files go back to their original location, and copies made by this app will be deleted. Files that were overwritten cannot be restored. Continue?",
         "undo_done_log": "\n↩  Undo complete.\n    {restored} file(s) restored, {removed} copy/copies removed, {failed} failed.",
@@ -246,6 +247,7 @@ STRINGS = {
 
         "undo_btn": "↩  برگردوندن آخرین مرتب‌سازی",
         "redo_btn": "🔄  مرتب‌سازی مجدد",
+        "start_over_btn": "↩  شروع دوباره",
         "undo_confirm_title": "برگردوندن آخرین مرتب‌سازی",
         "undo_confirm_msg": "با این کار، آخرین مرتب‌سازی برگردونده می‌شه: فایل‌های منتقل‌شده به مکان اصلی برمی‌گردن و کپی‌هایی که این برنامه ساخته حذف می‌شن. فایل‌هایی که جایگزین (overwrite) شدن قابل بازگشت نیستن. ادامه می‌دید؟",
         "undo_done_log": "\n↩  برگردوندن انجام شد.\n    {restored} فایل بازگردانده شد، {removed} کپی حذف شد، {failed} مورد ناموفق.",
