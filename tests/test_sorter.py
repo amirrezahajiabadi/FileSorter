@@ -22,6 +22,8 @@ from app.i18n import STRINGS
     (".JPG", "images"),   # case-insensitive
     (".py", "code"),
     (".pdf", "documents"),
+    (".csv", "documents"),  # csv belongs to documents, not data
+    (".json", "data"),
     (".zip", "archives"),
     (".unknownext", "others"),
     ("", "others"),
@@ -34,6 +36,14 @@ def test_get_category_respects_custom_categories():
     custom = {"memes": [".jpg", ".png"], "others": []}
     assert get_category(".jpg", custom) == "memes"
     assert get_category(".pdf", custom) == "others"
+
+
+def test_csv_not_duplicated_across_categories():
+    """Ensure .csv only appears in one category (documents), not data."""
+    all_exts = []
+    for exts in DEFAULT_CATEGORIES.values():
+        all_exts.extend(exts)
+    assert all_exts.count(".csv") == 1, f".csv appears {all_exts.count('.csv')} times; expected exactly once"
 
 
 # ══════════════════════════════════════════════════════════════════

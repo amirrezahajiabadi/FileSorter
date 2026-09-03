@@ -15,6 +15,11 @@ from app.constants import APP_VERSION
 STRINGS = {
     "en": {
         "app_title": "File Sorter",
+        "done_log_title": "Sorting completed successfully!",
+        "footer_tip1": "Files are sorted by extension",
+        "footer_tip2": "Category settings are editable in ⚙",
+        "edit_category_title": "Edit:",
+        "extensions_label": "Extensions (one per line)",
         "header_subtitle": "Select a folder and click Analyze & Sort",
         "dev_line": f"Developed by HajAmir  •  v{APP_VERSION}",
         "settings_btn": "⚙  Settings",
@@ -113,6 +118,7 @@ STRINGS = {
         "dry_run_empty": "No files found in this folder.",
 
         "undo_btn": "↩  Undo Last Sort",
+        "redo_btn": "🔄  Redo Sort",
         "undo_confirm_title": "Undo Last Sort",
         "undo_confirm_msg": "This will reverse the last sort: moved files go back to their original location, and copies made by this app will be deleted. Files that were overwritten cannot be restored. Continue?",
         "undo_done_log": "\n↩  Undo complete.\n    {restored} file(s) restored, {removed} copy/copies removed, {failed} failed.",
@@ -136,6 +142,11 @@ STRINGS = {
     },
     "fa": {
         "app_title": "مرتب‌کننده فایل",
+        "done_log_title": "مرتب‌سازی با موفقیت انجام شد!",
+        "footer_tip1": "فایل‌ها بر اساس پسوند مرتب می‌شوند",
+        "footer_tip2": "تنظیمات دسته‌بندی از بخش ⚙ قابل ویرایش است",
+        "edit_category_title": "ویرایش:",
+        "extensions_label": "پسوندها (هر پسوند در یک خط)",
         "header_subtitle": "یک پوشه انتخاب کنید و روی «تحلیل و مرتب‌سازی» کلیک کنید",
         "dev_line": f"توسعه‌یافته توسط HajAmir  •  نسخه {APP_VERSION}",
         "settings_btn": "⚙  تنظیمات",
@@ -234,6 +245,7 @@ STRINGS = {
         "dry_run_empty": "هیچ فایلی توی این پوشه پیدا نشد.",
 
         "undo_btn": "↩  برگردوندن آخرین مرتب‌سازی",
+        "redo_btn": "🔄  مرتب‌سازی مجدد",
         "undo_confirm_title": "برگردوندن آخرین مرتب‌سازی",
         "undo_confirm_msg": "با این کار، آخرین مرتب‌سازی برگردونده می‌شه: فایل‌های منتقل‌شده به مکان اصلی برمی‌گردن و کپی‌هایی که این برنامه ساخته حذف می‌شن. فایل‌هایی که جایگزین (overwrite) شدن قابل بازگشت نیستن. ادامه می‌دید؟",
         "undo_done_log": "\n↩  برگردوندن انجام شد.\n    {restored} فایل بازگردانده شد، {removed} کپی حذف شد، {failed} مورد ناموفق.",

@@ -33,8 +33,9 @@ def save_settings(settings: dict) -> None:
     try:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as exc:
+        import logging
+        logging.warning("Failed to save settings to %s: %s", SETTINGS_FILE, exc)
 
 
 def add_recent_folder(settings: dict, path: str) -> dict:

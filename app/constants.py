@@ -14,7 +14,7 @@ DEFAULT_CATEGORIES = {
     "audio":       [".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".wma"],
     "archives":    [".zip", ".rar", ".tar", ".gz", ".7z", ".bz2", ".xz"],
     "code":        [".py", ".js", ".ts", ".html", ".css", ".java", ".cpp", ".c", ".cs", ".go", ".rs", ".php", ".rb", ".swift", ".kt"],
-    "data":        [".json", ".xml", ".yaml", ".yml", ".sql", ".db", ".sqlite", ".parquet", ".csv"],
+    "data":        [".json", ".xml", ".yaml", ".yml", ".sql", ".db", ".sqlite", ".parquet"],
     "ebooks":      [".epub", ".mobi", ".azw", ".fb2"],
     "executables": [".exe", ".msi", ".dmg", ".deb", ".rpm", ".sh", ".bat", ".ps1"],
     "fonts":       [".ttf", ".otf", ".woff", ".woff2"],

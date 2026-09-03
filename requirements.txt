@@ -3,10 +3,14 @@
 # fine, just without drag & drop (falls back to a plain Tk window).
 tkinterdnd2
 
+# pywebview — required for the new web UI (main_web.py).
+# Only needed if running the web UI: python main_web.py
+pywebview
+
 # ── Dev-only ──────────────────────────────────────────────────────
 # To build a standalone .exe with PyInstaller:
 #   pip install pyinstaller
-#   pyinstaller --onefile --windowed --clean --name "FileSorter" main.py
+#   pyinstaller --onefile --windowed --clean --name "FileSorter" main_web.py
 #
 # To run the test suite:
 #   pip install pytest
