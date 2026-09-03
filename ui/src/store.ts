@@ -73,6 +73,8 @@ export interface UIState {
   errorCount: number;
   logs: LogLine[];
   result: (SortDone & { kind: 'sort' }) | (UndoDone & { kind: 'undo' }) | null;
+  undoOpen: boolean;
+  settingsOpen: boolean;
   notice: Notice | null;
 }
 
@@ -99,6 +101,8 @@ const initial: UIState = {
   errorCount: 0,
   logs: [],
   result: null,
+  undoOpen: false,
+  settingsOpen: false,
   notice: null,
 };
 
@@ -425,6 +429,107 @@ export async function runUndo(): Promise<void> {
 
 export function resetApp(): void {
   setFolder(state.folder);
+}
+
+// ── Modals: undo preview + settings ────────────────────────────
+
+export function openUndoModal(): void {
+  set({ undoOpen: true });
+}
+
+export function closeUndoModal(): void {
+  set({ undoOpen: false });
+}
+
+export function openSettings(): void {
+  set({ settingsOpen: true });
+}
+
+export function closeSettings(): void {
+  set({ settingsOpen: false });
+}
+
+// ── Settings: editable draft snapshot + persistence ────────────
+
+export interface CategoryDraft {
+  id: string;
+  icon: string;
+  nameEn: string;
+  nameFa: string;
+  extensions: string[];
+}
+
+/** Raw editable snapshot of the categories (incl. built-in fallbacks). */
+export function settingsSnapshot(): CategoryDraft[] {
+  const app = appState;
+  if (!app) return [];
+  const meta = app.categoryMeta ?? {};
+  const entries = Object.entries(app.categories).map(([id, exts]) => {
+    const m = meta[id] ?? {};
+    const fb = DEFAULT_CATEGORY_META[id];
+    return {
+      id,
+      icon: m.icon || fb?.icon || '📁',
+      nameEn: m.nameEn || fb?.nameEn || id,
+      nameFa: m.nameFa || fb?.nameFa || id,
+      extensions: [...exts],
+    };
+  });
+  return [...entries].sort((a, b) => {
+    if (a.id === 'others') return 1;
+    if (b.id === 'others') return -1;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function syncFromApp(app: AppState): void {
+  applyTheme(app.theme);
+  document.documentElement.lang = app.language;
+  document.documentElement.dir = app.language === 'fa' ? 'rtl' : 'ltr';
+  set({
+    theme: app.theme,
+    lang: app.language,
+    version: app.version,
+    strings: state.strings,
+    recentFolders: app.recentFolders ?? [],
+    categories: buildRows(app, app.language),
+  });
+}
+
+export async function saveSettings(drafts: CategoryDraft[]): Promise<boolean> {
+  const categories: Record<string, string[]> = {};
+  const meta: Record<string, Partial<CategoryMeta>> = {};
+  for (const d of drafts) {
+    categories[d.id] = d.extensions;
+    meta[d.id] = { icon: d.icon, nameEn: d.nameEn, nameFa: d.nameFa };
+  }
+  try {
+    await bridge.save_categories(categories, meta);
+    const fresh = await bridge.get_state();
+    appState = fresh;
+    syncFromApp(fresh);
+    set({ settingsOpen: false, phase: 'idle' });
+    const saved = inline(t(state.strings, 'settings_saved_log'));
+    pushLog('success', saved);
+    showNotice('success', saved);
+    return true;
+  } catch (err) {
+    showNotice('error', String(err));
+    return false;
+  }
+}
+
+export async function restoreDefaults(): Promise<boolean> {
+  try {
+    await bridge.restore_defaults();
+    const fresh = await bridge.get_state();
+    appState = fresh;
+    syncFromApp(fresh);
+    return true;
+  } catch (err) {
+    showNotice('error', String(err));
+    return false;
+  }
 }
 
 export async function toggleTheme(): Promise<void> {

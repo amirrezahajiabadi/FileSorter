@@ -1,6 +1,6 @@
 import type { UIState } from '../store';
-import { toggleLanguage, toggleTheme } from '../store';
-import { t } from '../i18n';
+import { openSettings, toggleLanguage, toggleTheme } from '../store';
+import { inline, t } from '../i18n';
 
 function SunIcon() {
   return (
@@ -35,6 +35,14 @@ export default function Header({ store }: { store: UIState }) {
       </div>
 
       <div className="header-actions">
+        <button
+          type="button"
+          className="header-btn"
+          title={inline(t(store.strings, 'settings_btn'))}
+          onClick={openSettings}
+        >
+          <span className="header-btn-label">{inline(t(store.strings, 'settings_btn'))}</span>
+        </button>
         <button
           type="button"
           className="header-btn"

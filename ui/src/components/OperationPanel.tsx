@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { useStore, resetApp, runUndo } from '../store';
+import { openUndoModal, resetApp, useStore } from '../store';
 import type { LogLine } from '../store';
 import { fmt, inline, t } from '../i18n';
 import { percent } from '../utils';
@@ -40,13 +40,6 @@ export default function OperationPanel() {
   const sorting = phase === 'sorting';
   const pct = percent(store.processed, store.totalFiles);
   const result = store.result;
-
-  const confirmUndo = () => {
-    const msg = inline(fmt(t(S, 'undo_confirm_msg'), {}));
-    if (window.confirm(msg)) {
-      void runUndo();
-    }
-  };
 
   return (
     <section className="op-panel" aria-label="Operation">
@@ -132,7 +125,7 @@ export default function OperationPanel() {
           </div>
 
           <div className="op-actions">
-            <button type="button" className="btn btn-danger" onClick={confirmUndo}>
+            <button type="button" className="btn btn-danger" onClick={openUndoModal}>
               {inline(t(S, 'undo_btn'))}
             </button>
             <button type="button" className="btn btn-ghost" onClick={resetApp}>

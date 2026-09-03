@@ -15,6 +15,7 @@
 import type {
   AnalysisReport,
   AppState,
+  CategoryMeta,
   DuplicateMode,
   EventKind,
   LangCode,
@@ -93,21 +94,24 @@ function emit(kind: EventKind, payload: unknown): void {
 // ── Browser-only mock (dev preview, no Python attached) ─────────
 
 const SAMPLE_PATH = 'D:/Sample Folder';
+
+const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
+  images: ['.jpg', '.png', '.gif', '.webp', '.svg'],
+  documents: ['.pdf', '.docx', '.txt', '.xlsx'],
+  videos: ['.mp4', '.mkv'],
+  audio: ['.mp3', '.wav'],
+  archives: ['.zip', '.rar'],
+  code: ['.py', '.ts', '.js', '.html'],
+  data: ['.json', '.csv'],
+  ebooks: ['.epub'],
+  executables: ['.exe'],
+  fonts: ['.ttf'],
+  others: [],
+};
+
 const SAMPLE_STATE: AppState = {
   version: '4.2.0',
-  categories: {
-    images: ['.jpg', '.png', '.gif', '.webp', '.svg'],
-    documents: ['.pdf', '.docx', '.txt', '.xlsx'],
-    videos: ['.mp4', '.mkv'],
-    audio: ['.mp3', '.wav'],
-    archives: ['.zip', '.rar'],
-    code: ['.py', '.ts', '.js', '.html'],
-    data: ['.json', '.csv'],
-    ebooks: ['.epub'],
-    executables: ['.exe'],
-    fonts: ['.ttf'],
-    others: [],
-  },
+  categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   recentFolders: [],
   theme: 'dark',
@@ -220,20 +224,20 @@ function createMockBridge(): BridgeApi {
     },
     async start_sort(): Promise<boolean> {
       void simulateStream(makeItems()).then(() => {
+        const okItems = makeItems().filter((i) => i.status === 'ok');
+        const sort_log: SortDone['sort_log'] = okItems.map((i) => ({
+          action: 'copied',
+          source: `D:/Sample Folder/${i.name}`,
+          final_dest: `D:/Sample Folder/sorted/${i.category}/${i.name}`,
+          name: i.name ?? '?',
+          category: i.category ?? 'others',
+        }));
         const payload: SortDone = {
           copied: 8,
           skipped: 1,
           errors: 1,
           target_dir: 'D:/Sample Folder/sorted',
-          sort_log: [
-            {
-              action: 'copied',
-              source: 'D:/Sample Folder/holiday-2023.mp4',
-              final_dest: 'D:/Sample Folder/sorted/videos/holiday-2023.mp4',
-              name: 'holiday-2023.mp4',
-              category: 'videos',
-            },
-          ],
+          sort_log,
         };
         emit('done', payload);
       });
@@ -255,10 +259,17 @@ function createMockBridge(): BridgeApi {
       });
       return true;
     },
-    async save_categories(): Promise<boolean> {
-      throw new Error('settings require the desktop runtime');
+    async save_categories(
+      categories: Record<string, string[]>,
+      meta?: Record<string, unknown>,
+    ): Promise<boolean> {
+      SAMPLE_STATE.categories = categories;
+      SAMPLE_STATE.categoryMeta = (meta ?? {}) as Record<string, CategoryMeta>;
+      return true;
     },
     async restore_defaults(): Promise<Record<string, string[]>> {
+      SAMPLE_STATE.categories = { ...SAMPLE_DEFAULT_CATEGORIES };
+      SAMPLE_STATE.categoryMeta = {};
       return SAMPLE_STATE.categories;
     },
   };

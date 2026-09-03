@@ -3,6 +3,8 @@ import Header from './components/Header';
 import FolderPicker from './components/FolderPicker';
 import CategoryGrid from './components/CategoryGrid';
 import AnalysisModal from './components/AnalysisModal';
+import UndoModal from './components/UndoModal';
+import SettingsModal from './components/SettingsModal';
 import OperationPanel from './components/OperationPanel';
 import Toasts from './components/Toasts';
 import './App.css';
@@ -34,6 +36,8 @@ export default function App() {
         </footer>
       )}
       <AnalysisModal />
+      <UndoModal />
+      {store.settingsOpen && <SettingsModal />}
       <Toasts />
     </div>
   );
