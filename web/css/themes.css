@@ -1,0 +1,115 @@
+/* ============================================
+   Light Theme (default)
+   ============================================ */
+
+:root {
+    --bg-primary: #F7F7FA;
+    --bg-secondary: #FFFFFF;
+    --bg-tertiary: #F0F0F5;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F7F7FA;
+    --bg-input: #F7F7FA;
+    --bg-input-hover: #F0F0F5;
+    --bg-input-focus: #FFFFFF;
+
+    --accent-primary: #6C63FF;
+    --accent-primary-hover: #5A52E0;
+    --accent-primary-active: #4A43C4;
+    --accent-primary-light: #EEEDFF;
+
+    --accent-secondary: #00D4AA;
+    --accent-secondary-hover: #00C896;
+    --accent-secondary-light: #E6FFF7;
+
+    --text-primary: #1A1A1E;
+    --text-secondary: #6B6B7A;
+    --text-muted: #9A9AAB;
+    --text-disabled: #B8B8C5;
+    --text-inverse: #FFFFFF;
+
+    --border-default: #E4E4EC;
+    --border-hover: #C8C8D4;
+    --border-focus: #6C63FF;
+    --border-error: #EF4444;
+    --border-success: #00C896;
+
+    --status-success: #00C896;
+    --status-success-bg: #E6FFF7;
+    --status-warning: #F59E0B;
+    --status-warning-bg: #FFF8E6;
+    --status-error: #EF4444;
+    --status-error-bg: #FFE6E6;
+    --status-info: #3B82F6;
+    --status-info-bg: #E6F0FF;
+
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+    --shadow-xl: 0 12px 48px rgba(0,0,0,0.16);
+
+    --overlay: rgba(0,0,0,0.4);
+}
+
+/* ============================================
+   Dark Theme
+   ============================================ */
+
+[data-theme="dark"] {
+    --bg-primary: #0D0D0F;
+    --bg-secondary: #1A1A1E;
+    --bg-tertiary: #232329;
+    --bg-card: #1A1A1E;
+    --bg-card-hover: #232329;
+    --bg-input: #232329;
+    --bg-input-hover: #2C2C33;
+    --bg-input-focus: #1A1A1E;
+
+    --accent-primary: #7C73FF;
+    --accent-primary-hover: #6C63FF;
+    --accent-primary-active: #5A52E0;
+    --accent-primary-light: #2A2850;
+
+    --accent-secondary: #00E6B8;
+    --accent-secondary-hover: #00D4AA;
+    --accent-secondary-light: #0A3328;
+
+    --text-primary: #EDEDF0;
+    --text-secondary: #8A8A99;
+    --text-muted: #5A5A6A;
+    --text-disabled: #3D3D4A;
+    --text-inverse: #0D0D0F;
+
+    --border-default: #2C2C33;
+    --border-hover: #3D3D4A;
+    --border-focus: #7C73FF;
+
+    --status-success: #00E6B8;
+    --status-success-bg: #0A3328;
+    --status-warning: #FBBF24;
+    --status-warning-bg: #332A0A;
+    --status-error: #F87171;
+    --status-error-bg: #331A1A;
+    --status-info: #60A5FA;
+    --status-info-bg: #1A2A40;
+
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
+    --shadow-xl: 0 12px 48px rgba(0,0,0,0.6);
+
+    --overlay: rgba(0,0,0,0.7);
+}
+
+/* ============================================
+   Theme Transition
+   ============================================ */
+
+#app,
+#app * {
+    transition: background-color 0.3s ease,
+                border-color 0.3s ease,
+                color 0.3s ease,
+                box-shadow 0.3s ease;
+}

@@ -1,89 +1,54 @@
-# Web Frontend — Design System (v4.1)
+# Web Frontend — FileSorter
 
-This is the folder structure and visual identity for the planned UI
-overhaul (Phase 3 of [ROADMAP.md](../ROADMAP.md)). **`index.html` here is
-a design preview, not a real screen yet** — it proves the visual identity
-and theming mechanism work. Real screens (folder picker, Settings,
-Analysis, etc.) get built here starting at v4.2.
+The new web-based UI for FileSorter, built with HTML/CSS/JS and served via
+[PyWebView](https://pywebview.flowrl.com/). This is the **main shipped UI**
+that replaces the old Tkinter interface.
 
-## Design direction: "Sorting Line"
-
-Deliberately not a port of the current Tkinter app's look — the goal was
-a distinct identity, grounded in what the app actually does: files
-moving along a line into labeled bins, like a sorting facility.
-
-- **One accent color** (`--signal`, a warm safety-orange) used sparingly —
-  for primary actions and progress, not scattered everywhere.
-- **Each file category gets its own color** (`--cat-images`,
-  `--cat-documents`, etc.) — functions like labeled bins on a sorting
-  line, and stays the same in both themes so "images = blue" is always
-  true.
-- **The signature element** is the sorting-line progress indicator
-  (`.sorting-line` in `index.html`) — colored file chips flowing along a
-  track into category-colored bins, instead of a generic progress bar.
-- **Typography**: Space Grotesk for headings/UI chrome, Inter for body
-  text, JetBrains Mono for file paths and the operation log (which is
-  deliberately styled like a ledger/manifest printout).
-
-## Structure
-
-```
-web/
-├── index.html            # design preview — proves the identity works, not a real screen yet
-├── css/
-│   ├── design-tokens.css  # hand-authored colors — see below, NOT auto-generated
-│   ├── fonts.css          # @font-face declarations for the self-hosted fonts
-│   └── base.css           # resets, typography, and every component style
-├── fonts/                 # self-hosted .woff2 files — no CDN dependency,
-│   │                        so the app renders correctly fully offline
-│   └── licenses/          # OFL license text for each font family (required
-│                             for redistribution — keep these alongside the fonts)
-└── js/
-    └── app.js             # theme toggle for now; Phase 3 adds pywebview.api calls
-```
-
-## Colors: hand-authored, not generated
-
-Earlier (v4.1.0) `theme-vars.css` was auto-generated from `app/themes.py`,
-porting the existing Tkinter colors 1:1. That generator (and its test)
-have since been **removed** — once the decision was made to design a
-genuinely distinct identity rather than reuse the old palette, keeping
-that generator around would have been actively misleading (it would
-imply the web colors still mirror Tkinter, which they intentionally no
-longer do).
-
-`design-tokens.css` is hand-authored instead. If you change a color,
-edit it directly there. Every other stylesheet references colors only
-via its CSS custom properties (`var(--bg)` → now `var(--ink)`,
-`var(--accent)` → now `var(--signal)`, etc.) — never a hardcoded hex
-value — so theme switching keeps working automatically as new screens
-get added.
-
-```html
-<html data-theme="dark">   <!-- dark mode -->
-<html data-theme="light">  <!-- light mode -->
-```
-
-## Fonts: self-hosted, not CDN-linked
-
-All three families (Space Grotesk, Inter, JetBrains Mono) are Google
-Fonts, downloaded and converted to `.woff2`, and referenced locally via
-`css/fonts.css`. This matters for a desktop app specifically: it
-shouldn't need internet access just to render its own UI correctly.
-Only the weights actually used are included, to keep the footprint
-small (~410 KB total for all three families).
-
-Each family is licensed under the SIL Open Font License — the license
-text lives in `fonts/licenses/` and must stay alongside the font files
-if they're ever redistributed elsewhere.
-
-## Previewing right now
+## How to run
 
 ```bash
-# any static file server works, e.g.:
-python -m http.server --directory web 8000
+pip install pywebview
+python main_web.py
 ```
 
-Then open `http://localhost:8000` in a browser and click the 🌙 button
-to compare both themes. (Phase 3 will load this through PyWebView
-instead of a browser — see `poc/webview_poc.py` for that wiring pattern.)
+## Architecture
+
+```
+main_web.py          Python adapter (Api class) — bridges JS ↔ AppController
+web/
+├── index.html       Main page — all modals, layout, structure
+├── css/
+│   ├── themes.css   Light/dark theme CSS variables
+│   └── main.css     Layout, components, modals, responsive
+├── js/
+│   ├── data.js      Category metadata (icons, display names per language)
+│   ├── state.js     Simple state management (subscribe/notify pattern)
+│   ├── utils.js     Helpers (formatSize, escapeHtml, translation wrapper)
+│   └── app.js       Main app: pywebview bridge, event handlers, rendering
+└── assets/
+    ├── fonts/       Self-hosted fonts (Inter, Space Grotesk, JetBrains Mono)
+    └── icons/       (reserved for future use)
+```
+
+## Communication flow
+
+```
+User action → JS function → pywebview.api.<method>(...)
+    → Python Api class → AppController
+    → events emitted via window.onSortEvent({kind, payload})
+    → JS handler updates UI
+```
+
+All business logic lives in `app/controller.py` — this frontend never
+touches the filesystem or does any sorting itself.
+
+## Design
+
+The visual identity is "Sorting Line" — files moving along a line into
+labeled category bins, with a purple/teal accent theme. This is intentionally
+distinct from the old Tkinter look.
+
+- **Theme:** Light/dark via `data-theme` attribute on `<html>`
+- **Language:** RTL Persian (fa) / LTR English (en) via `data-lang` attribute
+- **Typography:** Space Grotesk (headings), Inter (body), JetBrains Mono (paths/code) — all self-hosted in `assets/fonts/` (no CDN dependency)
+- **Responsive:** Adapts to narrow windows down to 480px

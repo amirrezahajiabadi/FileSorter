@@ -1,57 +1,318 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="fa" dir="rtl">
 <head>
-<meta charset="utf-8">
-<title>FileSorter</title>
-<link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/design-tokens.css">
-<link rel="stylesheet" href="css/base.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileSorter</title>
+
+    <!-- Fonts (self-hosted, no CDN dependency) -->
+    <link rel="stylesheet" href="assets/fonts/fonts.css">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/themes.css">
+    <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-<div class="app">
-
-  <div class="header">
-    <div class="title">
-      <h1>📁 FileSorter</h1>
-      <span class="version" id="versionText">v...</span>
+    <!-- Splash Screen -->
+    <div id="splash" style="position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s ease;">
+        <div style="text-align:center;">
+            <div style="font-size:48px;margin-bottom:16px;">&#x1F4C1;</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">FileSorter</div>
+            <div style="font-size:13px;color:var(--text-muted);">Loading...</div>
+        </div>
     </div>
-    <div class="nav-row">
-      <div class="nav-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</div>
-      <div class="nav-btn" id="recentBtn" onclick="toggleRecentMenu()" title="Recent folders">🕘</div>
+
+
+    <!-- ========================================== -->
+    <!-- APP -->
+    <!-- ========================================== -->
+    <div id="app" data-theme="dark" data-lang="fa">
+
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="2" width="24" height="24" rx="6"/>
+                    <path d="M8 8l4 4m8-4l-4 4M8 20l6-6m6 6l-6-6" stroke-linecap="round"/>
+                    <path d="M14 14l4 4m-4-4l-4 4" stroke-linecap="round"/>
+                </svg>
+                <span>FileSorter</span>
+                <span class="logo-version" id="versionText">v...</span>
+            </div>
+
+            <div class="header-actions">
+                <button class="header-btn" id="themeToggle" title="تغییر تم">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+                <button class="header-btn" id="langToggle" title="تغییر زبان">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span class="lang-label" id="langLabel">فارسی</span>
+                </button>
+                <button class="header-btn" id="recentBtn" title="پوشه‌های اخیر">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </button>
+                <button class="header-btn" id="settingsToggle" title="تنظیمات">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Recent Folders Dropdown -->
+            <div class="recent-dropdown" id="recentDropdown"></div>
+        </header>
+
+        <!-- MAIN -->
+        <main class="app-main">
+
+            <!-- Folder Selector -->
+            <div class="folder-selector" style="position:relative;">
+                <span class="icon">📂</span>
+                <span class="path">
+                    <span class="label" data-i18n="selected_folder_label">پوشه هدف:</span>
+                    <span id="folderPath"></span>
+                </span>
+                <button class="btn-browse" id="browseBtn" data-i18n="browse_btn">📁 انتخاب پوشه</button>
+            </div>
+
+            <!-- Category Preview -->
+            <div class="section-header">
+                <span class="section-title" data-i18n="files_by_category">دسته‌بندی فایل‌ها</span>
+                <button class="section-action" id="addCategoryBtn" data-i18n="add_cat_btn">+ افزودن دسته‌بندی</button>
+            </div>
+            <div class="category-grid" id="categoryGrid">
+                <!-- Rendered by JS -->
+            </div>
+
+            <!-- Action Button -->
+            <div class="action-section">
+                <button class="btn-primary" id="primaryAction" disabled onclick="startAnalysis()">
+                    <span>🔍</span>
+                    <span data-i18n="analyze_btn">تحلیل و مرتب‌سازی</span>
+                    <span class="badge" id="fileCount"></span>
+                </button>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="progressFill" style="width: 0%;"></div>
+                </div>
+                <div class="progress-stats">
+                    <span class="percentage" id="progressPercent">0%</span>
+                    <span id="progressDetails"></span>
+                </div>
+                <button class="btn-cancel-sort" id="cancelSortBtn" onclick="cancelSort()" style="display:none;">✖ لغو</button>
+            </div>
+
+            <!-- Results -->
+            <div class="results-section" id="resultsSection">
+                <div class="results-banner">
+                    <span class="icon">✅</span>
+                    <div class="content">
+                        <div class="title" data-i18n="done_log_title">مرتب‌سازی با موفقیت انجام شد!</div>
+                        <div class="subtitle" id="resultsSubtitle"></div>
+                    </div>
+                </div>
+
+                <div class="results-summary" id="resultsSummary">
+                    <!-- Rendered by JS -->
+                </div>
+
+                <div class="results-actions">
+                    <button class="btn" onclick="resetApp()" data-i18n="undo_btn">↩ بازگشت</button>
+                    <button class="btn" onclick="viewFullLog()" data-i18n="log_header">📋 لاگ کامل</button>
+                    <button class="btn" onclick="redoSort()" data-i18n="redo_btn">🔄 مرتب‌سازی مجدد</button>
+                    <button class="btn btn-danger" onclick="showUndoModal()" id="undoBtn" style="display:none;">↩ Undo</button>
+                </div>
+            </div>
+
+            <!-- Log -->
+            <div class="log-section">
+                <div class="log-header">
+                    <span class="title" data-i18n="log_header">لاگ عملیات</span>
+                    <button class="view-all" onclick="viewFullLog()" data-i18n="clear_btn">مشاهده همه</button>
+                </div>
+                <div class="log-list" id="logList">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <span class="tip">💡 <span data-i18n="footer_tip1">فایل‌ها بر اساس پسوند مرتب می‌شوند</span></span>
+            <span class="tip">⚙️ <span data-i18n="footer_tip2">تنظیمات دسته‌بندی از بخش ⚙ قابل ویرایش است</span></span>
+        </footer>
     </div>
-  </div>
 
-  <div id="recentMenu" class="card" style="display:none; margin-bottom:16px; padding:8px;"></div>
-
-  <div class="drop-zone">
-    <span class="path" id="folderPath">No folder selected</span>
-    <button class="btn-primary" onclick="browseFolder()">Browse</button>
-  </div>
-
-  <div class="legend" id="categoryLegend"></div>
-
-  <div class="sorting-line">
-    <div class="label">Progress</div>
-    <div class="track">
-      <div class="fill" id="progressFill" style="width:0%"></div>
+    <!-- ========================================== -->
+    <!-- SETTINGS MODAL -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">⚙️ <span data-i18n="settings_header">تنظیمات دسته‌بندی</span></span>
+                <button class="modal-close" id="settingsClose">✕</button>
+            </div>
+            <div class="modal-body" id="settingsBody">
+                <!-- Rendered by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="restoreDefaults()" data-i18n="restore_defaults_btn">🔄 بازگردانی پیش‌فرض</button>
+                <button class="btn btn-primary" onclick="saveSettings()" data-i18n="save_close_btn">💾 ذخیره تغییرات</button>
+            </div>
+        </div>
     </div>
-    <div class="progress-text">
-      <span id="progressCount">Ready</span>
-      <span id="progressPercent"></span>
+
+    <!-- ========================================== -->
+    <!-- EDIT CATEGORY MODAL -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">✏️ <span data-i18n="edit_category_title">ویرایش:</span> <span id="editCatName"></span></span>
+                <button class="modal-close" id="editClose">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;" data-i18n="new_category_label">نام دسته‌بندی</label>
+                    <input type="text" id="editNameInput" class="form-input">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;">آیکون</label>
+                    <input type="text" id="editIconInput" maxlength="2" style="width:60px;padding:8px 12px;border:1.5px solid var(--border-default);border-radius:10px;background:var(--bg-input);color:var(--text-primary);font-size:20px;text-align:center;">
+                </div>
+                <div>
+                    <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;" data-i18n="extensions_label">پسوندها (هر پسوند در یک خط)</label>
+                    <textarea id="editExtInput" rows="6" class="form-textarea" style="min-height:100px;"></textarea>
+                    <button id="addExtBtn" onclick="addExtensionToEdit()" style="margin-top:6px;padding:4px 14px;border:1.5px dashed var(--border-default);border-radius:6px;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:0.15s;">+ افزودن پسوند</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="deleteEditCategory()" data-i18n="remove_cat_btn">🗑️ حذف</button>
+                <button class="btn btn-secondary" id="editCancel" onclick="closeModal(document.getElementById('editModal'))" data-i18n="cancel_btn">انصراف</button>
+                <button class="btn btn-primary" onclick="saveEdit()" data-i18n="save_close_btn">💾 ذخیره</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <div class="actions">
-    <button class="btn-primary" id="sortBtn" style="flex:1;" onclick="startSort()" disabled>
-      ▶ Analyze &amp; Sort
-    </button>
-  </div>
+    <!-- ========================================== -->
+    <!-- ANALYSIS MODAL -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="analysisModal">
+        <div class="modal" style="max-width:780px;">
+            <div class="modal-header">
+                <span class="modal-title">📊 <span data-i18n="analysis_header">تحلیل پوشه</span></span>
+                <button class="modal-close" id="analysisClose">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="analysis-summary">
+                    <p><strong data-i18n="selected_folder_label">پوشه:</strong> <span id="analysisFolderPath"></span></p>
+                    <p id="analysisTotal"></p>
+                    <p id="analysisSize"></p>
+                </div>
 
-  <div class="log" id="logArea">
-    <div class="line"><span class="rest">Select a folder to get started.</span></div>
-  </div>
+                <div class="analysis-chart" id="analysisChart">
+                    <!-- Rendered by JS -->
+                </div>
 
-</div>
-<script src="js/app.js"></script>
+                <!-- Sort Options -->
+                <div class="sort-options">
+                    <div class="sort-options-row">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="analysisMoveToggle">
+                            <span class="slider"></span>
+                            <span data-i18n="move_checkbox_label">انتقال فایل‌ها به‌جای کپی</span>
+                        </label>
+                    </div>
+                    <div id="analysisMoveWarning" class="move-warning-text" style="display:none;">
+                        ⚠ <span data-i18n="move_warning">فایل‌های اصلی حذف می‌شوند. این عملیات غیرقابل بازگشت است.</span>
+                    </div>
+                    <div class="dup-group" id="analysisDupGroup" style="margin-top:12px;">
+                        <span class="dup-label" data-i18n="duplicate_mode_label">تکراری:</span>
+                        <label class="radio-card">
+                            <input type="radio" name="dupMode" value="skip" checked>
+                            <span class="radio-body" data-i18n="duplicate_mode_skip">رد شود</span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="dupMode" value="rename">
+                            <span class="radio-body" data-i18n="duplicate_mode_rename">تغییر نام</span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="dupMode" value="overwrite">
+                            <span class="radio-body" data-i18n="duplicate_mode_overwrite">جایگزین شود</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="analysis-suggestions" id="analysisSuggestions">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal(document.getElementById('analysisModal'))" data-i18n="cancel_btn">↩ بازگشت</button>
+                <button class="btn btn-primary" onclick="proceedWithSort()" data-i18n="proceed_btn">🚀 شروع مرتب‌سازی</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MOVE CONFIRMATION OVERLAY -->
+    <!-- ========================================== -->
+    <div class="move-confirm-overlay" id="moveConfirmOverlay">
+        <div class="move-confirm-card">
+            <h3>⚠️ <span data-i18n="move_confirm_title">تأیید انتقال</span></h3>
+            <p><span data-i18n="move_confirm_msg">فایل‌ها منتقل می‌شوند (نه کپی). نسخه اصلی حذف خواهد شد. ادامه می‌دهید؟</span></p>
+            <div class="actions">
+                <button class="btn btn-cancel" onclick="cancelMove()" data-i18n="cancel_btn">انصراف</button>
+                <button class="btn btn-confirm" onclick="confirmMove()">🚀 <span data-i18n="proceed_btn">شروع</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- UNDO MODAL -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="undoModal">
+        <div class="modal" style="max-width:780px;">
+            <div class="modal-header">
+                <span class="modal-title">↩️ <span data-i18n="undo_confirm_title">بازگردانی</span></span>
+                <button class="modal-close" id="undoClose">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="analysis-summary">
+                    <p>⏱ <span data-i18n="undo_confirm_msg">آخرین مرتب‌سازی:</span> <strong id="undoDate">-</strong></p>
+                </div>
+                <div id="undoList">
+                    <!-- Rendered by JS -->
+                </div>
+                <div class="undo-warning">⚠️ <span>فایل‌های جایگزین‌شده (overwrite) قابل بازگشت نیستند.</span></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal(document.getElementById('undoModal'))" data-i18n="cancel_btn">انصراف</button>
+                <button class="btn btn-danger" onclick="undoLastSort()">🔄 <span data-i18n="undo_confirm_title">بازگردانی همه</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SCRIPTS -->
+    <!-- ========================================== -->
+    <script src="js/data.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/app.js"></script>
+
 </body>
 </html>
