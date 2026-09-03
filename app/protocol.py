@@ -207,6 +207,41 @@ class DupDeleteResult(TypedDict):
     failed: List[dict]  # [{"path": str, "error": str}, ...]
 
 
+class CleanLocation(TypedDict):
+    """One scanned junk location (display name lives in the UI's i18n
+    tables under cleanup_loc_<id>)."""
+
+    id: str  # one of cleanup.LOCATION_IDS
+    files: int
+    bytes: int
+
+
+class CleanProgress(TypedDict):
+    """Payload of a clean_progress event while a scan is running."""
+
+    phase: str  # "scanning"
+    location: str  # location id
+    processed: int
+    files: int  # files counted in this location so far
+    bytes: int  # bytes counted in this location so far
+
+
+class CleanDone(TypedDict):
+    """Payload of the clean_done event when a scan finishes."""
+
+    locations: List[CleanLocation]
+    total_files: int
+    total_bytes: int
+
+
+class CleanDeleteResult(TypedDict):
+    """Return of Api.delete_cleanup()."""
+
+    deleted: List[str]
+    failed: List[dict]  # [{"path": str, "error": str}, ...]
+    freed_bytes: int
+
+
 class EventMessage(TypedDict):
     """The envelope window.onSortEvent() receives: {"kind", "payload"}."""
 

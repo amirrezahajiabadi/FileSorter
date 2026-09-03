@@ -23,6 +23,7 @@ from app.constants import DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings, add_recent_folder
 from app.duplicates import delete_files, scan_duplicates
 from app.disk_scan import scan_space
+from app.cleanup import delete_junk, scan_junk
 from app.sorter import analyze_folder, plan_sort
 
 
@@ -39,6 +40,7 @@ class AppController:
         self.watch_folders = self.settings.get("watched_folders", [])
         self.last_sort_log = []  # for undo: list of {"action", "source", "final_dest"}
         self.last_dup_paths = set()  # whitelist of paths the last duplicate scan flagged
+        self.last_clean_by_loc = {}  # {location_id: [paths]} flagged by the last cleanup scan
 
     # ══════════════════════════════════════════════════════════════
     #  Settings
@@ -109,6 +111,42 @@ class AppController:
         ("space_progress", ...) events during the walk. Read-only.
         """
         return scan_space(Path(path), self.categories, on_event=on_event)
+
+    def scan_cleanup(self, on_event=None) -> dict:
+        """Scan known junk locations (user temp, caches, crash dumps),
+        reporting progress through on_event(kind, payload):
+
+        - ("clean_progress", {"phase": "scanning", "location": str,
+                              "processed": int, "files": int,
+                              "bytes": int}) — repeatedly
+
+        Returns {"locations": [{"id", "files", "bytes"}],
+        "total_files", "total_bytes"} and records the exact file list
+        as the deletion whitelist for delete_cleanup().
+        """
+        result = scan_junk(on_event=on_event, want_paths=True)
+        # Whitelist per location: delete_cleanup(location_ids) later
+        # removes exactly these files and nothing else — a file that
+        # appeared *after* the scan is never touched.
+        self.last_clean_by_loc = {
+            loc_id: [Path(p) for p in loc_paths]
+            for loc_id, loc_paths in result.get("paths", {}).items()
+        }
+        return {k: v for k, v in result.items() if k != "paths"}
+
+    def delete_cleanup(self, location_ids: list) -> dict:
+        """Delete every file the last cleanup scan flagged under the
+        given location ids (whitelisted — see cleanup.delete_junk).
+        Returns {"deleted": [...], "failed": [{"path", "error"}],
+        "freed_bytes": int}.
+        """
+        whitelist = set()
+        paths: list = []
+        for loc_id in location_ids:
+            loc_paths = self.last_clean_by_loc.get(loc_id, [])
+            whitelist.update(loc_paths)
+            paths.extend(str(p) for p in loc_paths)
+        return delete_junk(paths, whitelist)
 
     def scan_duplicates(self, path: str, on_event=None) -> dict:
         """Find duplicate files under `path` (identical content), reporting

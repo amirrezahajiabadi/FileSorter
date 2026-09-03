@@ -211,7 +211,8 @@ class Api:
             self._push(kind, payload)
 
         try:
-            self.controller.scan_duplicates(path, on_event=on_event)
+            result = self.controller.scan_duplicates(path, on_event=on_event)
+            self._push("dup_done", result)
         except Exception as e:
             self._push("error", str(e))
 
@@ -243,9 +244,42 @@ class Api:
             self._push(kind, payload)
 
         try:
-            self.controller.scan_space(path, on_event=on_event)
+            result = self.controller.scan_space(path, on_event=on_event)
+            self._push("space_done", result)
         except Exception as e:
             self._push("error", str(e))
+
+    # ── Temp / cache cleanup ────────────────────────────────────
+
+    def scan_cleanup(self) -> bool:
+        """Kick off a junk-location scan on a background thread. Returns
+        immediately; live counters and the final report arrive via
+        window.onSortEvent() (clean_progress / clean_done)."""
+        threading.Thread(target=self._run_clean_scan, daemon=True).start()
+        return True
+
+    def _run_clean_scan(self) -> None:
+        def on_event(kind, payload):
+            self._push(kind, payload)
+
+        try:
+            result = self.controller.scan_cleanup(on_event=on_event)
+            self._push("clean_done", result)
+        except Exception as e:
+            self._push("error", str(e))
+
+    def delete_cleanup(self, location_ids: list) -> dict:
+        """Permanently delete everything the last cleanup scan flagged
+        under the given location ids. Returns {"deleted": [...],
+        "failed": [...], "freed_bytes": int}."""
+        try:
+            return self.controller.delete_cleanup(location_ids)
+        except Exception as e:
+            return {
+                "deleted": [],
+                "failed": [{"path": loc_id, "error": str(e)} for loc_id in location_ids],
+                "freed_bytes": 0,
+            }
 
     def add_watch_folder(self, path: str) -> bool:
         """Add a folder to the watch list and start watching it if the

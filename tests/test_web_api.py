@@ -214,3 +214,89 @@ def test_browse_folder_records_recent(api, tmp_path):
     api.window.create_file_dialog.return_value = [str(tmp_path)]
     api.browse_folder()
     assert str(tmp_path) in api.controller.recent_folders
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Background scan runners push terminal done events
+#  (regression: desktop scans used to emit progress but never finish)
+# ══════════════════════════════════════════════════════════════════
+
+def _event_kinds(api):
+    """Parse every evaluate_js call into its event kind."""
+    import json as _json
+    kinds = []
+    for c in api.window.evaluate_js.call_args_list:
+        arg = c.args[0]
+        payload = arg[len("window.onSortEvent("):-1]
+        kinds.append(_json.loads(payload)["kind"])
+    return kinds
+
+def _make_two_duplicates(root):
+    (root / "a.txt").write_text("same-content")
+    (root / "b.txt").write_text("same-content")
+
+
+def test_run_dup_scan_pushes_dup_done(api, tmp_path):
+    _make_two_duplicates(tmp_path)
+    api._run_dup_scan(str(tmp_path))
+    assert "dup_done" in _event_kinds(api)
+    import json as _json
+    done_payload = None
+    for c in api.window.evaluate_js.call_args_list:
+        arg = c.args[0]
+        payload = arg[len("window.onSortEvent("):-1]
+        msg = _json.loads(payload)
+        if msg["kind"] == "dup_done":
+            done_payload = msg["payload"]
+    assert done_payload is not None
+    assert len(done_payload["groups"]) == 1
+
+
+def test_run_dup_scan_pushes_error_on_exception(api, tmp_path):
+    api.window.reset_mock()
+    with patch.object(api.controller, "scan_duplicates", side_effect=RuntimeError("boom")):
+        api._run_dup_scan(str(tmp_path))
+    import json as _json
+    arg = api.window.evaluate_js.call_args.args[0]
+    payload = arg[len("window.onSortEvent("):-1]
+    assert _json.loads(payload)["kind"] == "error"
+
+
+def test_run_disk_scan_pushes_space_done(api, tmp_path):
+    (tmp_path / "v.txt").write_text("v" * 50)
+    api._run_disk_scan(str(tmp_path))
+    assert "space_done" in _event_kinds(api)
+
+
+def test_run_clean_scan_pushes_clean_done(api, tmp_path, monkeypatch):
+    import app.cleanup as cleanup_mod
+    monkeypatch.setattr(
+        cleanup_mod, "known_locations",
+        lambda: [{"id": "user_temp", "dirs": [str(tmp_path)]}],
+    )
+    (tmp_path / "junk.tmp").write_text("junk")
+    api._run_clean_scan()
+    assert "clean_done" in _event_kinds(api)
+
+
+def test_delete_cleanup_returns_result_dict(api, tmp_path):
+    # Nothing scanned yet: deleting by location id is a clean no-op.
+    result = api.delete_cleanup(["user_temp"])
+    assert result["deleted"] == []
+    assert result["failed"] == []
+    assert result["freed_bytes"] == 0
+
+
+def test_delete_cleanup_deletes_flagged_location(api, tmp_path, monkeypatch):
+    import app.cleanup as cleanup_mod
+    monkeypatch.setattr(
+        cleanup_mod, "known_locations",
+        lambda: [{"id": "user_temp", "dirs": [str(tmp_path)]}],
+    )
+    victim = tmp_path / "junk.tmp"
+    victim.write_text("x" * 7)
+    api._run_clean_scan()
+    result = api.delete_cleanup(["user_temp"])
+    assert len(result["deleted"]) == 1
+    assert result["freed_bytes"] == 7
+    assert not victim.exists()
