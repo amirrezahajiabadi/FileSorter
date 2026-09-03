@@ -10,7 +10,7 @@ pip install pyinstaller
 ## Step 2 — Build the .exe
 
 ```bash
-pyinstaller --onefile --windowed --clean --name "FileSorter" main_web.py
+pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py
 ```
 
 - `--onefile` → single .exe file (no extra DLLs)
@@ -39,7 +39,7 @@ This uses the `installer.nsi` script in the project root and creates
 - Includes an uninstaller
 
 **Important:** After any code change, rebuild the exe before running makensis:
-1. `pyinstaller --onefile --windowed --clean --name "FileSorter" main_web.py`
+1. `pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py`
 2. `makensis installer.nsi`
 
 The version in `installer.nsi` is kept in sync with `app/constants.py` —

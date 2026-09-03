@@ -79,13 +79,13 @@ Version numbers below are for organization only and can shift. See
   Tkinter app. Includes: folder picker, categories grid, sort (copy/move),
   duplicate handling (skip/rename/overwrite), analysis modal with charts,
   undo, settings (categories editor), recent folders, theme toggle,
-  bilingual (fa/en), self-hosted fonts, drag & drop, toast notifications,
+  bilingual (fa/en), self-hosted fonts, toast notifications,
   sorting animations, Persian date formatting.
 - ✅ **v4.3** — Settings screen (categories) — fully implemented in v4.2
 - ✅ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection — fully implemented in v4.2
 - ✅ **v4.5** — Undo, bilingual (fa/en), and dark/light — fully implemented in v4.2
 - ✅ **v4.6** — Final polish: animations, visual details, full bilingual/theme
-  testing — completed with toast notifications, drag & drop, self-hosted fonts
+  testing — completed with toast notifications and self-hosted fonts
 - ⬜ **v5.0** — 🎉 Old Tkinter UI removed entirely; the new UI is the only
   interface. Official major release.
 

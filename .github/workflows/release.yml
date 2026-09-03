@@ -38,7 +38,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build Windows executable
-        run: pyinstaller --onefile --windowed --clean --name "FileSorter" main.py
+        run: pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py
 
       - name: Create GitHub Release with the .exe attached
         uses: softprops/action-gh-release@v2
