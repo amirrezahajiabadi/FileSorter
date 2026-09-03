@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import WatchPanel from './components/WatchPanel';
 import DuplicatesPanel from './components/DuplicatesPanel';
 import DiskPanel from './components/DiskPanel';
+import CleanupPanel from './components/CleanupPanel';
 import OperationPanel from './components/OperationPanel';
 import Toasts from './components/Toasts';
 import './App.css';
@@ -44,6 +45,7 @@ export default function App() {
       <WatchPanel store={store} />
       <DuplicatesPanel store={store} />
       <DiskPanel store={store} />
+      <CleanupPanel store={store} />
       <Toasts />
     </div>
   );

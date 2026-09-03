@@ -14,6 +14,8 @@ import type {
   AnalysisReport,
   AppState,
   CategoryMeta,
+  CleanDone,
+  CleanLocationId,
   DuplicateMode,
   DupDone,
   LangCode,
@@ -119,6 +121,12 @@ export interface UIState {
   diskProcessed: number;
   diskBytes: number;
   diskReport: SpaceDone | null;
+  cleanOpen: boolean;
+  cleanScanning: boolean;
+  cleanReport: CleanDone | null;
+  cleanSel: Set<CleanLocationId>;
+  cleanArmed: boolean;
+  cleanDeleting: boolean;
   notice: Notice | null;
 }
 
@@ -164,6 +172,12 @@ const initial: UIState = {
   diskProcessed: 0,
   diskBytes: 0,
   diskReport: null,
+  cleanOpen: false,
+  cleanScanning: false,
+  cleanReport: null,
+  cleanSel: new Set<CleanLocationId>(),
+  cleanArmed: false,
+  cleanDeleting: false,
   notice: null,
 };
 
@@ -442,6 +456,22 @@ function handleEvent(msg: SortEvent): void {
         diskProcessed: 0,
         diskBytes: 0,
         diskReport: payload as SpaceDone,
+      });
+      break;
+    }
+    case 'clean_progress': {
+      // Keep the panel honest while scanning: no fake empty results.
+      set({ cleanScanning: true });
+      break;
+    }
+    case 'clean_done': {
+      const done = payload as CleanDone;
+      const live = done.locations.filter((l) => l.files > 0 || l.bytes > 0);
+      set({
+        cleanScanning: false,
+        cleanReport: { ...done, locations: live },
+        cleanSel: new Set(live.map((l) => l.id)),
+        cleanArmed: false,
       });
       break;
     }
@@ -970,6 +1000,96 @@ export async function diskScanFolder(): Promise<void> {
   const path = state.diskScanFolder ?? state.folder;
   if (!path) return;
   await startDiskScan(path);
+}
+
+// ── Temp / cache cleanup ──────────────────────────────────────
+
+export function openCleanPanel(): void {
+  set({ cleanOpen: true });
+}
+
+export function closeCleanPanel(): void {
+  set({
+    cleanOpen: false,
+    cleanScanning: false,
+    cleanReport: null,
+    cleanSel: new Set(),
+    cleanArmed: false,
+    cleanDeleting: false,
+  });
+}
+
+export async function runCleanScan(): Promise<void> {
+  set({
+    cleanScanning: true,
+    cleanReport: null,
+    cleanSel: new Set(),
+    cleanArmed: false,
+  });
+  try {
+    await bridge.scan_cleanup();
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ cleanScanning: false });
+  }
+}
+
+export function toggleCleanLoc(id: CleanLocationId): void {
+  const sel = new Set(state.cleanSel);
+  if (sel.has(id)) sel.delete(id);
+  else sel.add(id);
+  set({ cleanSel: sel, cleanArmed: false });
+}
+
+export function setCleanAll(select: boolean): void {
+  const live = (state.cleanReport?.locations ?? []).map((l) => l.id);
+  set({
+    cleanSel: select ? new Set(live) : new Set(),
+    cleanArmed: false,
+  });
+}
+
+export async function runCleanDelete(): Promise<void> {
+  if (state.cleanSel.size === 0 || state.cleanDeleting) return;
+  if (!state.cleanArmed) {
+    set({ cleanArmed: true });
+    return;
+  }
+  const byId = new Map(
+    (state.cleanReport?.locations ?? []).map((l) => [l.id, l]),
+  );
+  const ids = [...state.cleanSel];
+  const freedBytes = ids.reduce(
+    (n, id) => n + (byId.get(id)?.bytes ?? 0),
+    0,
+  );
+  set({ cleanDeleting: true, cleanArmed: false });
+  try {
+    // Delete by location id: the backend (and the mock) remove only
+    // what the last scan flagged under those locations.
+    const res = await bridge.delete_cleanup(ids);
+    const totalDeleted = res.deleted.length;
+    set({ cleanDeleting: false });
+    if (totalDeleted > 0) {
+      const msg = inline(
+        fmt(t(state.strings, 'clean_deleted_toast'), {
+          n: totalDeleted,
+          freed: formatSize(freedBytes),
+        }),
+      );
+      pushLog('success', msg);
+      showNotice('success', msg);
+    }
+    const firstFail = res.failed[0];
+    if (firstFail) {
+      showNotice('error', inline(t(state.strings, 'clean_failed_toast')));
+    }
+    // Re-scan so the panel shows what actually remains.
+    await runCleanScan();
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ cleanDeleting: false });
+  }
 }
 
 // React bindings: components re-render on any store change.

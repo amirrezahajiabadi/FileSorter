@@ -20,7 +20,9 @@ export type EventKind =
   | 'dup_progress'
   | 'dup_done'
   | 'space_progress'
-  | 'space_done';
+  | 'space_done'
+  | 'clean_progress'
+  | 'clean_done';
 
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
@@ -38,6 +40,8 @@ export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
   'dup_done',
   'space_progress',
   'space_done',
+  'clean_progress',
+  'clean_done',
 ]);
 
 // ── Wire shapes ─────────────────────────────────────────────────
@@ -161,6 +165,42 @@ export interface SpaceDone {
   top_files: SpaceTopFile[];
   files_scanned: number;
   total_bytes: number;
+}
+
+// ── Temp / cache cleanup (Api.scan_cleanup) ─────────────────────
+
+export type CleanLocationId =
+  | 'user_temp'
+  | 'crash_dumps'
+  | 'chrome_cache'
+  | 'edge_cache'
+  | 'firefox_cache'
+  | 'thumbnails';
+
+export interface CleanLocation {
+  id: CleanLocationId;
+  files: number;
+  bytes: number;
+}
+
+export interface CleanProgress {
+  phase: 'scanning';
+  location: CleanLocationId;
+  processed: number;
+  files: number;
+  bytes: number;
+}
+
+export interface CleanDone {
+  locations: CleanLocation[];
+  total_files: number;
+  total_bytes: number;
+}
+
+export interface CleanDeleteResult {
+  deleted: string[];
+  failed: { path: string; error: string }[];
+  freed_bytes: number;
 }
 
 // ── Analysis report (Api.analyze_folder) ────────────────────────

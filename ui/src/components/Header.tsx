@@ -1,5 +1,6 @@
 import type { UIState } from '../store';
 import {
+  openCleanPanel,
   openDiskPanel,
   openDupPanel,
   openSettings,
@@ -42,6 +43,14 @@ export default function Header({ store }: { store: UIState }) {
       </div>
 
       <div className="header-actions">
+        <button
+          type="button"
+          className="header-btn"
+          title={inline(t(store.strings, 'clean_btn'))}
+          onClick={openCleanPanel}
+        >
+          <span className="header-btn-label">{inline(t(store.strings, 'clean_btn'))}</span>
+        </button>
         <button
           type="button"
           className="header-btn"

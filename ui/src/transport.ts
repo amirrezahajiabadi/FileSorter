@@ -16,6 +16,8 @@ import type {
   AnalysisReport,
   AppState,
   CategoryMeta,
+  CleanDeleteResult,
+  CleanDone,
   DuplicateMode,
   DupDeleteResult,
   DupDone,
@@ -53,6 +55,8 @@ export interface BridgeApi {
   find_duplicates(path: string): Promise<boolean>;
   delete_duplicates(paths: string[]): Promise<DupDeleteResult>;
   scan_disk(path: string): Promise<boolean>;
+  scan_cleanup(): Promise<boolean>;
+  delete_cleanup(paths: string[]): Promise<CleanDeleteResult>;
   add_watch_folder(path: string): Promise<boolean>;
   remove_watch_folder(path: string): Promise<boolean>;
   start_watch(): Promise<boolean>;
@@ -124,7 +128,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.3.0',
+  version: '5.4.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   recentFolders: [],
@@ -394,6 +398,49 @@ function createMockBridge(): BridgeApi {
       emit('space_done', SAMPLE_SPACE);
       return true;
     },
+    async scan_cleanup(): Promise<boolean> {
+      // Simulate a live junk scan: per-location ticks, then the report.
+      const totals = cleanTotals();
+      const steps = Math.max(totals.locations.length, 1);
+      for (let i = 0; i < steps; i++) {
+        await sleep(160);
+        const loc = totals.locations[i];
+        if (!loc) break;
+        emit('clean_progress', {
+          phase: 'scanning',
+          location: loc.id,
+          processed: loc.files,
+          files: loc.files,
+          bytes: loc.bytes,
+        });
+      }
+      const done: CleanDone = cleanTotals();
+      emit('clean_done', done);
+      return true;
+    },
+    async delete_cleanup(ids: string[]): Promise<CleanDeleteResult> {
+      await sleep(300); // feel of real deletions
+      const deleted: string[] = [];
+      const failed: { path: string; error: string }[] = [];
+      let freedBytes = 0;
+      for (const id of ids) {
+        const list = junkState[id] ?? [];
+        for (const f of [...list]) {
+          // One thumbnail file stays locked to demonstrate the honest
+          // failure path (desktop: a file in use by Explorer).
+          if (id === 'thumbnails' && f.name === 'thumbcache_256.db') {
+            failed.push({ path: `${id}/${f.name}`, error: 'file is in use' });
+            continue;
+          }
+          freedBytes += f.bytes;
+          deleted.push(`${id}/${f.name}`);
+        }
+        junkState[id] = id === 'thumbnails'
+          ? (junkState[id] ?? []).filter((f) => f.name !== 'thumbcache_256.db')
+          : [];
+      }
+      return { deleted, failed, freed_bytes: freedBytes };
+    },
     async undo_sort(): Promise<boolean> {
       const items: SortItemEvent[] = [
         { status: 'removed', name: 'menu.pdf' },
@@ -475,6 +522,68 @@ function createMockBridge(): BridgeApi {
 
 let mockTimer: ReturnType<typeof setInterval> | null = null;
 let dupState: DupGroup[] = makeSampleDupGroups();
+
+// Mutable mock junk locations: id -> { size-bytes per fake file name }.
+// delete_cleanup removes entries so a rescan shows honest "emptied"
+// state, exactly like the desktop runtime behaves.
+type CleanMockFile = { name: string; bytes: number };
+const CLEAN_LOC_IDS = [
+  'user_temp',
+  'crash_dumps',
+  'chrome_cache',
+  'edge_cache',
+  'firefox_cache',
+  'thumbnails',
+] as const;
+
+function makeSampleJunk(): Record<string, CleanMockFile[]> {
+  const MB = 1024 * 1024;
+  return {
+    user_temp: [
+      { name: 'tmp-7f2a1c.tmp', bytes: 34 * MB },
+      { name: 'installer-cache-9d3e.log', bytes: 12 * MB },
+      { name: 'session-archive-4b88.zip', bytes: 210 * MB },
+    ],
+    crash_dumps: [
+      { name: 'firefox.exe.8841.dmp', bytes: 48 * MB },
+      { name: 'explorer.exe.1202.dmp', bytes: 72 * MB },
+    ],
+    chrome_cache: [
+      { name: 'f_0001a2', bytes: 8 * MB },
+      { name: 'f_0001b7', bytes: 22 * MB },
+      { name: 'f_000201', bytes: 5 * MB },
+      { name: 'data_0', bytes: 1 * MB },
+    ],
+    edge_cache: [
+      { name: 'f_00004c', bytes: 14 * MB },
+      { name: 'f_00009a', bytes: 3 * MB },
+    ],
+    firefox_cache: [
+      { name: 'cache2-entry-01', bytes: 9 * MB },
+      { name: 'cache2-entry-02', bytes: 17 * MB },
+    ],
+    thumbnails: [
+      { name: 'thumbcache_256.db', bytes: 6 * MB },
+      { name: 'thumbcache_1024.db', bytes: 38 * MB },
+    ],
+  };
+}
+
+let junkState: Record<string, CleanMockFile[]> = makeSampleJunk();
+
+function cleanTotals(): { locations: CleanDone['locations']; total_files: number; total_bytes: number } {
+  const locations = CLEAN_LOC_IDS.map((id) => ({
+    id,
+    files: junkState[id]?.length ?? 0,
+    bytes: (junkState[id] ?? []).reduce((sum, f) => sum + f.bytes, 0),
+  }))
+    .filter((l) => l.files > 0 || l.bytes > 0)
+    .sort((a, b) => b.bytes - a.bytes);
+  const total_files = locations.reduce((n, l) => n + l.files, 0);
+  const total_bytes = locations.reduce((n, l) => n + l.bytes, 0);
+  return { locations, total_files, total_bytes };
+}
+
 
 function stopMockWatch(): void {
   if (mockTimer !== null) {
