@@ -34,10 +34,14 @@ EVENT_WATCH_ERROR = "watch_error"
 EVENT_DUP_PROGRESS = "dup_progress"
 EVENT_DUP_DONE = "dup_done"
 
+EVENT_SPACE_PROGRESS = "space_progress"
+EVENT_SPACE_DONE = "space_done"
+
 EVENT_KINDS = frozenset({
     EVENT_TOTAL, EVENT_ITEM, EVENT_PROGRESS, EVENT_DONE, EVENT_ERROR,
     EVENT_WATCH_ITEM, EVENT_WATCH_ERROR,
     EVENT_DUP_PROGRESS, EVENT_DUP_DONE,
+    EVENT_SPACE_PROGRESS, EVENT_SPACE_DONE,
 })
 
 # ── Duplicate-handling modes ────────────────────────────────────
@@ -163,6 +167,37 @@ class DupDone(TypedDict):
     groups: List[DupGroup]
     wasted_bytes: int
     files_scanned: int
+
+
+class SpaceCategory(TypedDict):
+    """Per-category totals from a disk space scan."""
+
+    files: int
+    bytes: int
+
+
+class SpaceTopFile(TypedDict):
+    """One entry of the largest-files list."""
+
+    path: str
+    size: int
+
+
+class SpaceProgress(TypedDict):
+    """Payload of a space_progress event while a scan is running."""
+
+    phase: str  # "scanning"
+    processed: int  # files seen so far
+    bytes: int  # bytes seen so far
+
+
+class SpaceDone(TypedDict):
+    """Payload of the space_done event when a scan finishes."""
+
+    by_category: Dict[str, SpaceCategory]
+    top_files: List[SpaceTopFile]
+    files_scanned: int
+    total_bytes: int
 
 
 class DupDeleteResult(TypedDict):

@@ -227,6 +227,26 @@ class Api:
             }
 
 
+    # ── Disk space analysis ─────────────────────────────────────
+
+    def scan_disk(self, path: str) -> bool:
+        """Kick off a disk-space scan on a background thread. Returns
+        immediately; live counters and the final report arrive via
+        window.onSortEvent() (space_progress / space_done)."""
+        threading.Thread(
+            target=self._run_disk_scan, args=(path,), daemon=True
+        ).start()
+        return True
+
+    def _run_disk_scan(self, path: str) -> None:
+        def on_event(kind, payload):
+            self._push(kind, payload)
+
+        try:
+            self.controller.scan_space(path, on_event=on_event)
+        except Exception as e:
+            self._push("error", str(e))
+
     def add_watch_folder(self, path: str) -> bool:
         """Add a folder to the watch list and start watching it if the
         watcher is already running."""

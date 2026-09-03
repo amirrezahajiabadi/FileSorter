@@ -22,6 +22,7 @@ from pathlib import Path
 from app.constants import DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings, add_recent_folder
 from app.duplicates import delete_files, scan_duplicates
+from app.disk_scan import scan_space
 from app.sorter import analyze_folder, plan_sort
 
 
@@ -101,6 +102,13 @@ class AppController:
     # ══════════════════════════════════════════════════════════════
     #  Sort
     # ══════════════════════════════════════════════════════════════
+
+    def scan_space(self, path: str, on_event=None) -> dict:
+        """Analyze disk usage of `path`: per-category totals and the
+        largest files, bucketed by the current sort categories. Emits
+        ("space_progress", ...) events during the walk. Read-only.
+        """
+        return scan_space(Path(path), self.categories, on_event=on_event)
 
     def scan_duplicates(self, path: str, on_event=None) -> dict:
         """Find duplicate files under `path` (identical content), reporting
