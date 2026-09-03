@@ -24,6 +24,8 @@ import type {
   SortItemEvent,
   ThemeName,
   UndoDone,
+  WatchError,
+  WatchItem,
 } from './protocol';
 import { STRINGS_MIRROR } from './generated/strings';
 
@@ -43,6 +45,10 @@ export interface BridgeApi {
     duplicate_mode?: DuplicateMode,
   ): Promise<boolean>;
   undo_sort(): Promise<boolean>;
+  add_watch_folder(path: string): Promise<boolean>;
+  remove_watch_folder(path: string): Promise<boolean>;
+  start_watch(): Promise<boolean>;
+  stop_watch(): Promise<boolean>;
   save_categories(
     categories: Record<string, string[]>,
     meta?: Record<string, unknown>,
@@ -110,10 +116,11 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.0.0',
+  version: '5.1.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   recentFolders: [],
+  watchedFolders: [],
   theme: 'dark',
   language: 'en',
 };
@@ -272,5 +279,61 @@ function createMockBridge(): BridgeApi {
       SAMPLE_STATE.categoryMeta = {};
       return SAMPLE_STATE.categories;
     },
+
+    // Watch mode: folder list is real state; the sample events simulate
+    // a folder receiving files after start_watch().
+    async add_watch_folder(path: string): Promise<boolean> {
+      if (!SAMPLE_STATE.watchedFolders.includes(path)) {
+        SAMPLE_STATE.watchedFolders.push(path);
+      }
+      return true;
+    },
+    async remove_watch_folder(path: string): Promise<boolean> {
+      SAMPLE_STATE.watchedFolders = SAMPLE_STATE.watchedFolders.filter(
+        (f) => f !== path,
+      );
+      return true;
+    },
+    async start_watch(): Promise<boolean> {
+      stopMockWatch();
+      if (SAMPLE_STATE.watchedFolders.length === 0) return true;
+      const folder = SAMPLE_STATE.watchedFolders[0];
+      const seq: WatchItem[] = [
+        { folder, name: 'IMG_2041.jpg', category: 'images', action: 'moved' },
+        { folder, name: 'voice-note.mp3', category: 'audio', action: 'moved' },
+        { folder, name: 'report.pdf', category: 'documents', action: 'moved' },
+        { folder, name: 'backup.zip', category: 'archives', action: 'moved' },
+        { folder, name: 'dupe.jpg', category: 'images', action: 'skipped' },
+        { folder, name: 'locked.xlsx', category: 'documents', action: 'error', error: 'file is locked' },
+      ];
+      let i = 0;
+      mockTimer = setInterval(() => {
+        if (i >= seq.length) {
+          stopMockWatch();
+          return;
+        }
+        const item = seq[i++];
+        emit('watch_item', item);
+        if (item.action === 'error') {
+          const err: WatchError = { folder, message: item.error ?? '' };
+          // Not emitted: errors are per-file; keep the demo log clean.
+          void err;
+        }
+      }, 900);
+      return true;
+    },
+    async stop_watch(): Promise<boolean> {
+      stopMockWatch();
+      return true;
+    },
   };
+}
+
+let mockTimer: ReturnType<typeof setInterval> | null = null;
+
+function stopMockWatch(): void {
+  if (mockTimer !== null) {
+    clearInterval(mockTimer);
+    mockTimer = null;
+  }
 }

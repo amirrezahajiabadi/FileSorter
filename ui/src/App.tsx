@@ -5,6 +5,7 @@ import CategoryGrid from './components/CategoryGrid';
 import AnalysisModal from './components/AnalysisModal';
 import UndoModal from './components/UndoModal';
 import SettingsModal from './components/SettingsModal';
+import WatchPanel from './components/WatchPanel';
 import OperationPanel from './components/OperationPanel';
 import Toasts from './components/Toasts';
 import './App.css';
@@ -38,6 +39,7 @@ export default function App() {
       <AnalysisModal />
       <UndoModal />
       {store.settingsOpen && <SettingsModal />}
+      <WatchPanel store={store} />
       <Toasts />
     </div>
   );

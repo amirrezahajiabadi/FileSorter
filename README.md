@@ -19,6 +19,7 @@ A lightweight desktop application for automatically organizing files into catego
 - **🔁 Duplicate handling** — choose Skip (default), Rename (keeps both), or Overwrite when a destination file already exists
 - **🔍 Dry Run preview** — see exactly what a sort would do (including duplicate resolution) before anything is touched
 - **↩ Undo last sort** — reverses the previous sort: restores moved files, deletes copies made by the app (files overwritten as duplicates can't be restored)
+- **👀 Watch Mode** — pick folders to auto-organize; while it's on, new files are moved into the right category folder the moment they appear, with a live activity feed
 - **💡 Smart Suggestions** — flags large files (>100MB), old files (>1 year), and unknown extensions
 - **🌐 Bilingual UI** — full Persian (فارسی) and English support, toggle anytime with one click
 - **🎨 Dark / Light theme** — each mode has its own tuned color palette (Catppuccin Mocha-inspired dark mode) so every button and badge stays legible and "belongs" to that mode
@@ -171,6 +172,7 @@ git push origin v5.0.0
 ## 📌 Version History
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
+- **v5.1.0** — **Watch Mode (auto-sort folders).** Pick folders (browse, or watch the currently selected one) and while Watch is on, a background poller moves newly appeared files into the right category folder the moment they show up — duplicates are skipped, locked files are retried with a quiet backoff, and every decision lands in a live activity feed with per-folder counters. Watch list is persisted across restarts (watcher itself runs while the app is open — a headless service is the planned FastAPI-stage follow-up). Pure-stdlib polling (`app/watcher.py`), 11 new tests.
 - **v5.0.0** — 🎉 **Web-only official release.** The old Tkinter UI (`main.py`, `app/ui/`, `app/themes.py`) is removed entirely — `main_web.py` + the React frontend is the only interface. Also in this release: a typed JSON wire protocol shared by the Python core and the frontend (`app/protocol.py` ⟷ `ui/src/protocol.ts`); the vanilla `web/` frontend retired in favor of the React rebuild (`ui/`, Vite + TypeScript); honest fixes to the v4.2 screens (full undo data, truthful results actions, no fake cancel, no fake drag & drop); category names/icons persisted across restarts; and a release pipeline that builds the React frontend into the shipped `.exe`.
 
 - **v4.2.0** — First *real* Web UI screen (Phase 3 of [ROADMAP.md](ROADMAP.md), still parallel to the Tkinter app — run with `python main_web.py`, requires `pip install pywebview`). Features include: real folder picker, Sort (copy/move mode), duplicate handling (skip/rename/overwrite), Dry Run preview, Undo, Settings (categories), recent folders, theme toggle (dark/light), bilingual support (fa/en), self-hosted fonts (no CDN dependency), toast notifications, sorting animations, and Persian date formatting — all wired to the actual `AppController`.

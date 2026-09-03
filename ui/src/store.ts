@@ -21,6 +21,8 @@ import type {
   SortItemEvent,
   ThemeName,
   UndoDone,
+  WatchError,
+  WatchItem,
 } from './protocol';
 import { DEFAULT_CATEGORY_META } from './protocol';
 import { bridge, isDesktop, subscribeEvents } from './transport';
@@ -50,6 +52,13 @@ export interface Notice {
   text: string;
 }
 
+export interface WatchRow {
+  path: string;
+  moved: number;
+  skipped: number;
+  failed: number;
+}
+
 export interface UIState {
   ready: boolean;
   desktop: boolean;
@@ -75,6 +84,10 @@ export interface UIState {
   result: (SortDone & { kind: 'sort' }) | (UndoDone & { kind: 'undo' }) | null;
   undoOpen: boolean;
   settingsOpen: boolean;
+  watchOpen: boolean;
+  watchRunning: boolean;
+  watchFolders: WatchRow[];
+  watchLog: LogLine[];
   notice: Notice | null;
 }
 
@@ -103,6 +116,10 @@ const initial: UIState = {
   result: null,
   undoOpen: false,
   settingsOpen: false,
+  watchOpen: false,
+  watchRunning: false,
+  watchFolders: [],
+  watchLog: [],
   notice: null,
 };
 
@@ -142,6 +159,32 @@ function bumpCategory(id: string, delta: number): void {
       c.id === id ? { ...c, count: Math.max(0, c.count + delta) } : c,
     ),
   });
+}
+
+function mergeWatchRows(paths: string[], prev: WatchRow[]): WatchRow[] {
+  return paths.map((path) => {
+    const old = prev.find((r) => r.path === path);
+    return old ?? { path, moved: 0, skipped: 0, failed: 0 };
+  });
+}
+
+function bumpWatch(path: string, field: keyof Omit<WatchRow, 'path'>): void {
+  set({
+    watchFolders: state.watchFolders.map((r) =>
+      r.path === path ? { ...r, [field]: r[field] + 1 } : r,
+    ),
+  });
+}
+
+function categoryDisplay(id: string): string {
+  const row = state.categories.find((c) => c.id === id);
+  return row?.name ?? id;
+}
+
+function pushWatchLog(kind: LogKind, text: string): void {
+  logId += 1;
+  const line = { id: logId, kind, text };
+  set({ watchLog: [...state.watchLog.slice(-49), line] });
 }
 
 // ── Row building ────────────────────────────────────────────────
@@ -276,6 +319,46 @@ function handleEvent(msg: SortEvent): void {
       }
       break;
     }
+    case 'watch_item': {
+      const item = payload as WatchItem;
+      const S = state.strings;
+      const category = categoryDisplay(item.category);
+      if (item.action === 'moved') {
+        pushWatchLog(
+          'success',
+          inline(fmt(t(S, 'watch_sorted_log'), { name: item.name, category })),
+        );
+        bumpWatch(item.folder, 'moved');
+      } else if (item.action === 'skipped') {
+        pushWatchLog(
+          'warning',
+          inline(fmt(t(S, 'watch_skipped_log'), { name: item.name })),
+        );
+        bumpWatch(item.folder, 'skipped');
+      } else {
+        pushWatchLog(
+          'error',
+          inline(
+            fmt(t(S, 'watch_error_log'), { name: item.name, error: item.error ?? '' }),
+          ),
+        );
+        bumpWatch(item.folder, 'failed');
+      }
+      break;
+    }
+    case 'watch_error': {
+      const we = payload as WatchError;
+      pushWatchLog(
+        'error',
+        inline(
+          fmt(t(state.strings, 'watch_folder_error_log'), {
+            path: we.folder,
+            error: we.message,
+          }),
+        ),
+      );
+      break;
+    }
     case 'error': {
       const message = String(payload);
       pushLog('error', inline(fmt(t(state.strings, 'fatal_error_log'), { error: message })));
@@ -305,6 +388,7 @@ export async function init(): Promise<void> {
       version: app.version,
       strings,
       recentFolders: app.recentFolders ?? [],
+      watchFolders: mergeWatchRows(app.watchedFolders ?? [], []),
       categories: buildRows(app, app.language),
     });
   } catch (err) {
@@ -552,6 +636,86 @@ export async function toggleLanguage(): Promise<void> {
 
 export function clearNotice(): void {
   set({ notice: null });
+}
+
+// ── Watch mode (auto-sort folders) ───────────────────────────────
+
+export function openWatch(): void {
+  set({ watchOpen: true });
+}
+
+export function closeWatch(): void {
+  set({ watchOpen: false });
+}
+
+async function refreshWatchFolders(): Promise<void> {
+  const app = await bridge.get_state();
+  appState = app;
+  set({ watchFolders: mergeWatchRows(app.watchedFolders ?? [], state.watchFolders) });
+}
+
+export async function watchBrowseAdd(): Promise<void> {
+  const path = await bridge.browse_folder();
+  if (!path) return;
+  try {
+    await bridge.add_watch_folder(path);
+    pushWatchLog(
+      'info',
+      inline(fmt(t(state.strings, 'watch_added_log'), { path })),
+    );
+    await refreshWatchFolders();
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function watchAddCurrent(): Promise<void> {
+  const path = state.folder;
+  if (!path) return;
+  try {
+    await bridge.add_watch_folder(path);
+    pushWatchLog(
+      'info',
+      inline(fmt(t(state.strings, 'watch_added_log'), { path })),
+    );
+    await refreshWatchFolders();
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function watchRemove(path: string): Promise<void> {
+  try {
+    await bridge.remove_watch_folder(path);
+    pushWatchLog(
+      'info',
+      inline(fmt(t(state.strings, 'watch_removed_log'), { path })),
+    );
+    set({ watchFolders: state.watchFolders.filter((r) => r.path !== path) });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function watchStart(): Promise<void> {
+  try {
+    await bridge.start_watch();
+    pushWatchLog('success', inline(t(state.strings, 'watch_started_log')));
+    showNotice('success', inline(t(state.strings, 'watch_started_log')));
+    set({ watchRunning: true });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function watchStop(): Promise<void> {
+  try {
+    await bridge.stop_watch();
+    pushWatchLog('info', inline(t(state.strings, 'watch_stopped_log')));
+    set({ watchRunning: false });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
 }
 
 // React bindings: components re-render on any store change.

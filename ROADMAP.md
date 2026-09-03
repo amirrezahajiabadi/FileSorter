@@ -122,6 +122,9 @@ The bigger vision: evolve from a single-purpose file organizer into a genuinely
 useful, frequently-run Windows utility — closer to something like CCleaner or
 PowerToys. Candidate features, roughly in order of how naturally they fit:
 
+**Shipped so far:**
+- ✅ **v5.1.0** — Watch / auto-sort folders: pick folders and, while the app is open, newly arrived files are moved into their category folders automatically (stdlib polling, streamed over the JSON protocol; a headless always-on version is the FastAPI-stage follow-up).
+
 - **Duplicate file finder** across a whole drive (not just one folder)
 - **Disk space analysis** — what's actually taking up space
 - **Temp/cache cleanup**

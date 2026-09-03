@@ -9,7 +9,14 @@
 export const PROTOCOL_VERSION = 1;
 
 // ── Event kinds pushed from AppController to the UI ─────────────
-export type EventKind = 'total' | 'item' | 'progress' | 'done' | 'error';
+export type EventKind =
+  | 'total'
+  | 'item'
+  | 'progress'
+  | 'done'
+  | 'error'
+  | 'watch_item'
+  | 'watch_error';
 
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
@@ -21,6 +28,8 @@ export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
   'progress',
   'done',
   'error',
+  'watch_item',
+  'watch_error',
 ]);
 
 // ── Wire shapes ─────────────────────────────────────────────────
@@ -36,6 +45,7 @@ export interface AppState {
   categories: Record<string, string[]>;
   categoryMeta: Record<string, Partial<CategoryMeta>>;
   recentFolders: string[];
+  watchedFolders: string[];
   theme: ThemeName;
   language: LangCode;
 }
@@ -68,6 +78,21 @@ export interface UndoDone {
   removed: number;
   failed: number;
   nothing: boolean;
+}
+
+// ── Watch mode (auto-sort folders) ──────────────────────────────
+
+export interface WatchItem {
+  folder: string;
+  name: string;
+  category: string;
+  action: 'moved' | 'skipped' | 'error';
+  error?: string;
+}
+
+export interface WatchError {
+  folder: string;
+  message: string;
 }
 
 export interface EventMessage {
