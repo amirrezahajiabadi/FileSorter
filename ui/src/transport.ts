@@ -17,6 +17,10 @@ import type {
   AppState,
   CategoryMeta,
   DuplicateMode,
+  DupDeleteResult,
+  DupDone,
+  DupFile,
+  DupGroup,
   EventKind,
   LangCode,
   PlanItem,
@@ -45,6 +49,8 @@ export interface BridgeApi {
     duplicate_mode?: DuplicateMode,
   ): Promise<boolean>;
   undo_sort(): Promise<boolean>;
+  find_duplicates(path: string): Promise<boolean>;
+  delete_duplicates(paths: string[]): Promise<DupDeleteResult>;
   add_watch_folder(path: string): Promise<boolean>;
   remove_watch_folder(path: string): Promise<boolean>;
   start_watch(): Promise<boolean>;
@@ -116,7 +122,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.1.0',
+  version: '5.2.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   recentFolders: [],
@@ -165,6 +171,62 @@ const SAMPLE_PLAN: PlanItem[] = [
   { name: '2022-tax.pdf', category: 'documents', action: 'overwrite', final_name: '2022-tax.pdf' },
   { name: 'menu.pdf', category: 'documents', action: 'ok', final_name: 'menu.pdf' },
 ];
+
+function dupFiles(specs: [string, number][]): DupFile[] {
+  return specs.map(([rel, size]) => ({
+    path: `${SAMPLE_PATH}/${rel}`,
+    size,
+  }));
+}
+
+function makeSampleDupGroups(): DupGroup[] {
+  return [
+    {
+      id: '3f9a1c2b7d4e',
+      size: 158_300_000,
+      files: dupFiles([
+        ['backup/backup.zip', 158_300_000],
+        ['archives/backup-copy.zip', 158_300_000],
+      ]),
+    },
+    {
+      id: '8d2e0f1a5b9c',
+      size: 8_200_000,
+      files: dupFiles([
+        ['music/song.mp3', 8_200_000],
+        ['music/song (1).mp3', 8_200_000],
+        ['downloads/song-copy.mp3', 8_200_000],
+      ]),
+    },
+    {
+      id: '1a7c4e9f2b3d',
+      size: 3_400_000,
+      files: dupFiles([
+        ['photos/holiday-2023.jpg', 3_400_000],
+        ['backup/old/holiday-2023.jpg', 3_400_000],
+      ]),
+    },
+    {
+      id: '6e0b2d8a4f1c',
+      size: 1_200_000,
+      files: dupFiles([
+        ['docs/report-final.pdf', 1_200_000],
+        ['inbox/report (2).pdf', 1_200_000],
+      ]),
+    },
+  ];
+}
+
+function dupSummary(groups: DupGroup[]): { groups: DupGroup[]; wasted: number } {
+  const live = groups
+    .map((g) => ({ ...g, files: [...g.files] }))
+    .filter((g) => g.files.length >= 2);
+  const wasted = live.reduce(
+    (sum, g) => sum + g.size * (g.files.length - 1),
+    0,
+  );
+  return { groups: live, wasted };
+}
 
 function makeItems(): SortItemEvent[] {
   return SAMPLE_PLAN.map((p) => {
@@ -250,6 +312,49 @@ function createMockBridge(): BridgeApi {
       });
       return true;
     },
+    async find_duplicates(): Promise<boolean> {
+      // Simulate a live scan over the current sample duplicates: list,
+      // then hash each candidate with progress ticks, then report.
+      const { groups } = dupSummary(dupState);
+      const fileCount = groups.reduce((n, g) => n + g.files.length, 0);
+      await sleep(120);
+      emit('dup_progress', { phase: 'listing', processed: 0, total: fileCount });
+      await sleep(150);
+      for (let i = 0; i < fileCount; i++) {
+        await sleep(70);
+        emit('dup_progress', {
+          phase: 'hashing',
+          processed: i + 1,
+          total: fileCount,
+        });
+      }
+      const done = dupSummary(dupState);
+      const payload: DupDone = {
+        groups: done.groups,
+        wasted_bytes: done.wasted,
+        files_scanned: 34,
+      };
+      emit('dup_done', payload);
+      return true;
+    },
+    async delete_duplicates(paths: string[]): Promise<DupDeleteResult> {
+      await sleep(250); // feel of real deletions
+      const deleted: string[] = [];
+      const failed: { path: string; error: string }[] = [];
+      for (const path of paths) {
+        const found = dupState.some((g) => g.files.some((f) => f.path === path));
+        if (found) {
+          dupState = dupState.map((g) => ({
+            ...g,
+            files: g.files.filter((f) => f.path !== path),
+          }));
+          deleted.push(path);
+        } else {
+          failed.push({ path, error: 'no longer exists' });
+        }
+      }
+      return { deleted, failed };
+    },
     async undo_sort(): Promise<boolean> {
       const items: SortItemEvent[] = [
         { status: 'removed', name: 'menu.pdf' },
@@ -330,6 +435,7 @@ function createMockBridge(): BridgeApi {
 }
 
 let mockTimer: ReturnType<typeof setInterval> | null = null;
+let dupState: DupGroup[] = makeSampleDupGroups();
 
 function stopMockWatch(): void {
   if (mockTimer !== null) {

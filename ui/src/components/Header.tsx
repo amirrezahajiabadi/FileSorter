@@ -1,5 +1,5 @@
 import type { UIState } from '../store';
-import { openSettings, openWatch, toggleLanguage, toggleTheme } from '../store';
+import { openDupPanel, openSettings, openWatch, toggleLanguage, toggleTheme } from '../store';
 import { inline, t } from '../i18n';
 
 function SunIcon() {
@@ -42,6 +42,14 @@ export default function Header({ store }: { store: UIState }) {
           onClick={openWatch}
         >
           <span className="header-btn-label">{inline(t(store.strings, 'watch_btn'))}</span>
+        </button>
+        <button
+          type="button"
+          className="header-btn"
+          title={inline(t(store.strings, 'dup_btn'))}
+          onClick={openDupPanel}
+        >
+          <span className="header-btn-label">{inline(t(store.strings, 'dup_btn'))}</span>
         </button>
         <button
           type="button"

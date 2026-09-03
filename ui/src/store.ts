@@ -15,6 +15,7 @@ import type {
   AppState,
   CategoryMeta,
   DuplicateMode,
+  DupDone,
   LangCode,
   PlanItem,
   SortDone,
@@ -29,6 +30,7 @@ import { bridge, isDesktop, subscribeEvents } from './transport';
 import type { SortEvent } from './transport';
 import type { StringTable } from './i18n';
 import { fmt, inline, t } from './i18n';
+import { formatSize } from './utils';
 
 export interface CategoryRow {
   id: string;
@@ -51,6 +53,21 @@ export interface Notice {
   kind: 'success' | 'error' | 'info';
   text: string;
 }
+
+export interface DupFileRow {
+  path: string;
+  size: number;
+  /** True = this copy is marked for deletion (at least one per group stays). */
+  markDelete: boolean;
+}
+
+export interface DupGroupRow {
+  id: string;
+  size: number;
+  files: DupFileRow[];
+}
+
+export type DupScanPhase = 'idle' | 'listing' | 'hashing';
 
 export interface WatchRow {
   path: string;
@@ -88,6 +105,13 @@ export interface UIState {
   watchRunning: boolean;
   watchFolders: WatchRow[];
   watchLog: LogLine[];
+  dupOpen: boolean;
+  dupScanning: boolean;
+  dupScanFolder: string | null;
+  dupPhase: DupScanPhase;
+  dupProcessed: number;
+  dupTotal: number;
+  dupGroups: DupGroupRow[];
   notice: Notice | null;
 }
 
@@ -120,6 +144,13 @@ const initial: UIState = {
   watchRunning: false,
   watchFolders: [],
   watchLog: [],
+  dupOpen: false,
+  dupScanning: false,
+  dupScanFolder: null,
+  dupPhase: 'idle',
+  dupProcessed: 0,
+  dupTotal: 0,
+  dupGroups: [],
   notice: null,
 };
 
@@ -359,11 +390,35 @@ function handleEvent(msg: SortEvent): void {
       );
       break;
     }
+    case 'dup_progress': {
+      const p = payload as { phase: 'listing' | 'hashing'; processed: number; total: number };
+      set({
+        dupScanning: true,
+        dupPhase: p.phase,
+        dupProcessed: p.processed,
+        dupTotal: p.total,
+      });
+      break;
+    }
+    case 'dup_done': {
+      const p = payload as DupDone;
+      const rows: DupGroupRow[] = p.groups.map((g) => ({
+        id: g.id,
+        size: g.size,
+        files: g.files.map((f, i) => ({
+          path: f.path,
+          size: f.size,
+          markDelete: i > 0, // keep the first copy of each group by default
+        })),
+      }));
+      set({ dupScanning: false, dupPhase: 'idle', dupGroups: rows });
+      break;
+    }
     case 'error': {
       const message = String(payload);
       pushLog('error', inline(fmt(t(state.strings, 'fatal_error_log'), { error: message })));
       showNotice('error', message);
-      set({ phase: 'idle', result: null });
+      set({ phase: 'idle', result: null, dupScanning: false });
       break;
     }
   }
@@ -713,6 +768,124 @@ export async function watchStop(): Promise<void> {
     await bridge.stop_watch();
     pushWatchLog('info', inline(t(state.strings, 'watch_stopped_log')));
     set({ watchRunning: false });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+// ── Duplicate finder ──────────────────────────────────────────────
+
+export function openDupPanel(): void {
+  set({ dupOpen: true });
+}
+
+export function closeDupPanel(): void {
+  set({
+    dupOpen: false,
+    dupScanning: false,
+    dupScanFolder: null,
+    dupPhase: 'idle',
+    dupGroups: [],
+  });
+}
+
+async function startDupScan(path: string): Promise<void> {
+  set({
+    dupScanning: true,
+    dupScanFolder: path,
+    dupPhase: 'listing',
+    dupProcessed: 0,
+    dupTotal: 0,
+    dupGroups: [],
+  });
+  try {
+    await bridge.find_duplicates(path);
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ dupScanning: false });
+  }
+}
+
+export async function dupScanCurrent(): Promise<void> {
+  if (!state.folder) return;
+  await startDupScan(state.folder);
+}
+
+export async function dupScanBrowse(): Promise<void> {
+  const path = await bridge.browse_folder();
+  if (!path) return;
+  await startDupScan(path);
+}
+
+export async function dupScanFolder(): Promise<void> {
+  // Duplicates panel with a folder already set (e.g. after reopening).
+  const path = state.dupScanFolder ?? state.folder;
+  if (!path) return;
+  await startDupScan(path);
+}
+
+/** Toggle whether one copy is marked for deletion; never unmarks the
+ *  last remaining keeper of a group (one copy must always stay). */
+export function toggleDupFile(groupId: string, path: string): void {
+  set({
+    dupGroups: state.dupGroups.map((g) => {
+      if (g.id !== groupId) return g;
+      const keepers = g.files.filter((f) => !f.markDelete);
+      const target = g.files.find((f) => f.path === path);
+      if (!target) return g;
+      const wouldUnmark = !target.markDelete && keepers.length === 1;
+      if (wouldUnmark) return g; // last keeper cannot be marked for deletion
+      return {
+        ...g,
+        files: g.files.map((f) =>
+          f.path === path ? { ...f, markDelete: !f.markDelete } : f,
+        ),
+      };
+    }),
+  });
+}
+
+export async function deleteSelectedDupes(): Promise<void> {
+  const marked = state.dupGroups.flatMap((g) =>
+    g.files.filter((f) => f.markDelete).map((f) => ({ ...f, groupId: g.id })),
+  );
+  const paths = marked.map((f) => f.path);
+  if (paths.length === 0) return;
+  const freedBytes = marked.reduce((n, f) => n + f.size, 0);
+  try {
+    const res = await bridge.delete_duplicates(paths);
+    const deletedSet = new Set(res.deleted);
+    set({
+      dupGroups: state.dupGroups
+        .map((g) => ({
+          ...g,
+          files: g.files.filter((f) => !deletedSet.has(f.path)),
+        }))
+        .filter((g) => g.files.length >= 2), // a lone copy is no longer a duplicate
+    });
+    if (res.deleted.length > 0) {
+      const msg = inline(
+        fmt(t(state.strings, 'dup_deleted_log'), {
+          n: res.deleted.length,
+          size: formatSize(freedBytes),
+        }),
+      );
+      pushLog('success', msg);
+      showNotice('success', msg);
+    }
+    const firstFail = res.failed[0];
+    if (firstFail) {
+      const pathOnly = firstFail.path.split(/[\/]/).pop() ?? firstFail.path;
+      showNotice(
+        'error',
+        inline(
+          fmt(t(state.strings, 'dup_delete_failed_log'), {
+            name: pathOnly,
+            error: firstFail.error,
+          }),
+        ),
+      );
+    }
   } catch (err) {
     showNotice('error', String(err));
   }

@@ -6,6 +6,7 @@ import AnalysisModal from './components/AnalysisModal';
 import UndoModal from './components/UndoModal';
 import SettingsModal from './components/SettingsModal';
 import WatchPanel from './components/WatchPanel';
+import DuplicatesPanel from './components/DuplicatesPanel';
 import OperationPanel from './components/OperationPanel';
 import Toasts from './components/Toasts';
 import './App.css';
@@ -40,6 +41,7 @@ export default function App() {
       <UndoModal />
       {store.settingsOpen && <SettingsModal />}
       <WatchPanel store={store} />
+      <DuplicatesPanel store={store} />
       <Toasts />
     </div>
   );

@@ -16,7 +16,9 @@ export type EventKind =
   | 'done'
   | 'error'
   | 'watch_item'
-  | 'watch_error';
+  | 'watch_error'
+  | 'dup_progress'
+  | 'dup_done';
 
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
@@ -30,6 +32,8 @@ export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
   'error',
   'watch_item',
   'watch_error',
+  'dup_progress',
+  'dup_done',
 ]);
 
 // ── Wire shapes ─────────────────────────────────────────────────
@@ -98,6 +102,36 @@ export interface WatchError {
 export interface EventMessage {
   kind: EventKind;
   payload: unknown;
+}
+
+// ── Duplicate finder (Api.find_duplicates) ───────────────────────
+
+export interface DupProgress {
+  phase: 'listing' | 'hashing';
+  processed: number;
+  total: number;
+}
+
+export interface DupFile {
+  path: string;
+  size: number;
+}
+
+export interface DupGroup {
+  id: string; // short sha256 prefix
+  size: number; // bytes of one copy
+  files: DupFile[];
+}
+
+export interface DupDone {
+  groups: DupGroup[];
+  wasted_bytes: number;
+  files_scanned: number;
+}
+
+export interface DupDeleteResult {
+  deleted: string[];
+  failed: { path: string; error: string }[];
 }
 
 // ── Analysis report (Api.analyze_folder) ────────────────────────
