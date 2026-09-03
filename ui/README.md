@@ -1,14 +1,15 @@
 # FileSorter UI (React + Vite + TypeScript)
 
-The new frontend for the desktop app, in development as the migration of
-the legacy vanilla UI under `../web/` proceeds.
+The frontend for the desktop app, loaded by `main_web.py` from this
+app's production build (`dist/`), which `main_web.py` serves over a local
+HTTP server.
 
 ## Stack
 
 - React 19 + Vite 6 + TypeScript (strict)
-- No UI framework — plain CSS with the design tokens from `../web/css/themes.css`
-- Self-hosted fonts (Inter / Space Grotesk / JetBrains Mono) copied from
-  `../web/assets/fonts/` into `src/assets/fonts/`
+- No UI framework — plain CSS with design tokens defined in `src/index.css`
+- Self-hosted fonts (Inter / Space Grotesk / JetBrains Mono) under
+  `src/assets/fonts/` — no CDN dependency
 
 ## Layout
 

@@ -70,8 +70,9 @@ Version numbers below are for organization only and can shift. See
   what the app does (files moving into labeled bins on a sorting line),
   not a port of the Tkinter look. Category colors, a warm safety-orange
   accent, Space Grotesk/Inter/JetBrains Mono typography (self-hosted, no
-  CDN dependency), and a signature animated progress element. See
-  `web/README.md` for the full rationale.
+  CDN dependency), and a signature animated progress element. The design
+  lives on in the React UI (`ui/`); the vanilla `web/` implementation was
+  retired once the React migration reached parity.
 
 **Phase 3 — New UI, screen by screen**
 - ✅ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,

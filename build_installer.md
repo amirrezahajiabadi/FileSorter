@@ -5,22 +5,33 @@
 ```bash
 pip install -r requirements.txt
 pip install pyinstaller
+cd ui
+npm install
 ```
 
-## Step 2 — Build the .exe
+## Step 2 — Build the frontend (React UI)
 
 ```bash
-pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py
+cd ui
+npm run build        # -> ui/dist/
+```
+
+The desktop app serves this build. Skip nothing — the .exe bundles it.
+
+## Step 3 — Build the .exe
+
+```bash
+pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py
 ```
 
 - `--onefile` → single .exe file (no extra DLLs)
 - `--windowed` → no black terminal window behind the app
-- `main_web.py` → builds the web UI version (with pywebview)
+- `main_web.py` → builds the React UI version (with pywebview)
 - Output: `dist/FileSorter.exe`
 
 ---
 
-## Step 3 — Create a proper installer (optional)
+## Step 4 — Create a proper installer (optional)
 
 Download and install **NSIS** from https://nsis.sourceforge.io
 
@@ -39,7 +50,9 @@ This uses the `installer.nsi` script in the project root and creates
 - Includes an uninstaller
 
 **Important:** After any code change, rebuild the exe before running makensis:
-1. `pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py`
+1. `npm run build` in `ui/`
+2. `pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py`
+3. `makensis installer.nsi`
 2. `makensis installer.nsi`
 
 The version in `installer.nsi` is kept in sync with `app/constants.py` —

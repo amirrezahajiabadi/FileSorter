@@ -4,15 +4,18 @@ Run with:
     pip install pywebview
     python main_web.py
 
-Architecture: this file (and the Api class in it) is a thin adapter,
-exactly like app/ui/main_window.py is for Tkinter — it builds the
-window and translates between JS calls / AppController events. All
-actual logic lives in app/controller.py.
+Architecture: this file (and the Api class in it) is a thin adapter —
+it builds the window and translates between JS calls / AppController
+events. All actual logic lives in app/controller.py. The frontend is
+the React app in ui/ (build with `npm run build` in ui/ first); this
+entry point serves that build over a local HTTP server.
 """
 
 import json
 import sys
 import threading
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import webview
@@ -30,6 +33,34 @@ def _base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)
     return Path(__file__).resolve().parent
+
+
+def _serve_dist() -> str:
+    """Serve the built React UI (ui/dist) over a local HTTP server.
+
+    Returns the page URL for pywebview to open. localhost HTTP is used
+    instead of a file:// URL on purpose: the frontend ships as ES
+    modules, which browsers refuse to load from file:// due to CORS.
+
+    The server binds an ephemeral loopback port (never exposed) and runs
+    on a daemon thread, so it dies with the app.
+    """
+    dist = _base_dir() / "ui" / "dist"
+    index = dist / "index.html"
+    if not index.exists():
+        sys.exit(
+            "Frontend build not found at ui/dist/index.html. "
+            "Build it first with:  cd ui && npm install && npm run build"
+        )
+
+    class QuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, *args):  # silence per-request logging
+            pass
+
+    handler = partial(QuietHandler, directory=str(dist))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_address[1]}/index.html"
 
 
 class Api:
@@ -182,9 +213,8 @@ class Api:
 
 def main() -> None:
     api = Api()
-    web_index = str(_base_dir() / "web" / "index.html")
     window = webview.create_window(
-        "FileSorter", web_index, js_api=api, width=800, height=800
+        "FileSorter", _serve_dist(), js_api=api, width=800, height=800
     )
     api.window = window
     webview.start()

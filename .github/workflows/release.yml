@@ -25,6 +25,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ui
+        run: npm run build
+
       - name: Install test dependencies
         run: pip install pytest
 
@@ -38,7 +51,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build Windows executable
-        run: pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py
+        run: pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py
 
       - name: Create GitHub Release with the .exe attached
         uses: softprops/action-gh-release@v2

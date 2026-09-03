@@ -60,10 +60,19 @@ pip install pywebview
 python main_web.py
 ```
 
-This is the **new shipped UI** — a modern HTML/CSS/JS interface served via
-PyWebView, replacing the old Tkinter app. See `web/README.md` for the
-design system and architecture details. `main.py` (the Tkinter app above)
-is kept for backward compatibility.
+This is the **shipped UI** — a React + Vite + TypeScript app served by
+PyWebView over a local HTTP server. Build the frontend first:
+
+```bash
+cd ui
+npm install
+npm run build          # -> ui/dist/
+cd ..
+python main_web.py
+```
+
+See `ui/README.md` for the architecture. `main.py` (the Tkinter app) is
+kept only for backward compatibility.
 
 ---
 
@@ -101,17 +110,15 @@ FileSorter/
 ├── requirements.txt
 ├── build_installer.md
 ├── README.md
-├── web/                          # New Web UI (pywebview) — see web/README.md
-│   ├── index.html                 # Main page — all modals, layout, structure
-│   ├── css/
-│   │   ├── themes.css             # Light/dark theme CSS variables
-│   │   └── main.css               # Layout, components, modals, responsive
-│   ├── js/
-│   │   ├── data.js                # Category metadata (icons, display names)
-│   │   ├── state.js               # Simple state management (pub/sub)
-│   │   ├── utils.js               # Helpers (formatSize, escapeHtml, etc.)
-│   │   └── app.js                 # Main app: pywebview bridge, event handlers
-│   └── assets/icons/              # (reserved for future use)
+├── ui/                           # React UI (pywebview) — see ui/README.md
+│   ├── src/
+│   │   ├── components/            # Header, FolderPicker, modals, panels…
+│   │   ├── store.ts               # Typed external store + phase machine
+│   │   ├── transport.ts           # pywebview bridge + browser mock
+│   │   ├── protocol.ts            # Wire types (mirror of app/protocol.py)
+│   │   └── generated/strings.ts   # Generated mirror of app/i18n.py
+│   ├── scripts/export_i18n.py     # Regenerates the strings mirror
+│   └── package.json
 └── poc/                          # throwaway experiments for the roadmap (not shipped)
     ├── webview_poc.py             # v4.0 — PyWebView + AppController proof of concept
     └── README.md
