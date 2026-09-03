@@ -75,6 +75,37 @@ export interface EventMessage {
   payload: unknown;
 }
 
+// ── Analysis report (Api.analyze_folder) ────────────────────────
+
+export interface AnalysisReport {
+  total: number;
+  by_category: Record<string, number>;
+  large_files: [string, number][];
+  old_files: [string, number][];
+  unknown_extensions: string[];
+  total_size: number;
+  suggestions: string[];
+  error?: string;
+}
+
+// ── Live event payloads (window.onSortEvent) ───────────────────
+
+export type ItemStatus =
+  | 'ok'
+  | 'skip'
+  | 'error'
+  | 'restored'
+  | 'removed'
+  | 'failed';
+
+export interface SortItemEvent {
+  status: ItemStatus;
+  name?: string;
+  category?: string;
+  action?: 'copied' | 'moved';
+  error?: string;
+}
+
 // ── Fallback display metadata (used until Python state arrives) ──
 // Mirrors the constants once shipped in web/js/data.js.
 export const DEFAULT_CATEGORY_META: Record<string, CategoryMeta> = {

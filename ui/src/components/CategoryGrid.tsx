@@ -10,6 +10,7 @@ export default function CategoryGrid({ store }: { store: UIState }) {
       <div className="category-grid">
         {store.categories.map((cat) => (
           <div key={cat.id} className={`category-card category-${cat.id}`}>
+            {cat.count > 0 && <span className="category-count">{cat.count}</span>}
             <span className="category-icon" aria-hidden="true">
               {cat.icon}
             </span>

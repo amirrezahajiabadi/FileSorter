@@ -1,5 +1,5 @@
 import type { UIState } from '../store';
-import { browseFolder, pickRecent } from '../store';
+import { analyzeFolder, browseFolder, pickRecent } from '../store';
 import { t } from '../i18n';
 
 function FolderIcon() {
@@ -11,7 +11,7 @@ function FolderIcon() {
 }
 
 export default function FolderPicker({ store }: { store: UIState }) {
-  const { strings, folder, recentFolders } = store;
+  const { strings, folder, recentFolders, phase } = store;
   const browseLabel = t(strings, 'browse_btn');
   const recentLabel = t(strings, 'recent_folders_btn');
   const noFolder = t(strings, 'no_folder');
@@ -30,14 +30,33 @@ export default function FolderPicker({ store }: { store: UIState }) {
             {folder ?? noFolder}
           </span>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => void browseFolder()}
-        >
-          {browseLabel}
-        </button>
+        <div className="picker-actions">
+          {folder && phase === 'idle' && (
+            <button
+              type="button"
+              className="btn btn-accent"
+              onClick={() => void analyzeFolder()}
+            >
+              {t(strings, 'analyze_btn')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={phase === 'analyzing'}
+            onClick={() => void browseFolder()}
+          >
+            {browseLabel}
+          </button>
+        </div>
       </div>
+
+      {phase === 'analyzing' && (
+        <div className="analyzing-note">
+          <span className="spinner spinner-sm" aria-hidden="true" />
+          <span>{t(strings, 'analyzing_btn')}</span>
+        </div>
+      )}
 
       {recentFolders.length > 0 && (
         <div className="recent-row">

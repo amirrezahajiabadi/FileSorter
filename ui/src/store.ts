@@ -1,23 +1,53 @@
 /**
- * Minimal external store + React bindings.
+ * External store + React bindings.
  *
- * The vanilla UI kept everything in one global State object with manual
- * subscribers; this is the same idea, typed, and consumed through
- * useSyncExternalStore so React components re-render on change.
+ * Same idea as the vanilla UI's global State object, but typed and
+ * consumed through useSyncExternalStore. Holds the phase machine
+ * (idle -> analysis -> sorting -> done), the live analysis/sort data,
+ * and every action the UI can take; backend-pushed events flow into it
+ * through subscribeEvents (registered once at init).
  */
 
 import { useSyncExternalStore } from 'react';
 
-import type { AppState, CategoryMeta, LangCode, ThemeName } from './protocol';
+import type {
+  AnalysisReport,
+  AppState,
+  CategoryMeta,
+  DuplicateMode,
+  LangCode,
+  PlanItem,
+  SortDone,
+  SortItemEvent,
+  ThemeName,
+  UndoDone,
+} from './protocol';
 import { DEFAULT_CATEGORY_META } from './protocol';
-import { bridge, isDesktop } from './transport';
+import { bridge, isDesktop, subscribeEvents } from './transport';
+import type { SortEvent } from './transport';
 import type { StringTable } from './i18n';
+import { fmt, inline, t } from './i18n';
 
 export interface CategoryRow {
   id: string;
   icon: string;
   name: string;
   extensions: string[];
+  count: number;
+}
+
+export type Phase = 'idle' | 'analyzing' | 'analysis' | 'sorting' | 'done';
+export type LogKind = 'success' | 'warning' | 'error' | 'info';
+
+export interface LogLine {
+  id: number;
+  kind: LogKind;
+  text: string;
+}
+
+export interface Notice {
+  kind: 'success' | 'error' | 'info';
+  text: string;
 }
 
 export interface UIState {
@@ -30,6 +60,20 @@ export interface UIState {
   folder: string | null;
   recentFolders: string[];
   categories: CategoryRow[];
+  phase: Phase;
+  move: boolean;
+  dupMode: DuplicateMode;
+  report: AnalysisReport | null;
+  plan: PlanItem[] | null;
+  dryRunOpen: boolean;
+  totalFiles: number;
+  processed: number;
+  okCount: number;
+  skipCount: number;
+  errorCount: number;
+  logs: LogLine[];
+  result: (SortDone & { kind: 'sort' }) | (UndoDone & { kind: 'undo' }) | null;
+  notice: Notice | null;
 }
 
 const initial: UIState = {
@@ -42,10 +86,25 @@ const initial: UIState = {
   folder: null,
   recentFolders: [],
   categories: [],
+  phase: 'idle',
+  move: false,
+  dupMode: 'skip',
+  report: null,
+  plan: null,
+  dryRunOpen: false,
+  totalFiles: 0,
+  processed: 0,
+  okCount: 0,
+  skipCount: 0,
+  errorCount: 0,
+  logs: [],
+  result: null,
+  notice: null,
 };
 
 let state: UIState = initial;
 let appState: AppState | null = null;
+let logId = 0;
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<UIState>): void {
@@ -62,6 +121,27 @@ function getSnapshot(): UIState {
   return state;
 }
 
+// ── Localized helpers bound to the current state ────────────────
+
+function pushLog(kind: LogKind, text: string): void {
+  logId += 1;
+  set({ logs: [...state.logs, { id: logId, kind, text }] });
+}
+
+function showNotice(kind: Notice['kind'], text: string): void {
+  set({ notice: { kind, text } });
+}
+
+function bumpCategory(id: string, delta: number): void {
+  set({
+    categories: state.categories.map((c) =>
+      c.id === id ? { ...c, count: Math.max(0, c.count + delta) } : c,
+    ),
+  });
+}
+
+// ── Row building ────────────────────────────────────────────────
+
 function buildRows(app: AppState, lang: LangCode): CategoryRow[] {
   const ids = Object.keys(app.categories);
   const sorted = [...ids].sort((a, b) => {
@@ -73,28 +153,147 @@ function buildRows(app: AppState, lang: LangCode): CategoryRow[] {
     const meta: Partial<CategoryMeta> = app.categoryMeta?.[id] ?? {};
     const fallback = DEFAULT_CATEGORY_META[id];
     const icon = meta.icon || fallback?.icon || '📁';
-    // Localized name: persisted meta wins, then the built-in fallback.
     const name =
       (lang === 'fa'
         ? meta.nameFa ?? fallback?.nameFa
         : meta.nameEn ?? fallback?.nameEn) ?? id;
-    return { id, icon, name, extensions: app.categories[id] ?? [] };
+    return { id, icon, name, extensions: app.categories[id] ?? [], count: 0 };
   });
 }
+
+function applyCategoryCounts(byCategory: Record<string, number>): void {
+  set({
+    categories: state.categories.map((c) => ({
+      ...c,
+      count: byCategory[c.id] ?? 0,
+    })),
+  });
+}
+
+function resetCounts(): void {
+  applyCategoryCounts({});
+}
+
+// ── Theme / language helpers ────────────────────────────────────
 
 function applyTheme(theme: ThemeName): void {
   document.documentElement.dataset.theme = theme;
 }
 
-// ── Actions ─────────────────────────────────────────────────────
+// ── Backend event handling ──────────────────────────────────────
+
+function localizeItem(item: SortItemEvent): string {
+  const S = state.strings;
+  const name = item.name ?? '?';
+  const category = item.category ?? '';
+  switch (item.status) {
+    case 'ok': {
+      const tpl = item.action === 'moved' ? t(S, 'moved_log') : t(S, 'copied_log');
+      return inline(fmt(tpl, { name, category }));
+    }
+    case 'skip':
+      return inline(fmt(t(S, 'skipped_log'), { name }));
+    case 'error':
+      return inline(fmt(t(S, 'error_log'), { name, error: item.error ?? '' }));
+    case 'restored':
+      return inline(fmt(t(S, 'undo_restored_log'), { name }));
+    case 'removed':
+      return inline(fmt(t(S, 'undo_removed_log'), { name }));
+    case 'failed':
+      return inline(fmt(t(S, 'undo_failed_log'), { name, error: item.error ?? '' }));
+  }
+}
+
+function handleEvent(msg: SortEvent): void {
+  const { kind, payload } = msg;
+  switch (kind) {
+    case 'total': {
+      const total = payload as number;
+      set({
+        totalFiles: total,
+        processed: 0,
+        okCount: 0,
+        skipCount: 0,
+        errorCount: 0,
+      });
+      resetCounts();
+      break;
+    }
+    case 'item': {
+      const item = payload as SortItemEvent;
+      pushLog(
+        item.status === 'ok' || item.status === 'restored'
+          ? 'success'
+          : item.status === 'skip' || item.status === 'removed'
+            ? 'warning'
+            : 'error',
+        localizeItem(item),
+      );
+      if (item.status === 'ok' && item.category) {
+        bumpCategory(item.category, 1);
+        set({ okCount: state.okCount + 1 });
+      } else if (item.status === 'skip') {
+        set({ skipCount: state.skipCount + 1 });
+      } else if (item.status === 'error') {
+        set({ errorCount: state.errorCount + 1 });
+      }
+      break;
+    }
+    case 'progress':
+      set({ processed: payload as number });
+      break;
+    case 'done': {
+      const p = payload as SortDone | UndoDone;
+      if ('nothing' in p) {
+        if (p.nothing) {
+          pushLog('info', inline(t(state.strings, 'undo_nothing_msg')));
+          showNotice('info', inline(t(state.strings, 'undo_nothing_title')));
+          set({ phase: 'idle', result: null, totalFiles: 0, processed: 0 });
+        } else {
+          const line = fmt(t(state.strings, 'undo_done_log'), {
+            restored: p.restored,
+            removed: p.removed,
+            failed: p.failed,
+          });
+          pushLog('success', inline(line));
+          showNotice('success', inline(line));
+          set({ phase: 'idle', result: null });
+        }
+      } else {
+        const line = fmt(t(state.strings, 'done_log'), {
+          copied: p.copied,
+          skipped: p.skipped,
+          errors: p.errors,
+          target: p.target_dir,
+        });
+        pushLog('success', inline(line));
+        showNotice('success', inline(t(state.strings, 'done_log_title')));
+        set({ phase: 'done', result: { ...p, kind: 'sort' } });
+      }
+      break;
+    }
+    case 'error': {
+      const message = String(payload);
+      pushLog('error', inline(fmt(t(state.strings, 'fatal_error_log'), { error: message })));
+      showNotice('error', message);
+      set({ phase: 'idle', result: null });
+      break;
+    }
+  }
+}
+// ── Public actions ──────────────────────────────────────────────
 
 export async function init(): Promise<void> {
+  // Events may arrive before state is loaded (sort started elsewhere);
+  // register first, then fetch state/strings.
+  subscribeEvents(handleEvent);
   try {
     const app = await bridge.get_state();
     appState = app;
     const strings = await bridge.get_strings(app.language);
     applyTheme(app.theme);
     document.documentElement.lang = app.language;
+    document.documentElement.dir = app.language === 'fa' ? 'rtl' : 'ltr';
     set({
       ready: true,
       theme: app.theme,
@@ -110,15 +309,122 @@ export async function init(): Promise<void> {
   }
 }
 
+export function setFolder(folder: string | null): void {
+  set({
+    folder,
+    phase: 'idle',
+    report: null,
+    plan: null,
+    dryRunOpen: false,
+    result: null,
+    logs: [],
+  });
+}
+
 export async function browseFolder(): Promise<void> {
   const path = await bridge.browse_folder();
   if (path) {
-    set({ folder: path });
+    setFolder(path);
+    pushLog('info', inline(fmt(t(state.strings, 'folder_selected_log'), { path })));
   }
 }
 
 export function pickRecent(path: string): void {
-  set({ folder: path });
+  setFolder(path);
+}
+
+export async function analyzeFolder(): Promise<void> {
+  if (!state.folder || state.phase !== 'idle') return;
+  set({ phase: 'analyzing' });
+  try {
+    const report = await bridge.analyze_folder(state.folder);
+    if (report.error) {
+      showNotice('error', report.error);
+      set({ phase: 'idle' });
+      return;
+    }
+    set({
+      report,
+      totalFiles: report.total,
+      phase: 'analysis',
+      plan: null,
+      dryRunOpen: false,
+    });
+    applyCategoryCounts(report.by_category);
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ phase: 'idle' });
+  }
+}
+
+export function closeAnalysis(): void {
+  set({ phase: 'idle', plan: null, dryRunOpen: false });
+}
+
+export async function loadPlan(mode: DuplicateMode): Promise<void> {
+  if (!state.folder) return;
+  try {
+    const plan = await bridge.plan_sort(state.folder, mode);
+    set({ plan, dryRunOpen: true });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export function toggleDryRun(open: boolean): void {
+  set({ dryRunOpen: open });
+}
+
+export function setMove(move: boolean): void {
+  set({ move });
+}
+
+export function setDupMode(mode: DuplicateMode): void {
+  set({ dupMode: mode });
+}
+
+export async function runSort(): Promise<void> {
+  if (!state.folder) return;
+  set({
+    phase: 'sorting',
+    result: null,
+    totalFiles: 0,
+    processed: 0,
+    okCount: 0,
+    skipCount: 0,
+    errorCount: 0,
+    logs: [],
+  });
+  resetCounts();
+  try {
+    await bridge.start_sort(state.folder, state.move, state.dupMode);
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ phase: 'idle' });
+  }
+}
+
+export async function runUndo(): Promise<void> {
+  set({
+    phase: 'sorting',
+    result: null,
+    totalFiles: 0,
+    processed: 0,
+    okCount: 0,
+    skipCount: 0,
+    errorCount: 0,
+    logs: [],
+  });
+  try {
+    await bridge.undo_sort();
+  } catch (err) {
+    showNotice('error', String(err));
+    set({ phase: 'idle' });
+  }
+}
+
+export function resetApp(): void {
+  setFolder(state.folder);
 }
 
 export async function toggleTheme(): Promise<void> {
@@ -137,6 +443,10 @@ export async function toggleLanguage(): Promise<void> {
     strings,
     categories: appState ? buildRows(appState, lang) : state.categories,
   });
+}
+
+export function clearNotice(): void {
+  set({ notice: null });
 }
 
 // React bindings: components re-render on any store change.

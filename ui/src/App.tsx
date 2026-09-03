@@ -2,6 +2,9 @@ import { useStore } from './store';
 import Header from './components/Header';
 import FolderPicker from './components/FolderPicker';
 import CategoryGrid from './components/CategoryGrid';
+import AnalysisModal from './components/AnalysisModal';
+import OperationPanel from './components/OperationPanel';
+import Toasts from './components/Toasts';
 import './App.css';
 
 export default function App() {
@@ -10,24 +13,28 @@ export default function App() {
   if (!store.ready) {
     return (
       <div className="boot-screen">
-        <span className="boot-spinner" aria-hidden="true" />
+        <span className="spinner" aria-hidden="true" />
       </div>
     );
   }
+
+  const busy = store.phase === 'sorting' || store.phase === 'done';
 
   return (
     <div id="app">
       <Header store={store} />
       <main className="app-main">
         <FolderPicker store={store} />
-        <CategoryGrid store={store} />
+        {busy ? <OperationPanel /> : <CategoryGrid store={store} />}
       </main>
       {!store.desktop && (
         <footer className="dev-note">
-          Browser preview — folder picking and sorting need the desktop
-          runtime (python main_web.py).
+          Browser preview — sorting runs against sample data; for real
+          folders run the desktop runtime (python main_web.py).
         </footer>
       )}
+      <AnalysisModal />
+      <Toasts />
     </div>
   );
 }
