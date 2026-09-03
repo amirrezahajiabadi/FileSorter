@@ -10,7 +10,7 @@ A lightweight desktop application for automatically organizing files into catego
 
 ## ✨ Features
 
-- Browse and select any folder with a single click (or **drag & drop a folder** onto the window in the desktop edition)
+- Browse and select any folder with a single click
 - **🕘 Recent folders** — quickly re-pick one of your last 8 sorted folders
 - Sorts files into categories: `images`, `documents`, `videos`, `audio`, `archives`, `code`, `data`, `ebooks`, `executables`, `fonts`, `others`
 - **⚙ Settings panel** — fully customize categories and file extensions
@@ -36,44 +36,28 @@ A lightweight desktop application for automatically organizing files into catego
 
 ### Run from source
 
-**Requirements:** Python 3.8+
+**Requirements:** Python 3.8+ and Node.js (only needed for building the frontend)
 
 ```bash
 git clone https://github.com/amirrezahajiabadi/FileSorter.git
 cd FileSorter
 pip install -r requirements.txt
-python main.py
-```
-
-The app is built mostly with the Python standard library. The one dependency,
-[`tkinterdnd2`](https://pypi.org/project/tkinterdnd2/), enables drag & drop —
-it's optional: without it, the app runs the same, just without drag & drop.
-
-### Download the installer (Windows)
-
-Go to the [Releases](https://github.com/amirrezahajiabadi/FileSorter/releases) page and download the latest `FileSorter.exe`.
-
-### Preview the in-progress Web UI
-
-```bash
-pip install pywebview
-python main_web.py
-```
-
-This is the **shipped UI** — a React + Vite + TypeScript app served by
-PyWebView over a local HTTP server. Build the frontend first:
-
-```bash
 cd ui
 npm install
-npm run build          # -> ui/dist/
+npm run build          # -> ui/dist/  (the React frontend)
 cd ..
 python main_web.py
 ```
 
-See `ui/README.md` for the architecture. `main.py` (the Tkinter app) is
-kept only for backward compatibility.
+The app is a PyWebView window running a React + Vite + TypeScript
+frontend (`ui/`) over a local HTTP server. The Python side is built
+almost entirely on the standard library — pywebview is the only runtime
+dependency. No internet access is needed at runtime: fonts are
+self-hosted and everything runs locally.
 
+### Download the installer (Windows)
+
+Go to the [Releases](https://github.com/amirrezahajiabadi/FileSorter/releases) page and download the latest `FileSorter.exe`.
 ---
 
 ## 🗂 Project Structure
@@ -85,31 +69,22 @@ FileSorter/
 ├── .github/
 │   └── workflows/
 │       ├── tests.yml             # CI — runs pytest on every push/PR
-│       └── release.yml           # builds .exe + publishes a Release on version tags
-├── main.py                      # entry point — run this
-├── main_web.py                  # Web UI entry point (in progress, parallel to main.py — see ROADMAP.md)
+│       └── release.yml           # builds the frontend + .exe, publishes a Release on version tags
+├── main_web.py                  # entry point — run this
 ├── app/
 │   ├── constants.py              # APP_VERSION, default categories, thresholds
+│   ├── protocol.py               # typed JSON wire contract (events, state, plans)
 │   ├── settings_manager.py       # load/save ~/.filesorter_settings.json
-│   ├── controller.py             # AppController — all business logic, zero Tkinter
-│   ├── sorter.py                 # pure sorting logic (no UI) — get_category, analyze_folder...
-│   ├── i18n.py                   # STRINGS (fa/en) + language helpers
-│   ├── themes.py                 # THEMES (dark/light) + ttk styling
-│   └── ui/
-│       ├── splash.py             # startup splash screen
-│       ├── settings_window.py    # category/extension editor
-│       ├── analysis_window.py    # pre-sort report window
-│       ├── preview_window.py     # dry-run preview window
-│       └── main_window.py        # FileSorterApp — the main window
+│   ├── controller.py             # AppController — all business logic, UI-free
+│   ├── sorter.py                 # pure sorting logic — get_category, analyze_folder...
+│   └── i18n.py                   # STRINGS (fa/en translations)
 ├── tests/
-│   └── test_sorter.py            # pytest suite for app/sorter.py
-│   └── test_duplicate_handling.py # pytest suite for resolve_duplicate/plan_sort
-│   └── test_recent_folders.py    # pytest suite for the recent-folders helper
-│   └── test_controller.py        # pytest suite for AppController (sort/undo/settings)
+│   ├── test_sorter.py            # pytest suite for app/sorter.py
+│   ├── test_duplicate_handling.py # pytest suite for resolve_duplicate/plan_sort
+│   ├── test_recent_folders.py    # pytest suite for the recent-folders helper
+│   ├── test_controller.py        # pytest suite for AppController (sort/undo/settings)
+│   ├── test_protocol.py          # pytest suite for the wire protocol round-trips
 │   └── test_web_api.py           # pytest suite for main_web.py Api class
-├── requirements.txt
-├── build_installer.md
-├── README.md
 ├── ui/                           # React UI (pywebview) — see ui/README.md
 │   ├── src/
 │   │   ├── components/            # Header, FolderPicker, modals, panels…
@@ -119,12 +94,10 @@ FileSorter/
 │   │   └── generated/strings.ts   # Generated mirror of app/i18n.py
 │   ├── scripts/export_i18n.py     # Regenerates the strings mirror
 │   └── package.json
-└── poc/                          # throwaway experiments for the roadmap (not shipped)
-    ├── webview_poc.py             # v4.0 — PyWebView + AppController proof of concept
-    └── README.md
-```
+└── requirements.txt
 
-`app/sorter.py` has no Tkinter dependency, so its logic is fully unit-tested — see [Running Tests](#-running-tests).
+```
+`app/sorter.py` has no UI dependency, so its logic is fully unit-tested — see [Running Tests](#-running-tests).
 
 ---
 
@@ -168,11 +141,13 @@ your-folder/
 ## 🛠 Build Executable (Windows)
 
 ```bash
+pip install -r requirements.txt
 pip install pyinstaller
-pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "web;web" main_web.py
+cd ui && npm install && npm run build && cd ..   # -> ui/dist/
+pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py
 ```
 
-The `.exe` will be in the `dist/` folder.
+The `.exe` will be in the `dist/` folder. See `build_installer.md` for the full step-by-step guide.
 
 This manual build is mainly useful for local testing. For an official release, see below — it's automated.
 
@@ -185,17 +160,18 @@ Pushing a version tag builds `FileSorter.exe` and publishes a GitHub Release aut
 ```bash
 git checkout main
 git pull origin main
-git tag v3.6.0
-git push origin v3.6.0
+git tag v5.0.0
+git push origin v5.0.0
 ```
 
-**The tag must exactly match `v` + three dot-separated numbers** (e.g. `v3.6.0`) — anything else (`V.3.6`, `v3.6`, `version1`) will not trigger the [Build & Release workflow](.github/workflows/release.yml). Check progress under the repo's **Actions** tab; when it finishes, the new release with `FileSorter.exe` attached appears under **Releases**.
+**The tag must exactly match `v` + three dot-separated numbers** (e.g. `v5.0.0`) — anything else (`V.3.6`, `v3.6`, `version1`) will not trigger the [Build & Release workflow](.github/workflows/release.yml). Check progress under the repo's **Actions** tab; when it finishes, the new release with `FileSorter.exe` attached appears under **Releases**.
 
 ---
 
 ## 📌 Version History
 
 > Looking for what's planned further out (AI features, a possible UI overhaul, expanding beyond file sorting)? See [ROADMAP.md](ROADMAP.md).
+- **v5.0.0** — 🎉 **Web-only official release.** The old Tkinter UI (`main.py`, `app/ui/`, `app/themes.py`) is removed entirely — `main_web.py` + the React frontend is the only interface. Also in this release: a typed JSON wire protocol shared by the Python core and the frontend (`app/protocol.py` ⟷ `ui/src/protocol.ts`); the vanilla `web/` frontend retired in favor of the React rebuild (`ui/`, Vite + TypeScript); honest fixes to the v4.2 screens (full undo data, truthful results actions, no fake cancel, no fake drag & drop); category names/icons persisted across restarts; and a release pipeline that builds the React frontend into the shipped `.exe`.
 
 - **v4.2.0** — First *real* Web UI screen (Phase 3 of [ROADMAP.md](ROADMAP.md), still parallel to the Tkinter app — run with `python main_web.py`, requires `pip install pywebview`). Features include: real folder picker, Sort (copy/move mode), duplicate handling (skip/rename/overwrite), Dry Run preview, Undo, Settings (categories), recent folders, theme toggle (dark/light), bilingual support (fa/en), self-hosted fonts (no CDN dependency), toast notifications, sorting animations, and Persian date formatting — all wired to the actual `AppController`.
 - **v4.1.1** — No user-facing changes. Finalized the web UI's visual identity: "Sorting Line" — a distinct design deliberately grounded in what the app does (files moving into labeled bins), not a port of the Tkinter look. Replaced the auto-generated palette from v4.1.0 with a hand-authored one (colors no longer need to match Tkinter — see `web/README.md` for why), and self-hosted three font families (Space Grotesk, Inter, JetBrains Mono) so the app doesn't depend on internet access to render its own UI.
@@ -206,7 +182,7 @@ git push origin v3.6.0
 - **v3.7.1** — Fixed the Analysis window: when there were enough smart suggestions or categories to exceed the window's fixed height, the "Proceed with Sort" / "Cancel" buttons could get pushed out of view with no way to reach them. The content area now scrolls (mouse wheel supported) while those buttons stay permanently visible at the bottom.
 - **v3.7.0** — Added drag & drop folder selection and a Recent Folders list (last 8, persisted). First release with a runtime dependency (`tkinterdnd2`, optional — the app still works without it, just without drag & drop)
 - **v3.6.1** — Fixed a bug where sorting large or numerous files could silently stop after processing only a few (or one) file — background operations now communicate with the UI exclusively through a thread-safe queue instead of touching Tkinter directly from a worker thread, which turned out to be unreliable under load. Affects sorting, Undo, and the Dry Run preview.
-- **v3.6.0** — Added an automated Build & Release workflow: pushing a version tag (e.g. `v3.6.0`) runs the tests, builds `FileSorter.exe`, and publishes a GitHub Release with the exe attached — no more manual PyInstaller builds or file uploads
+- **v3.6.0** — Added an automated Build & Release workflow: pushing a version tag (e.g. `v5.0.0`) runs the tests, builds `FileSorter.exe`, and publishes a GitHub Release with the exe attached — no more manual PyInstaller builds or file uploads
 - **v3.5.0** — Added duplicate-handling modes (Skip/Rename/Overwrite), a Dry Run preview that shows the exact planned outcome before sorting, and an Undo button that reverses the last sort. Preview and real execution now share one function (`plan_sort`) so they can never disagree.
 - **v3.4.0** — Added an optional "Move instead of copy" mode in the Analysis window (unchecked/Copy by default), with a warning and a confirmation dialog before any irreversible move happens
 - **v3.3.0** — Added GitHub Actions CI: `pytest` now runs automatically on every push and pull request to `main`, with a status badge in this README

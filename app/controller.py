@@ -1,21 +1,19 @@
-"""AppController — the application's business logic, entirely free of
-Tkinter.
+"""AppController — the application's business logic, entirely UI-free.
 
-This is what lets a future UI (e.g. a PyWebView/Eel front end, per the
-roadmap) drive the exact same folder analysis, sorting, undo, and
-settings logic without duplicating or rewriting any of it — only the UI
-layer (currently app/ui/*) would need to change.
+This is what lets any interface (today the React UI driven through the
+PyWebView bridge in main_web.py) drive the exact same folder analysis,
+sorting, undo, and settings logic without duplicating or rewriting any
+of it — only the adapter layer changes when the front end does.
 
-Design rule: nothing in this file imports tkinter, and no method here
-touches a widget. Long-running operations (sort, undo) accept an
-`on_event(kind, payload)` callback so the caller decides how to report
-progress — today that's a Tkinter queue.Queue (see app/ui/main_window.py),
-but a future caller could stream the same events over a websocket, an
-async generator, or anything else, without this file changing at all.
+Design rule: nothing in this module imports a GUI framework, and no
+method here touches a widget. Long-running operations (sort, undo)
+accept an `on_event(kind, payload)` callback so the caller decides how
+to report progress — the web UI streams those events over the JS
+bridge, and a future caller could stream them over a websocket or an
+async generator without this file changing at all.
 
 Every method is safe to call from any thread; the controller itself
-never starts threads — the caller (currently the Tkinter UI) decides
-that too.
+never starts threads — the caller decides that too.
 """
 
 import shutil

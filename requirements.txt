@@ -1,17 +1,14 @@
-# tkinterdnd2 enables drag & drop (dropping a folder onto the window).
-# It's optional at runtime: if it's not installed, the app still runs
-# fine, just without drag & drop (falls back to a plain Tk window).
-tkinterdnd2
-
-# pywebview — required for the new web UI (main_web.py).
-# Only needed if running the web UI: python main_web.py
+# Runtime dependencies
 pywebview
 
 # ── Dev-only ──────────────────────────────────────────────────────
 # To build a standalone .exe with PyInstaller:
 #   pip install pyinstaller
-#   pyinstaller --onefile --windowed --clean --name "FileSorter" main_web.py
+#   pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py
 #
 # To run the test suite:
 #   pip install pytest
 #   pytest
+#
+# Frontend build (requires Node.js):
+#   cd ui && npm install && npm run build

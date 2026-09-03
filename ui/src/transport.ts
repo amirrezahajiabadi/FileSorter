@@ -110,7 +110,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '4.2.0',
+  version: '5.0.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   recentFolders: [],

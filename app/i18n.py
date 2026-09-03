@@ -1,9 +1,8 @@
-"""Translations (fa / en) and language-aware UI helpers.
+"""Translations (fa / en).
 
-Every user-facing string lives in STRINGS. get_font()/anchor_for()/
-justify_for() pick the right font family and text direction for the
-active language (Tahoma + right-aligned for Persian, Segoe UI + left
-for English — Tkinter has no true RTL, so this is an approximation).
+Every user-facing string lives in STRINGS. The browser UI resolves the
+language at runtime; keys used by webview/api code must exist in both
+the "fa" and "en" tables.
 """
 
 from app.constants import APP_VERSION
@@ -278,33 +277,3 @@ STRINGS = {
         "theme_toggle_to_light": "☀",
     },
 }
-
-
-def get_font(lang: str, size: int = 10, weight: str = "normal") -> tuple:
-    """Return a font tuple appropriate for the given language.
-
-    Tahoma renders Persian glyphs correctly on Windows; Segoe UI is used
-    for English to match the original design.
-
-    Args:
-        lang: Either "fa" or "en".
-        size: Font point size.
-        weight: "normal" or "bold".
-
-    Returns:
-        A tkinter-compatible font tuple.
-    """
-    family = "Tahoma" if lang == "fa" else "Segoe UI"
-    if weight == "normal":
-        return (family, size)
-    return (family, size, weight)
-
-
-def anchor_for(lang: str) -> str:
-    """Return the text anchor ("e" for Persian/RTL-ish, "w" for English)."""
-    return "e" if lang == "fa" else "w"
-
-
-def justify_for(lang: str) -> str:
-    """Return the text justify mode matching the language's reading direction."""
-    return "right" if lang == "fa" else "left"

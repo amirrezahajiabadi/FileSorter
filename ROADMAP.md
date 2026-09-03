@@ -25,18 +25,18 @@ The ideas below are about what comes *after* that foundation is fully settled.
 
 ## 1. UI/UX Overhaul
 
-**Status:** in progress — Phases 1 and 2 complete, Phase 3 underway (see below).
+**Status:** ✅ complete — shipped as v5.0.0.
 
-Move the interface from raw Tkinter to an HTML/CSS/JS front end, most likely via
-**PyWebView** or **Eel** — Python still drives the logic, but the UI itself is a
-real web interface (easier to make modern, animated, and genuinely good-looking
-without fighting Tkinter's limitations).
+The interface moved from raw Tkinter to a React front end driven through
+**PyWebView** — Python still drives the logic, but the UI itself is a real web
+interface (much easier to make modern, animated, and genuinely good-looking).
+The old Tkinter UI and the vanilla HTML/JS prototype were both removed once the
+React rebuild (`ui/`) reached parity.
 
-This choice isn't isolated — it's also a stepping stone toward item 2 below and
-toward the FastAPI stage of the personal learning roadmap: once the UI talks to
-Python over a local interface instead of directly calling Tkinter widgets, it's
-a much smaller step to eventually put that same logic behind a real FastAPI
-service.
+This choice wasn't isolated — it's also the stepping stone toward the FastAPI
+stage: now that the UI talks to Python over a local JSON protocol
+(`app/protocol.py`), putting that same logic behind a real FastAPI service is a
+small step.
 
 ### Planned path: v3.7 → v5.0
 
@@ -52,19 +52,16 @@ Version numbers below are for organization only and can shift. See
 - ✅ **v3.8.0** — A real progress bar (percentage + file count) instead of the
   indeterminate one
 
-**Phase 2 — Architecture prep (before any new UI code gets written)** — in progress
+**Phase 2 — Architecture prep (before any new UI code gets written)** ✅ complete
 - ✅ **v3.9.0** — *The most important step.* Extracted `app/controller.py`
   (`AppController`): everything `main_window.py` used to do directly (start
   sort, undo, analyze, settings) now lives behind a clean class/API with zero
   Tkinter imports. This is what lets a future web UI drive the exact same
   logic without a rewrite of the app's brain.
-- ✅ **v4.0.0** — Added `poc/webview_poc.py`: a throwaway PyWebView window
-  wired to the real `AppController`, running *alongside* the existing
-  Tkinter UI (not replacing it). Confirmed the Python ⟷ HTML/JS bridge
-  works and can drive real controller calls — see `poc/README.md` for the
-  manual test checklist (the actual window rendering needs to be verified
-  on Windows, since the automated testing environment has no GTK/Qt
-  backend to open a real window with).
+- ✅ **v4.0.0** — Added a throwaway PyWebView proof of concept wired to the
+  real `AppController`, running *alongside* the existing Tkinter UI (not
+  replacing it). Confirmed the Python ⟷ JS bridge works and can drive real
+  controller calls. (Removed in v5.0.0, superseded by `main_web.py`.)
 - ✅ **v4.1.0 / v4.1.1** — Added the `web/` folder structure and finalized
   the visual identity: **"Sorting Line"** — a distinct design grounded in
   what the app does (files moving into labeled bins on a sorting line),
@@ -74,7 +71,7 @@ Version numbers below are for organization only and can shift. See
   lives on in the React UI (`ui/`); the vanilla `web/` implementation was
   retired once the React migration reached parity.
 
-**Phase 3 — New UI, screen by screen**
+**Phase 3 — New UI, screen by screen** ✅ complete
 - ✅ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
   wired to `AppController`. Runs via `python main_web.py`, parallel to the
   Tkinter app. Includes: folder picker, categories grid, sort (copy/move),
@@ -87,8 +84,8 @@ Version numbers below are for organization only and can shift. See
 - ✅ **v4.5** — Undo, bilingual (fa/en), and dark/light — fully implemented in v4.2
 - ✅ **v4.6** — Final polish: animations, visual details, full bilingual/theme
   testing — completed with toast notifications and self-hosted fonts
-- ⬜ **v5.0** — 🎉 Old Tkinter UI removed entirely; the new UI is the only
-  interface. Official major release.
+- ✅ **v5.0** — 🎉 Old Tkinter UI removed entirely; the React UI (`ui/`) is
+  the only interface. Official major release.
 
 Phase 1 is fully independent and was completed without blocking phases 2/3.
 Phases 2 and 3 are sequential — skipping v3.9 would have meant pulling the
