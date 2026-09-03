@@ -20,6 +20,7 @@ import webview
 from app.constants import APP_VERSION, DEFAULT_CATEGORIES
 from app.controller import AppController
 from app.i18n import STRINGS
+from app.protocol import plan_item_wire
 
 
 def _base_dir() -> Path:
@@ -100,16 +101,8 @@ class Api:
         """
         try:
             plan = self.controller.plan(path, duplicate_mode)
-            # Serialize Path objects to strings for JSON
-            return [
-                {
-                    "name": item["name"],
-                    "category": item["category"],
-                    "action": item["action"],
-                    "final_name": item["final_name"],
-                }
-                for item in plan
-            ]
+            # Build wire-safe rows through the shared protocol contract.
+            return [plan_item_wire(item) for item in plan]
         except Exception as e:
             return [{"error": str(e)}]
 
