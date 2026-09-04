@@ -33,6 +33,9 @@ import type {
   SortItemEvent,
   SmartRule,
   SpaceDone,
+  TaskDef,
+  TaskHistoryEntry,
+  TaskKind,
   ThemeName,
   UndoDone,
   WatchError,
@@ -75,6 +78,15 @@ export interface BridgeApi {
   ): Promise<boolean>;
   save_smart_rules(rules: SmartRule[]): Promise<boolean>;
   restore_defaults(): Promise<Record<string, string[]>>;
+  get_task_history(): Promise<TaskHistoryEntry[]>;
+  add_task(
+    kind: TaskKind,
+    folder?: string | null,
+    interval_minutes?: number,
+  ): Promise<TaskDef>;
+  update_task(task_id: string, patch: Record<string, unknown>): Promise<TaskDef>;
+  remove_task(task_id: string): Promise<boolean>;
+  run_task_now(task_id: string): Promise<boolean>;
 }
 
 declare global {
@@ -126,10 +138,11 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.8.0',
+  version: '5.9.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],
+  tasks: [],
   recentFolders: [],
   watchedFolders: [],
   theme: 'dark',
@@ -558,6 +571,52 @@ function createMockBridge(): BridgeApi {
       SAMPLE_STATE.smartRules = [];
       return SAMPLE_STATE.categories;
     },
+    async get_task_history(): Promise<TaskHistoryEntry[]> {
+      return [...mockTaskHistory];
+    },
+    async add_task(
+      kind: TaskKind,
+      folder?: string | null,
+      interval_minutes?: number,
+    ): Promise<TaskDef> {
+      const task: TaskDef = {
+        id: `tk_${Math.random().toString(36).slice(2, 12)}`,
+        kind,
+        folder: folder ?? null,
+        interval_minutes: interval_minutes ?? 1440,
+        enabled: true,
+        last_run: Date.now() / 1000,
+      };
+      mockTasks.push(task);
+      SAMPLE_STATE.tasks = [...mockTasks];
+      return task;
+    },
+    async update_task(
+      task_id: string,
+      patch: Record<string, unknown>,
+    ): Promise<TaskDef> {
+      const task = mockTasks.find((t) => t.id === task_id);
+      if (!task) throw new Error('task not found');
+      if (typeof patch.enabled === 'boolean') task.enabled = patch.enabled;
+      if (typeof patch.interval_minutes === 'number')
+        task.interval_minutes = Math.max(1, patch.interval_minutes);
+      if (typeof patch.folder === 'string') task.folder = patch.folder;
+      SAMPLE_STATE.tasks = [...mockTasks];
+      return task;
+    },
+    async remove_task(task_id: string): Promise<boolean> {
+      const before = mockTasks.length;
+      mockTasks = mockTasks.filter((t) => t.id !== task_id);
+      SAMPLE_STATE.tasks = [...mockTasks];
+      return mockTasks.length !== before;
+    },
+    async run_task_now(task_id: string): Promise<boolean> {
+      const task = mockTasks.find((t) => t.id === task_id);
+      if (!task) return false;
+      if (mockRunningTasks.has(task_id)) return false;
+      void mockRunTask(task);
+      return true;
+    },
 
     // Watch mode: folder list is real state; the sample events simulate
     // a folder receiving files after start_watch().
@@ -613,6 +672,58 @@ let mockTimer: ReturnType<typeof setInterval> | null = null;
 // Cancel support for the mock disk/dup scans (mirrors the real backend).
 let mockScanRunning = false;
 let mockScanCancel = false;
+
+// Scheduled-task mock state (v5.9.0).
+let mockTasks: TaskDef[] = [];
+let mockTaskHistory: TaskHistoryEntry[] = [];
+const mockRunningTasks = new Set<string>();
+
+async function mockRunTask(task: TaskDef): Promise<void> {
+  // Stream a plausible scan for the task's kind, then report sched_done
+  // and record the run — same event shapes as the real backend.
+  mockRunningTasks.add(task.id);
+  emit('sched_run', { task_id: task.id, kind: task.kind, folder: task.folder });
+  const MB = 1024 * 1024;
+  const summary: Partial<TaskHistoryEntry> = {};
+  if (task.kind === 'cleanup') {
+    const totals = cleanTotals();
+    for (let i = 1; i <= 3; i++) {
+      await sleep(90);
+      emit('clean_progress', { phase: 'scanning', location: 'mock', processed: i });
+    }
+    summary.files = totals.total_files;
+    summary.bytes = totals.total_bytes;
+  } else if (task.kind === 'disk_scan') {
+    for (let i = 1; i <= 3; i++) {
+      await sleep(90);
+      emit('space_progress', { phase: 'scanning', processed: i * 1000, bytes: i * 800 * MB });
+    }
+    summary.files = 134;
+    summary.bytes = 2067 * MB;
+  } else {
+    const { groups } = dupSummary(dupState);
+    for (let i = 1; i <= 3; i++) {
+      await sleep(90);
+      emit('dup_progress', { phase: 'hashing', processed: i, total: 3 });
+    }
+    summary.groups = groups.length;
+    summary.bytes = groups.reduce((n, g) => n + (g.files.length - 1) * g.size, 0);
+  }
+  mockRunningTasks.delete(task.id);
+  task.last_run = Date.now() / 1000;
+  SAMPLE_STATE.tasks = [...mockTasks];
+  const entry: TaskHistoryEntry = {
+    task_id: task.id,
+    kind: task.kind,
+    folder: task.folder,
+    ok: true,
+    at: Date.now() / 1000,
+    ...summary,
+  };
+  mockTaskHistory.unshift(entry);
+  mockTaskHistory = mockTaskHistory.slice(0, 20);
+  emit('sched_done', entry);
+}
 let dupState: DupGroup[] = makeSampleDupGroups();
 
 // Mutable mock junk locations: id -> { size-bytes per fake file name }.

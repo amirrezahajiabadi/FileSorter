@@ -24,6 +24,9 @@ import type {
   SortDone,
   SortItemEvent,
   SpaceDone,
+  TaskDef,
+  TaskHistoryEntry,
+  TaskKind,
   ThemeName,
   UndoDone,
   WatchError,
@@ -36,6 +39,33 @@ import type { SortEvent } from './transport';
 import type { StringTable } from './i18n';
 import { fmt, inline, t } from './i18n';
 import { formatSize } from './utils';
+
+// ── Scheduled-task i18n helpers (v5.9.0) ────────────────────────
+
+export const TASK_INTERVALS: { minutes: number; key: string }[] = [
+  { minutes: 30, key: 'task_interval_30m' },
+  { minutes: 60, key: 'task_interval_1h' },
+  { minutes: 180, key: 'task_interval_3h' },
+  { minutes: 360, key: 'task_interval_6h' },
+  { minutes: 720, key: 'task_interval_12h' },
+  { minutes: 1440, key: 'task_interval_1d' },
+  { minutes: 10080, key: 'task_interval_7d' },
+];
+
+export function taskKindKey(kind: TaskKind): string {
+  return `task_kind_${kind}`;
+}
+
+export function taskSummaryKey(kind: TaskKind): string {
+  return `task_summary_${kind}`;
+}
+
+export function taskSummaryArgs(p: TaskHistoryEntry): Record<string, string | number> {
+  const bytes = formatSize(p.bytes ?? 0);
+  return p.kind === 'dup_scan'
+    ? { groups: p.groups ?? 0, bytes }
+    : { files: p.files ?? 0, bytes };
+}
 
 export interface CategoryRow {
   id: string;
@@ -133,6 +163,10 @@ export interface UIState {
   cleanSel: Set<CleanLocationId>;
   cleanArmed: boolean;
   cleanDeleting: boolean;
+  tasks: TaskDef[];
+  tasksHistory: TaskHistoryEntry[];
+  tasksOpen: boolean;
+  runningTasks: Set<string>;
   notice: Notice | null;
 }
 
@@ -189,6 +223,10 @@ const initial: UIState = {
   cleanArmed: false,
   cleanDeleting: false,
   notice: null,
+  tasks: [],
+  tasksHistory: [],
+  tasksOpen: false,
+  runningTasks: new Set<string>(),
 };
 
 let state: UIState = initial;
@@ -485,6 +523,36 @@ function handleEvent(msg: SortEvent): void {
       });
       break;
     }
+    case 'sched_run': {
+      const p = payload as { task_id: string };
+      const running = new Set(state.runningTasks);
+      running.add(p.task_id);
+      set({ runningTasks: running });
+      break;
+    }
+    case 'sched_done': {
+      const p = payload as TaskHistoryEntry;
+      const running = new Set(state.runningTasks);
+      running.delete(p.task_id);
+      const tasks = state.tasks.map((t) =>
+        t.id === p.task_id
+          ? { ...t, last_run: p.ok ? Math.floor(p.at) : t.last_run }
+          : t,
+      );
+      const history = [p, ...state.tasksHistory.filter((h) => h.task_id !== p.task_id)].slice(0, 20);
+      set({ runningTasks: running, tasks, tasksHistory: history });
+      // A toast keeps the user informed when a scheduled job finishes.
+      const kindName = t(state.strings, taskKindKey(p.kind));
+      if (p.ok) {
+        const summary = inline(
+          fmt(t(state.strings, taskSummaryKey(p.kind)), taskSummaryArgs(p)),
+        );
+        showNotice('success', `${kindName} — ${summary}`);
+      } else {
+        showNotice('error', `${kindName}: ${inline(t(state.strings, 'task_failed'))}`);
+      }
+      break;
+    }
     case 'error': {
       const message = String(payload);
       pushLog('error', inline(fmt(t(state.strings, 'fatal_error_log'), { error: message })));
@@ -515,6 +583,7 @@ export async function init(): Promise<void> {
       strings,
       recentFolders: app.recentFolders ?? [],
       watchFolders: mergeWatchRows(app.watchedFolders ?? [], []),
+      tasks: app.tasks ?? [],
       categories: buildRows(app, app.language),
     });
   } catch (err) {
@@ -1065,6 +1134,73 @@ export async function diskScanDrive(drive: DriveInfo): Promise<void> {
 export async function cancelScan(): Promise<void> {
   try {
     await bridge.cancel_scan();
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+// ── Scheduled tasks (v5.9.0) ────────────────────────────────────
+
+export function openTasksPanel(): void {
+  set({ tasksOpen: true });
+  if (state.tasksHistory.length === 0) {
+    void loadTaskHistory();
+  }
+}
+
+export function closeTasksPanel(): void {
+  set({ tasksOpen: false });
+}
+
+export async function loadTaskHistory(): Promise<void> {
+  try {
+    const history = await bridge.get_task_history();
+    set({ tasksHistory: history });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function addScheduledTask(
+  kind: TaskKind,
+  folder: string | null,
+  intervalMinutes: number,
+): Promise<void> {
+  try {
+    const task = await bridge.add_task(kind, folder, intervalMinutes);
+    set({ tasks: [...state.tasks.filter((x) => x.id !== task.id), task] });
+    showNotice('success', inline(t(state.strings, 'task_added_toast')));
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function updateScheduledTask(
+  taskId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const updated = await bridge.update_task(taskId, patch);
+    set({
+      tasks: state.tasks.map((x) => (x.id === taskId ? updated : x)),
+    });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function removeScheduledTask(taskId: string): Promise<void> {
+  try {
+    await bridge.remove_task(taskId);
+    set({ tasks: state.tasks.filter((x) => x.id !== taskId) });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+export async function runTaskNow(taskId: string): Promise<void> {
+  try {
+    await bridge.run_task_now(taskId);
   } catch (err) {
     showNotice('error', String(err));
   }

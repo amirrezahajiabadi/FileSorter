@@ -20,6 +20,8 @@ import type {
   DupDeleteResult,
   LangCode,
   PlanItem,
+  TaskDef,
+  TaskHistoryEntry,
   ThemeName,
 } from './protocol';
 import type { BridgeApi } from './transport';
@@ -96,5 +98,11 @@ export function createHttpBridge(): BridgeApi {
     save_categories: (categories, meta) => call<boolean>('save_categories', categories, meta),
     save_smart_rules: (rules) => call<boolean>('save_smart_rules', rules),
     restore_defaults: () => call<Record<string, string[]>>('restore_defaults'),
+    get_task_history: () => call<TaskHistoryEntry[]>('get_task_history'),
+    add_task: (kind, folder, interval) =>
+      call<TaskDef>('add_task', kind, folder, interval),
+    update_task: (task_id, patch) => call<TaskDef>('update_task', task_id, patch),
+    remove_task: (task_id) => call<boolean>('remove_task', task_id),
+    run_task_now: (task_id) => call<boolean>('run_task_now', task_id),
   };
 }

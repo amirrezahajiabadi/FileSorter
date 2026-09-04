@@ -9,6 +9,7 @@ import WatchPanel from './components/WatchPanel';
 import DuplicatesPanel from './components/DuplicatesPanel';
 import DiskPanel from './components/DiskPanel';
 import CleanupPanel from './components/CleanupPanel';
+import SchedulesPanel from './components/SchedulesPanel';
 import OperationPanel from './components/OperationPanel';
 import Toasts from './components/Toasts';
 import { t } from './i18n';
@@ -52,6 +53,7 @@ export default function App() {
       <DuplicatesPanel store={store} />
       <DiskPanel store={store} />
       <CleanupPanel store={store} />
+      <SchedulesPanel store={store} />
       <Toasts />
     </div>
   );

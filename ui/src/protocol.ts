@@ -22,7 +22,9 @@ export type EventKind =
   | 'space_progress'
   | 'space_done'
   | 'clean_progress'
-  | 'clean_done';
+  | 'clean_done'
+  | 'sched_run'
+  | 'sched_done';
 
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
@@ -62,10 +64,34 @@ export interface AppState {
   categories: Record<string, string[]>;
   categoryMeta: Record<string, Partial<CategoryMeta>>;
   smartRules: SmartRule[];
+  tasks: TaskDef[];
   recentFolders: string[];
   watchedFolders: string[];
   theme: ThemeName;
   language: LangCode;
+}
+
+export type TaskKind = 'cleanup' | 'disk_scan' | 'dup_scan';
+
+export interface TaskDef {
+  id: string;
+  kind: TaskKind;
+  folder: string | null;
+  interval_minutes: number;
+  enabled: boolean;
+  last_run: number;
+}
+
+export interface TaskHistoryEntry {
+  task_id: string;
+  kind: TaskKind;
+  folder: string | null;
+  ok: boolean;
+  at: number;
+  files?: number;
+  bytes?: number;
+  groups?: number;
+  error?: string;
 }
 
 export interface PlanItem {
