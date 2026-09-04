@@ -297,6 +297,7 @@ class FileSorterService:
     def start(self) -> None:
         """Bind the port and start serving on a background thread."""
         self._httpd = self._bind()
+        self.api.start_tasks()  # scheduled tasks run while the service is up
         self._thread = threading.Thread(
             target=self._httpd.serve_forever, daemon=True, name="filesorter-service"
         )
@@ -305,6 +306,7 @@ class FileSorterService:
     def serve_forever(self) -> None:
         """Bind and serve on the calling thread (used by tests / CLI)."""
         self._httpd = self._bind()
+        self.api.start_tasks()
         self._httpd.serve_forever()
 
     def shutdown(self) -> None:

@@ -123,7 +123,7 @@ def test_events_requires_token(service):
 def test_get_state(service):
     resp = rpc(service, "get_state")
     state = resp["result"]
-    assert state["version"] == "5.8.0"
+    assert state["version"] == "5.9.0"
     assert "categories" in state and "smartRules" in state
     assert state["language"] in ("fa", "en")
 
@@ -278,3 +278,33 @@ def test_dup_scan_cancel_streams_partial_done(service, tmp_path):
     assert "dup_progress" in kinds, f"expected progress ticks, got {kinds}"
     done = events[-1]["payload"]
     assert done["cancelled"] is True
+
+
+def test_run_task_now_streams_sched_done(service, tmp_path):
+    """run_task_now executes a task's scan and streams a sched_done with
+    the summary over SSE."""
+    folder = tmp_path / "taskdir"
+    folder.mkdir()
+    (folder / "a.txt").write_bytes(b"aa")
+    (folder / "b.txt").write_bytes(b"bb")
+
+    task = rpc(service, "add_task", ["disk_scan", str(folder), 60])["result"]
+    assert "id" in task
+
+    def run_now():
+        ok = rpc(service, "run_task_now", [task["id"]])["result"]
+        assert ok is True
+
+    events = read_sse_until(
+        service, run_now,
+        lambda ev: ev["kind"] == "sched_done" and ev["payload"]["task_id"] == task["id"],
+        timeout=20,
+    )
+    kinds = [ev["kind"] for ev in events]
+    assert "sched_run" in kinds
+    done = events[-1]["payload"]
+    assert done["ok"] is True
+    assert done["files"] == 2 and done["bytes"] == 4
+    # history endpoint records the run
+    hist = rpc(service, "get_task_history")["result"]
+    assert hist and hist[0]["task_id"] == task["id"]

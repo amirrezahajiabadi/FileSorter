@@ -73,6 +73,7 @@ def main() -> None:
         return
 
     api = Api()
+    api.start_tasks()  # scheduled tasks run while the desktop app is open
     window = webview.create_window(
         "FileSorter", serve_dist(), js_api=api, width=800, height=800
     )

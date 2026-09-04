@@ -39,6 +39,7 @@ class AppController:
         self.recent_folders = self.settings.get("recent_folders", [])
         self.watch_folders = self.settings.get("watched_folders", [])
         self.smart_rules = self.settings.get("smart_rules", [])
+        self.tasks = self.settings.get("tasks", [])
         self.last_sort_log = []  # for undo: list of {"action", "source", "final_dest"}
         self.last_dup_paths = set()  # whitelist of paths the last duplicate scan flagged
         self.last_clean_by_loc = {}  # {location_id: [paths]} flagged by the last cleanup scan
@@ -90,6 +91,79 @@ class AppController:
         add_recent_folder(self.settings, path)
         self.recent_folders = self.settings["recent_folders"]
         return self.recent_folders
+
+    # ══════════════════════════════════════════════════════════════
+    #  Scheduled tasks (v5.9.0)
+    # ══════════════════════════════════════════════════════════════
+
+    TASK_KINDS = ("cleanup", "disk_scan", "dup_scan")
+
+    def persist_settings(self) -> None:
+        """Write the in-memory settings dict (incl. tasks + last_run
+        timestamps) back to disk. Called after scheduled runs finish.
+        """
+        save_settings(self.settings)
+
+    def add_task(self, kind: str, folder: str = None,
+                 interval_minutes: int = 1440) -> dict:
+        """Create and persist a scheduled task.
+
+        kind: one of TASK_KINDS (cleanup needs no folder).
+        folder: scan target for disk_scan/dup_scan.
+        interval_minutes: how often to run (>= 1).
+
+        last_run is set to now, so the first automatic run happens a
+        full interval from creation ("Run now" is always available).
+        """
+        import time
+        import uuid
+
+        if kind not in self.TASK_KINDS:
+            raise ValueError(f"unknown task kind: {kind}")
+        if kind in ("disk_scan", "dup_scan") and not folder:
+            raise ValueError(f"{kind} needs a folder")
+        interval = max(1, int(interval_minutes or 1))
+        task = {
+            "id": f"tk_{uuid.uuid4().hex[:10]}",
+            "kind": kind,
+            "folder": folder,
+            "interval_minutes": interval,
+            "enabled": True,
+            "last_run": time.time(),
+        }
+        self.tasks.append(task)
+        self.settings["tasks"] = self.tasks
+        save_settings(self.settings)
+        return task
+
+    def update_task(self, task_id: str, patch: dict = None) -> dict:
+        """Apply a patch ({enabled, interval_minutes, folder}) to a task.
+        Returns the task, or None if the id doesn't exist.
+        """
+        task = next((t for t in self.tasks if t.get("id") == task_id), None)
+        if task is None:
+            return None
+        patch = patch or {}
+        if "enabled" in patch:
+            task["enabled"] = bool(patch["enabled"])
+        if "interval_minutes" in patch:
+            task["interval_minutes"] = max(1, int(patch["interval_minutes"] or 1))
+        if "folder" in patch:
+            if task["kind"] in ("disk_scan", "dup_scan"):
+                task["folder"] = patch["folder"] or None
+        self.settings["tasks"] = self.tasks
+        save_settings(self.settings)
+        return task
+
+    def remove_task(self, task_id: str) -> bool:
+        """Delete a task. Returns True if something was removed."""
+        before = len(self.tasks)
+        self.tasks = [t for t in self.tasks if t.get("id") != task_id]
+        self.settings["tasks"] = self.tasks
+        if len(self.tasks) != before:
+            save_settings(self.settings)
+            return True
+        return False
 
 
     def add_watch_folder(self, path: str) -> list:

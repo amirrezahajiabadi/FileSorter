@@ -15,12 +15,16 @@ frontends unchanged.
 """
 
 import threading
+import time
 
 from app.constants import APP_VERSION, DEFAULT_CATEGORIES
 from app.controller import AppController
 from app.i18n import STRINGS
 from app.protocol import plan_item_wire
+from app.tasks import TaskScheduler
 from app.watcher import WatchManager
+
+TASK_HISTORY_LIMIT = 20
 
 
 class BaseApi:
@@ -34,12 +38,18 @@ class BaseApi:
     def __init__(self):
         self.controller = AppController()
         self._scan_cancel = None  # set per scan by find_duplicates()/scan_disk(); read by cancel_scan()
+        self._task_history = []  # ring of recent scheduled-run reports
         self.watch_manager = WatchManager(
             get_categories=lambda: self.controller.categories,
             on_event=self._push,
             get_rules=lambda: self.controller.smart_rules,
         )
         self.watch_manager.update_folders(self.controller.watch_folders)
+        self.task_scheduler = TaskScheduler(
+            get_tasks=lambda: self.controller.tasks,
+            run_job=self._run_task_job,
+            on_done=self._on_task_done,
+        )
 
     # ── Subclass hooks ──────────────────────────────────────────
 
@@ -55,6 +65,97 @@ class BaseApi:
         """
         return None
 
+    # ── Scheduled tasks (v5.9.0) ───────────────────────────────
+
+    def start_tasks(self) -> None:
+        """Start the task tick loop (idempotent). Called by the service
+        on bind and by the windowed app on launch, so schedules run
+        while the runtime is alive."""
+        self.task_scheduler.start()
+
+    def get_task_history(self) -> list:
+        """Recent scheduled-run reports (newest first)."""
+        return list(self._task_history)
+
+    def add_task(self, kind: str, folder: str = None,
+                 interval_minutes: int = 1440) -> dict:
+        """Create a scheduled task (persisted). cleanup needs no folder;
+        disk_scan/dup_scan need one."""
+        try:
+            task = self.controller.add_task(kind, folder, interval_minutes)
+            self.start_tasks()
+            return task
+        except ValueError:
+            return {"error": "invalid task"}
+
+    def update_task(self, task_id: str, patch: dict = None) -> dict:
+        """Update a task ({enabled, interval_minutes, folder})."""
+        task = self.controller.update_task(task_id, patch)
+        return task if task is not None else {"error": "not found"}
+
+    def remove_task(self, task_id: str) -> bool:
+        """Delete a scheduled task."""
+        return self.controller.remove_task(task_id)
+
+    def run_task_now(self, task_id: str) -> bool:
+        """Run one task immediately ("Run now"). Returns False if the id
+        is unknown or the task is already running."""
+        task = next(
+            (t for t in self.controller.tasks if t.get("id") == task_id), None
+        )
+        if task is None:
+            return False
+        return self.task_scheduler.run_now(task)
+
+    def _run_task_job(self, task: dict) -> dict:
+        """Execute one task's scan; progress streams like a manual run.
+        Returns a short summary for the history/toast."""
+        kind = task.get("kind")
+        folder = task.get("folder")
+        self._push("sched_run", {
+            "task_id": task.get("id"), "kind": kind, "folder": folder,
+        })
+        if kind == "cleanup":
+            result = self.controller.scan_cleanup(on_event=self._push)
+            return {
+                "kind": "cleanup", "folder": None,
+                "files": result.get("total_files", 0),
+                "bytes": result.get("total_bytes", 0),
+            }
+        if kind == "disk_scan":
+            result = self.controller.scan_space(folder, on_event=self._push)
+            return {
+                "kind": "disk_scan", "folder": folder,
+                "files": result.get("files_scanned", 0),
+                "bytes": result.get("total_bytes", 0),
+            }
+        if kind == "dup_scan":
+            result = self.controller.scan_duplicates(folder, on_event=self._push)
+            return {
+                "kind": "dup_scan", "folder": folder,
+                "groups": len(result.get("groups", [])),
+                "bytes": result.get("wasted_bytes", 0),
+            }
+        raise ValueError(f"unknown task kind: {kind}")
+
+    def _on_task_done(self, task: dict, summary: dict, ok: bool) -> None:
+        """Persist last_run, record the run, and tell the UI."""
+        self.controller.persist_settings()
+        entry = {
+            "task_id": task.get("id"),
+            "kind": task.get("kind"),
+            "folder": task.get("folder"),
+            "ok": ok,
+            "at": time.time(),
+        }
+        if ok:
+            entry.update(summary)
+        else:
+            entry["error"] = summary.get("error", "failed")
+        self._task_history.insert(0, entry)
+        del self._task_history[TASK_HISTORY_LIMIT:]
+        self._push("sched_done", entry)
+
     # ── State / prefs ───────────────────────────────────────────
 
     def get_state(self) -> dict:
@@ -64,6 +165,7 @@ class BaseApi:
             "categories": self.controller.categories,
             "categoryMeta": self.controller.category_meta,
             "smartRules": self.controller.smart_rules,
+            "tasks": self.controller.tasks,
             "recentFolders": self.controller.recent_folders,
             "watchedFolders": self.controller.watch_folders,
             "theme": self.controller.theme_name,
