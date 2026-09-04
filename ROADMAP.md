@@ -123,6 +123,7 @@ useful, frequently-run Windows utility — closer to something like CCleaner or
 PowerToys. Candidate features, roughly in order of how naturally they fit:
 
 **Shipped so far:**
+- ✅ **v5.9.0** — Scheduled tasks on the headless service: a daemon tick loop (`app/tasks.py`) runs due tasks — junk check, disk-space scan, duplicate scan — on per-task intervals (30 min to weekly), persisted in the settings file, with pause/delete, **Run now**, and a session **Recent runs** history streamed over SSE (`sched_event`). Verified live: a daily cleanup task ran a real 11,537-file / 2.3 GB junk scan. 11 tests.
 - ✅ **v5.8.0** — Drive-wide duplicate scanning: the Duplicates panel lists your drives and scans a whole drive for identical content — two-phase hashing with a cancel button that stops at the next file boundary and reports partial results (`app/duplicates.py` `cancel_event`, shared with the disk scan). 4 tests.
 - ✅ **v5.7.0** — Drive-wide disk analysis: the Storage panel lists your real drives (letter + free/total + usage bar) and scans a whole drive, not just a folder — unreadable system dirs skipped, progress streamed, and a Cancel button stops the walk at the next file and shows partial results (`app/disk_scan.py` `list_drives()` + `cancel_event`; `BaseApi.cancel_scan`). Verified live on a real 221.8 GB drive. 7 tests.
 - ✅ **v5.6.0** — Headless Service: the whole app runs with no window — `python main_web.py --headless` serves the React UI plus the exact same JSON vocabulary over a loopback HTTP server (JSON-RPC `POST /api` + Server-Sent Events `/events`), auth-gated by a per-run token (`app/service.py`; windowed app is now a thin subclass of the shared `app/api.py`). The browser preview now drives the real backend. This is the foundation drive-wide scans, scheduled runs, always-on watch and the AI module build on; zero new dependencies, 13 tests.
@@ -132,8 +133,8 @@ PowerToys. Candidate features, roughly in order of how naturally they fit:
 - ✅ **v5.2.0** — Duplicate Finder (per-folder): scans a chosen folder for content-identical files with two-phase hashing, groups them keeping one copy each, and deletes the selected copies behind a two-step confirm — deletion is whitelisted to the scan's own results (`app/duplicates.py`, 10 tests). Whole-drive scanning and scheduled cleanups are the headless-service follow-up.
 - ✅ **v5.1.0** — Watch / auto-sort folders: pick folders and, while the app is open, newly arrived files are moved into their category folders automatically (stdlib polling, streamed over the JSON protocol; a headless always-on version is the FastAPI-stage follow-up).
 
-- ~~**Drive-wide duplicate scanning**~~ ✅ shipped in v5.8.0 (scheduled runs still come with the headless service)
-- ~~**Drive-wide disk analysis**~~ ✅ shipped in v5.7.0 (scheduled runs still come with the headless service)
+- ~~**Drive-wide duplicate scanning**~~ ✅ shipped in v5.8.0
+- ~~**Drive-wide disk analysis**~~ ✅ shipped in v5.7.0
 - **System-wide cleanup** (user-scope junk cleaning shipped in v5.4.0; Windows Temp and other admin-scope locations come with the headless service shipped in v5.6.0)
 - **Startup app management** — much less related to file sorting; lowest priority,
   most likely to dilute the app's identity if added too early
