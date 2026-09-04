@@ -53,7 +53,6 @@ This uses the `installer.nsi` script in the project root and creates
 1. `npm run build` in `ui/`
 2. `pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py`
 3. `makensis installer.nsi`
-2. `makensis installer.nsi`
 
 The version in `installer.nsi` is kept in sync with `app/constants.py` —
 always update it to match when bumping the version.

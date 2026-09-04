@@ -16,7 +16,7 @@ is a side effect of good structure, not a goal on its own.
 
 FileSorter is currently a solid, well-tested desktop file organizer: bilingual
 UI, dark/light themes, a proper package structure, automated tests + CI, and
-automated `.exe` releases on tag push. See [README.md](README.md#-version-history)
+automated `.exe` releases on tag push. See [CHANGELOG.md](CHANGELOG.md)
 for the full version history.
 
 The ideas below are about what comes *after* that foundation is fully settled.
@@ -42,7 +42,7 @@ small step.
 
 Same discipline as always — one focused piece per version, nothing skipped ahead.
 Version numbers below are for organization only and can shift. See
-[README.md](README.md#-version-history) for exact details on completed versions.
+[CHANGELOG.md](CHANGELOG.md) for exact details on completed versions.
 
 **Phase 1 — UX polish (still on Tkinter)** ✅ complete
 - ✅ **v3.7.0** — Drag & drop folder selection, plus a recent-folders list
