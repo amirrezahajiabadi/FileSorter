@@ -10,6 +10,23 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.1.1] — 2026
+
+### Fixed
+- **UI freeze on large folders.** Sorting or scanning a folder with thousands of
+  files used to push one event per file straight to the UI bridge, and the log
+  panel grew a DOM row per file — on a 20,000-file sort the page froze for
+  tens of seconds at a time. Now `BaseApi.push_event()` (`app/api.py`)
+  coalesces high-frequency kinds: monotonic counters (`progress`,
+  `space_progress`, `dup_progress`, `clean_progress`) deliver latest-wins,
+  per-file rows (`item`, `watch_item`) accumulate and flush together, and
+  terminal events always land after the ticks they follow. The log list is
+  capped at the latest 250 lines instead of growing without bound.
+- Verified live with a real 8,000-file sort: main-thread stalls dropped from
+  **40,507 ms to 90 ms max**, zero gaps over 200 ms, all 8,000 files sorted
+  correctly. 14 new coalescer tests; total **251 passed, 1 skipped**; `tsc`
+  strict and `vite build` clean.
+
 ## [6.1.0] — 2026
 
 ### Added

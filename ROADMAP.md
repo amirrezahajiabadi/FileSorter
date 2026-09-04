@@ -156,6 +156,12 @@ a different category of tool wearing the same UI.
   folder and sort new files automatically in the background, using something
   like `watchdog`. This is arguably what turns the app from "something I open
   sometimes" into "something that's just always running and useful."
+
+> ✅ **Done** — shipped in v5.9.0 (scheduled scans) and v6.0.0 (tray + autostart).
+> The remaining known item is **UI responsiveness under heavy scans**,
+> fixed in v6.1.1: per-file events are now coalesced and the log list is
+> bounded, so a 20k-file sort no longer freezes the page (measured live:
+> 40 s main-thread stalls → 90 ms max).
 - **Sort history in SQLite** instead of a plain text log — a natural bridge to
   the SQL stage of the personal learning roadmap, and it enables a real
   "view past sorts" feature.

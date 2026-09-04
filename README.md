@@ -156,8 +156,8 @@ Pushing a version tag builds the `.exe` and publishes a GitHub Release
 automatically — no manual builds:
 
 ```bash
-git tag v6.1.0
-git push origin v6.1.0
+git tag v6.1.1
+git push origin v6.1.1
 ```
 
 The tag must match `v` + three dot-separated numbers exactly (e.g. `v5.0.0`).
@@ -166,7 +166,7 @@ The tag must match `v` + three dot-separated numbers exactly (e.g. `v5.0.0`).
 
 ## 📚 Documentation
 
-- **[CHANGELOG.md](CHANGELOG.md)** — complete version history, v1.0.0 → v6.1.0
+- **[CHANGELOG.md](CHANGELOG.md)** — complete version history, v1.0.0 → v6.1.1
 - **[ROADMAP.md](ROADMAP.md)** — long-term direction: AI-powered analysis, desktop-utility scope, and smaller ideas
 - **[ui/README.md](ui/README.md)** — frontend structure, commands, i18n workflow
 
