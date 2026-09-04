@@ -123,6 +123,7 @@ useful, frequently-run Windows utility — closer to something like CCleaner or
 PowerToys. Candidate features, roughly in order of how naturally they fit:
 
 **Shipped so far:**
+- ✅ **v6.1.0** — System-wide cleanup: the Clean panel gains a **System-wide** section (Windows Temp through the same whitelist flow, unreadable dirs skipped, elevation-needed deletions reported) and a **Recycle Bin** block — real size via `SHQueryRecycleBinW`, empty behind the two-step armed confirm via `SHEmptyRecycleBinW` (`app/cleanup.py`, zero new dependencies). Live-verified against a real 27-item / 2.1 GB bin (query only). 9 tests.
 - ✅ **v6.0.0** — Always-on background mode: `--headless --tray` runs the service under a native WinForms tray icon (open in browser / start with Windows / quit — pythonnet, so no new dependencies) and `--autostart on|off|status` manages the silent HKCU Run-at-login entry (`app/tray.py` + `app/autostart.py`; pythonw from source, the exe when frozen). Verified live: real registry round-trip + full tray pump serving HTTP. 25 tests.
 - ✅ **v5.9.0** — Scheduled tasks on the headless service: a daemon tick loop (`app/tasks.py`) runs due tasks — junk check, disk-space scan, duplicate scan — on per-task intervals (30 min to weekly), persisted in the settings file, with pause/delete, **Run now**, and a session **Recent runs** history streamed over SSE (`sched_event`). Verified live: a daily cleanup task ran a real 11,537-file / 2.3 GB junk scan. 11 tests.
 - ✅ **v5.8.0** — Drive-wide duplicate scanning: the Duplicates panel lists your drives and scans a whole drive for identical content — two-phase hashing with a cancel button that stops at the next file boundary and reports partial results (`app/duplicates.py` `cancel_event`, shared with the disk scan). 4 tests.
@@ -136,7 +137,7 @@ PowerToys. Candidate features, roughly in order of how naturally they fit:
 
 - ~~**Drive-wide duplicate scanning**~~ ✅ shipped in v5.8.0
 - ~~**Drive-wide disk analysis**~~ ✅ shipped in v5.7.0
-- **System-wide cleanup** (user-scope junk cleaning shipped in v5.4.0; Windows Temp and other admin-scope locations come with the headless service shipped in v5.6.0)
+- ~~**System-wide cleanup**~~ ✅ shipped in v6.1.0 (Windows Temp + Recycle Bin; deeper admin-scope locations like the Windows Update cache remain future work)
 - **Startup app management** — much less related to file sorting; lowest priority,
   most likely to dilute the app's identity if added too early
 
