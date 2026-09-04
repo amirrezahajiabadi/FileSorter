@@ -13,6 +13,13 @@ import {
 import { fmt, inline, t } from '../i18n';
 import { formatSize, percent } from '../utils';
 
+// Rendering guard-rails (v6.1.2): a drive-wide duplicate scan can return
+// tens of thousands of files. Rendering every row — with an O(n²) filter
+// computed inside each row's render — froze the page for minutes. Rows
+// are now capped per group (expandable) and groups are paged.
+const GROUP_ROW_CAP = 150;
+const GROUPS_PER_PAGE = 60;
+
 function FileGlyph(name: string): string {
   const lower = name.toLowerCase();
   if (/\.(jpe?g|png|gif|webp|svg|heic)$/.test(lower)) return '🖼';
@@ -24,12 +31,17 @@ function FileGlyph(name: string): string {
 }
 
 function fileName(path: string): string {
-  return path.split(/[\/]/).pop() ?? path;
+  return path.split(/[\\/]/).pop() ?? path;
 }
 
 export default function DuplicatesPanel({ store }: { store: UIState }) {
   const S = store.strings;
   const [armed, setArmed] = useState(false);
+  // Per-group visible-row counts: giant groups render in pages of
+  // GROUP_ROW_CAP instead of all at once (all-at-once froze the page
+  // for tens of seconds on a 25k-row group).
+  const [rowCaps, setRowCaps] = useState<Record<string, number>>({});
+  const [shownGroups, setShownGroups] = useState(GROUPS_PER_PAGE);
 
   if (!store.dupOpen) return null;
 
@@ -51,6 +63,16 @@ export default function DuplicatesPanel({ store }: { store: UIState }) {
   const doDelete = async () => {
     await deleteSelectedDupes();
     setArmed(false);
+  };
+
+  const visibleGroups = dupGroups.slice(0, shownGroups);
+  const moreGroups = dupGroups.length - visibleGroups.length;
+
+  const growGroup = (groupId: string, total: number) => {
+    setRowCaps((prev) => ({
+      ...prev,
+      [groupId]: Math.min((prev[groupId] ?? GROUP_ROW_CAP) + GROUP_ROW_CAP, total),
+    }));
   };
 
   return (
@@ -202,56 +224,88 @@ export default function DuplicatesPanel({ store }: { store: UIState }) {
             <p className="dup-hint">{inline(t(S, 'dup_hint'))}</p>
 
             <div className="dup-groups">
-              {dupGroups.map((group, gi) => (
-                <section className="dup-group" key={group.id}>
-                  <header className="dup-group-head">
-                    <span className="dup-group-num">#{gi + 1}</span>
-                    <span className="dup-group-meta">
-                      {formatSize(group.size)} × {group.files.length}
-                    </span>
-                  </header>
-                  <ul className="dup-files">
-                    {group.files.map((f) => {
-                      const name = fileName(f.path);
-                      const keepers = group.files.filter((x) => !x.markDelete);
-                      const isLastKeeper = !f.markDelete && keepers.length === 1;
-                      return (
-                        <li className="dup-file" key={f.path}>
-                          <label
-                            className={`dup-file-main ${f.markDelete ? 'is-del' : 'is-keep'}${isLastKeeper ? ' is-locked' : ''}`}
-                            title={
-                              isLastKeeper ? inline(t(S, 'dup_keep_label')) : undefined
-                            }
-                          >
-                            <input
-                              type="checkbox"
-                              checked={f.markDelete}
-                              disabled={isLastKeeper}
-                              onChange={() => toggleDupFile(group.id, f.path)}
-                            />
-                            <span className="dup-glyph" aria-hidden="true">
-                              {FileGlyph(name)}
+              {visibleGroups.map((group, gi) => {
+                // Hoisted out of the row loop (v6.1.2): this used to
+                // re-filter the whole group once per file — O(n²) per
+                // render, minutes of freeze on a large group.
+                const keptCount = group.files.reduce(
+                  (n, f) => n + (f.markDelete ? 0 : 1),
+                  0,
+                );
+                const rows = group.files.slice(0, rowCaps[group.id] ?? GROUP_ROW_CAP);
+                const hiddenCount = group.files.length - rows.length;
+                return (
+                  <section className="dup-group" key={group.id}>
+                    <header className="dup-group-head">
+                      <span className="dup-group-num">#{gi + 1}</span>
+                      <span className="dup-group-meta">
+                        {formatSize(group.size)} × {group.files.length}
+                      </span>
+                    </header>
+                    <ul className="dup-files">
+                      {rows.map((f) => {
+                        const name = fileName(f.path);
+                        const isLastKeeper = !f.markDelete && keptCount === 1;
+                        return (
+                          <li className="dup-file" key={f.path}>
+                            <label
+                              className={`dup-file-main ${f.markDelete ? 'is-del' : 'is-keep'}${isLastKeeper ? ' is-locked' : ''}`}
+                              title={
+                                isLastKeeper ? inline(t(S, 'dup_keep_label')) : undefined
+                              }
+                            >
+                              <input
+                                type="checkbox"
+                                checked={f.markDelete}
+                                disabled={isLastKeeper}
+                                onChange={() => toggleDupFile(group.id, f.path)}
+                              />
+                              <span className="dup-glyph" aria-hidden="true">
+                                {FileGlyph(name)}
+                              </span>
+                              <span className="dup-name" dir="ltr">
+                                {name}
+                              </span>
+                            </label>
+                            <span className="dup-file-dir" dir="ltr" title={f.path}>
+                              {f.path}
                             </span>
-                            <span className="dup-name" dir="ltr">
-                              {name}
+                            <span className="dup-size">{formatSize(f.size)}</span>
+                            <span
+                              className={`dup-tag ${f.markDelete ? 'dup-tag-del' : 'dup-tag-keep'}`}
+                            >
+                              {inline(t(S, f.markDelete ? 'dup_delete_label' : 'dup_keep_label'))}
                             </span>
-                          </label>
-                          <span className="dup-file-dir" dir="ltr" title={f.path}>
-                            {f.path}
-                          </span>
-                          <span className="dup-size">{formatSize(f.size)}</span>
-                          <span
-                            className={`dup-tag ${f.markDelete ? 'dup-tag-del' : 'dup-tag-keep'}`}
-                          >
-                            {inline(t(S, f.markDelete ? 'dup_delete_label' : 'dup_keep_label'))}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              ))}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {hiddenCount > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm dup-more-rows"
+                        onClick={() => growGroup(group.id, group.files.length)}
+                      >
+                        {inline(
+                          fmt(t(S, 'dup_show_all'), {
+                            n: Math.min(hiddenCount, GROUP_ROW_CAP),
+                          }),
+                        )}
+                      </button>
+                    )}
+                  </section>
+                );
+              })}
             </div>
+            {moreGroups > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm dup-more-groups"
+                onClick={() => setShownGroups((n) => n + GROUPS_PER_PAGE)}
+              >
+                {inline(fmt(t(S, 'dup_more_groups'), { n: moreGroups }))}
+              </button>
+            )}
 
             <div className="modal-foot dup-foot">
               <p className="dup-arm-note" aria-live="polite">

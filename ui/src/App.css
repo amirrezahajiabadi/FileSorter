@@ -2312,3 +2312,48 @@ html[dir='rtl'] .picker-path {
   font-size: 13px;
   padding: 4px;
 }
+
+/* --- v6.1.2: typed-path fallback + bounded result lists --- */
+
+.picker-typed {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.picker-typed-input {
+  flex: 1;
+  min-width: 260px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.35));
+  background: var(--bg, #1c1f26);
+  color: inherit;
+  font-size: 13px;
+  direction: ltr;
+  text-align: left;
+  font-family: var(--font-mono, monospace);
+}
+
+.picker-typed-input:focus {
+  outline: none;
+  border-color: var(--accent, #6c8cff);
+}
+
+.dup-more-rows {
+  display: block;
+  margin: 8px auto 4px;
+}
+
+.dup-more-groups {
+  display: block;
+  margin: 14px auto 4px;
+}
+
+.undo-more-note {
+  padding: 6px 10px 10px;
+  font-size: 12px;
+  opacity: 0.7;
+}

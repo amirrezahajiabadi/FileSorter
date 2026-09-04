@@ -79,22 +79,35 @@ export default function UndoModal() {
         </div>
 
         <div className="undo-groups">
-          {groups.map((g) => (
-            <div className="undo-group" key={g.category}>
-              <div className="undo-group-head">
-                <span aria-hidden="true">{g.icon}</span>
-                <span className="undo-group-name">{g.name}</span>
-                <span className="undo-group-count">{g.files.length}</span>
-              </div>
-              <div className="undo-group-files">
-                {g.files.map((name) => (
-                  <div className="undo-file" key={name} dir="ltr">
-                    {name}
+          {groups.map((g) => {
+            // A whole-drive sort can move tens of thousands of files;
+            // rendering every name froze the page (v6.1.2). Show a
+            // bounded preview — undoing moves the whole sort anyway.
+            const ROW_CAP = 400;
+            const rows = g.files.slice(0, ROW_CAP);
+            const hiddenCount = g.files.length - rows.length;
+            return (
+              <div className="undo-group" key={g.category}>
+                <div className="undo-group-head">
+                  <span aria-hidden="true">{g.icon}</span>
+                  <span className="undo-group-name">{g.name}</span>
+                  <span className="undo-group-count">{g.files.length}</span>
+                </div>
+                <div className="undo-group-files">
+                  {rows.map((name) => (
+                    <div className="undo-file" key={name} dir="ltr">
+                      {name}
+                    </div>
+                  ))}
+                </div>
+                {hiddenCount > 0 && (
+                  <div className="undo-more-note">
+                    {inline(fmt(t(S, 'undo_more_files'), { n: hiddenCount }))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="modal-foot">

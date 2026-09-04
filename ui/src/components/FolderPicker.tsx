@@ -1,6 +1,8 @@
+import { useState } from 'react';
+
 import type { UIState } from '../store';
 import { analyzeFolder, browseFolder, pickRecent } from '../store';
-import { t } from '../i18n';
+import { inline, t } from '../i18n';
 
 function FolderIcon() {
   return (
@@ -17,6 +19,30 @@ export default function FolderPicker({ store }: { store: UIState }) {
   const noFolder = t(strings, 'no_folder');
   const selectedLabel = t(strings, 'selected_folder_label');
   const recentEmpty = t(strings, 'recent_folders_empty');
+  const typedPlaceholder = t(strings, 'picker_typed_placeholder');
+  const typedGo = t(strings, 'picker_typed_go');
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const submitTyped = (raw: string) => {
+    const path = raw.trim();
+    if (!path) return;
+    pickRecent(path);
+    setTyping(false);
+    setDraft('');
+  };
+
+  const handleBrowse = async () => {
+    if (phase === 'analyzing') return;
+    // Headless transports have no native dialog (returns null); desktop
+    // users can cancel. Both fall back to a typed path so every mode can
+    // pick any folder, not just the recent list (v6.1.2).
+    const picked = await browseFolder();
+    if (!picked) {
+      setDraft(folder ?? '');
+      setTyping(true);
+    }
+  };
 
   return (
     <section className="picker" aria-label="Folder selection">
@@ -44,12 +70,45 @@ export default function FolderPicker({ store }: { store: UIState }) {
             type="button"
             className="btn btn-primary"
             disabled={phase === 'analyzing'}
-            onClick={() => void browseFolder()}
+            onClick={() => void handleBrowse()}
           >
             {browseLabel}
           </button>
         </div>
       </div>
+
+      {typing && (
+        <form
+          className="picker-typed"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitTyped(draft);
+          }}
+        >
+          <input
+            className="picker-typed-input"
+            type="text"
+            dir="ltr"
+            value={draft}
+            placeholder={inline(typedPlaceholder)}
+            onChange={(e) => setDraft(e.target.value)}
+            autoFocus
+          />
+          <button type="submit" className="btn btn-secondary btn-sm">
+            {inline(typedGo)}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              setTyping(false);
+              setDraft('');
+            }}
+          >
+            ✕
+          </button>
+        </form>
+      )}
 
       {phase === 'analyzing' && (
         <div className="analyzing-note">

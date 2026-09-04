@@ -271,30 +271,112 @@ function pushLog(kind: LogKind, text: string): void {
   set({ logs: [...state.logs.slice(-(MAX_LOG_LINES - 1)), { id: logId, kind, text }] });
 }
 
-function showNotice(kind: Notice['kind'], text: string): void {
-  set({ notice: { kind, text } });
+// ── Client-side event batching (v6.1.2) ─────────────────────────
+// The service coalescer (v6.1.1) already bounds wire traffic, but the
+// browser still handled every "item" frame individually — three full
+// store updates (log row + category + counter) per file, each
+// re-rendering the whole tree. On a fast sort that is hundreds of
+// renders per second. Instead we accumulate hot events here and apply
+// them in one set() on a short timer, so a burst of N files costs one
+// render instead of ~3N.
+
+let pendingLogs: LogLine[] = [];
+let pendingWatchLogs: LogLine[] = [];
+let pendingCat: Record<string, number> = {};
+let pendingOk = 0;
+let pendingSkip = 0;
+let pendingErr = 0;
+let pendingBumps: { path: string; field: 'moved' | 'skipped' | 'failed' }[] = [];
+let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+
+const BATCH_INTERVAL_MS = 120; // aligns with the backend coalescer flush
+
+function scheduleBatchFlush(): void {
+  if (pendingTimer !== null) return;
+  pendingTimer = setTimeout(flushBatch, BATCH_INTERVAL_MS);
 }
 
-function bumpCategory(id: string, delta: number): void {
-  set({
-    categories: state.categories.map((c) =>
-      c.id === id ? { ...c, count: Math.max(0, c.count + delta) } : c,
-    ),
-  });
+/** Apply every buffered item/watch update in a single store set(). */
+function flushBatch(): void {
+  pendingTimer = null;
+  const logs = pendingLogs;
+  const watchLogs = pendingWatchLogs;
+  const catDeltas = pendingCat;
+  const ok = pendingOk;
+  const skip = pendingSkip;
+  const err = pendingErr;
+  const bumps = pendingBumps;
+  pendingLogs = [];
+  pendingWatchLogs = [];
+  pendingCat = {};
+  pendingOk = 0;
+  pendingSkip = 0;
+  pendingErr = 0;
+  pendingBumps = [];
+  if (
+    logs.length === 0 &&
+    watchLogs.length === 0 &&
+    ok === 0 &&
+    skip === 0 &&
+    err === 0 &&
+    Object.keys(catDeltas).length === 0 &&
+    bumps.length === 0
+  ) {
+    return;
+  }
+  const patch: Partial<UIState> = {};
+  if (logs.length > 0) {
+    patch.logs = [...state.logs, ...logs].slice(-MAX_LOG_LINES);
+  }
+  if (watchLogs.length > 0) {
+    patch.watchLog = [...state.watchLog, ...watchLogs].slice(-50);
+  }
+  if (ok > 0 || skip > 0 || err > 0) {
+    patch.okCount = state.okCount + ok;
+    patch.skipCount = state.skipCount + skip;
+    patch.errorCount = state.errorCount + err;
+  }
+  const catIds = Object.keys(catDeltas);
+  if (catIds.length > 0) {
+    patch.categories = state.categories.map((c) => {
+      const d = catDeltas[c.id];
+      return d ? { ...c, count: Math.max(0, c.count + d) } : c;
+    });
+  }
+  if (bumps.length > 0) {
+    const byPath = new Map<string, Partial<WatchRow>>();
+    for (const b of bumps) {
+      const row = byPath.get(b.path) ?? {};
+      row[b.field] = (row[b.field] ?? 0) + 1;
+      byPath.set(b.path, row);
+    }
+    patch.watchFolders = state.watchFolders.map((r) => {
+      const d = byPath.get(r.path);
+      return d
+        ? {
+            ...r,
+            moved: r.moved + (d.moved ?? 0),
+            skipped: r.skipped + (d.skipped ?? 0),
+            failed: r.failed + (d.failed ?? 0),
+          }
+        : r;
+    });
+  }
+  set(patch);
+}
+
+/** Events that end a phase must land after the rows/counters that
+ *  preceded them — drain any buffered items first. */
+const BATCH_FLUSH_KINDS = new Set(['total', 'done', 'error']);
+
+function showNotice(kind: Notice['kind'], text: string): void {
+  set({ notice: { kind, text } });
 }
 
 function mergeWatchRows(paths: string[], prev: WatchRow[]): WatchRow[] {
   return paths.map((path) => {
     const old = prev.find((r) => r.path === path);
     return old ?? { path, moved: 0, skipped: 0, failed: 0 };
-  });
-}
-
-function bumpWatch(path: string, field: keyof Omit<WatchRow, 'path'>): void {
-  set({
-    watchFolders: state.watchFolders.map((r) =>
-      r.path === path ? { ...r, [field]: r[field] + 1 } : r,
-    ),
   });
 }
 
@@ -375,6 +457,11 @@ function localizeItem(item: SortItemEvent): string {
 
 function handleEvent(msg: SortEvent): void {
   const { kind, payload } = msg;
+  // Phase-ending events must observe every row/counter emitted before
+  // them, so drain the batch buffer synchronously first.
+  if (BATCH_FLUSH_KINDS.has(kind)) {
+    flushBatch();
+  }
   switch (kind) {
     case 'total': {
       const total = payload as number;
@@ -390,22 +477,26 @@ function handleEvent(msg: SortEvent): void {
     }
     case 'item': {
       const item = payload as SortItemEvent;
-      pushLog(
-        item.status === 'ok' || item.status === 'restored'
-          ? 'success'
-          : item.status === 'skip' || item.status === 'removed'
-            ? 'warning'
-            : 'error',
-        localizeItem(item),
-      );
+      logId += 1;
+      pendingLogs.push({
+        id: logId,
+        kind:
+          item.status === 'ok' || item.status === 'restored'
+            ? 'success'
+            : item.status === 'skip' || item.status === 'removed'
+              ? 'warning'
+              : 'error',
+        text: localizeItem(item),
+      });
       if (item.status === 'ok' && item.category) {
-        bumpCategory(item.category, 1);
-        set({ okCount: state.okCount + 1 });
+        pendingCat[item.category] = (pendingCat[item.category] ?? 0) + 1;
+        pendingOk += 1;
       } else if (item.status === 'skip') {
-        set({ skipCount: state.skipCount + 1 });
+        pendingSkip += 1;
       } else if (item.status === 'error') {
-        set({ errorCount: state.errorCount + 1 });
+        pendingErr += 1;
       }
+      scheduleBatchFlush();
       break;
     }
     case 'progress':
@@ -445,27 +536,32 @@ function handleEvent(msg: SortEvent): void {
       const item = payload as WatchItem;
       const S = state.strings;
       const category = categoryDisplay(item.category);
+      logId += 1;
       if (item.action === 'moved') {
-        pushWatchLog(
-          'success',
-          inline(fmt(t(S, 'watch_sorted_log'), { name: item.name, category })),
-        );
-        bumpWatch(item.folder, 'moved');
+        pendingWatchLogs.push({
+          id: logId,
+          kind: 'success',
+          text: inline(fmt(t(S, 'watch_sorted_log'), { name: item.name, category })),
+        });
+        pendingBumps.push({ path: item.folder, field: 'moved' });
       } else if (item.action === 'skipped') {
-        pushWatchLog(
-          'warning',
-          inline(fmt(t(S, 'watch_skipped_log'), { name: item.name })),
-        );
-        bumpWatch(item.folder, 'skipped');
+        pendingWatchLogs.push({
+          id: logId,
+          kind: 'warning',
+          text: inline(fmt(t(S, 'watch_skipped_log'), { name: item.name })),
+        });
+        pendingBumps.push({ path: item.folder, field: 'skipped' });
       } else {
-        pushWatchLog(
-          'error',
-          inline(
+        pendingWatchLogs.push({
+          id: logId,
+          kind: 'error',
+          text: inline(
             fmt(t(S, 'watch_error_log'), { name: item.name, error: item.error ?? '' }),
           ),
-        );
-        bumpWatch(item.folder, 'failed');
+        });
+        pendingBumps.push({ path: item.folder, field: 'failed' });
       }
+      scheduleBatchFlush();
       break;
     }
     case 'watch_error': {
@@ -573,7 +669,17 @@ function handleEvent(msg: SortEvent): void {
       const message = String(payload);
       pushLog('error', inline(fmt(t(state.strings, 'fatal_error_log'), { error: message })));
       showNotice('error', message);
-      set({ phase: 'idle', result: null, dupScanning: false });
+      // Any job thread can fail mid-run; clear every operation flag so no
+      // panel is left on an eternal spinner.
+      set({
+        phase: 'idle',
+        result: null,
+        dupScanning: false,
+        diskScanning: false,
+        cleanScanning: false,
+        cleanDeleting: false,
+        binEmptying: false,
+      });
       break;
     }
   }
@@ -620,12 +726,14 @@ export function setFolder(folder: string | null): void {
   });
 }
 
-export async function browseFolder(): Promise<void> {
+export async function browseFolder(): Promise<boolean> {
   const path = await bridge.browse_folder();
   if (path) {
     setFolder(path);
     pushLog('info', inline(fmt(t(state.strings, 'folder_selected_log'), { path })));
+    return true;
   }
+  return false;
 }
 
 export function pickRecent(path: string): void {
