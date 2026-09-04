@@ -40,6 +40,11 @@ export default function Header({ store }: { store: UIState }) {
         </svg>
         <span className="logo-name">{title}</span>
         {store.version && <span className="logo-version">v{store.version}</span>}
+        {store.transport === 'service' && (
+          <span className="service-badge" title={inline(t(store.strings, 'service_badge_tip'))}>
+            {inline(t(store.strings, 'service_badge'))}
+          </span>
+        )}
       </div>
 
       <div className="header-actions">

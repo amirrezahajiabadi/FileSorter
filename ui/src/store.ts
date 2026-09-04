@@ -29,7 +29,8 @@ import type {
   WatchItem,
 } from './protocol';
 import { DEFAULT_CATEGORY_META } from './protocol';
-import { bridge, isDesktop, subscribeEvents } from './transport';
+import { bridge, isDesktop, subscribeEvents, transportKind } from './transport';
+import type { TransportKind } from './transport';
 import type { SortEvent } from './transport';
 import type { StringTable } from './i18n';
 import { fmt, inline, t } from './i18n';
@@ -82,6 +83,7 @@ export interface WatchRow {
 export interface UIState {
   ready: boolean;
   desktop: boolean;
+  transport: TransportKind;
   theme: ThemeName;
   lang: LangCode;
   version: string;
@@ -133,6 +135,7 @@ export interface UIState {
 const initial: UIState = {
   ready: false,
   desktop: isDesktop(),
+  transport: transportKind,
   theme: 'dark',
   lang: 'en',
   version: '',

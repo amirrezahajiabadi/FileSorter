@@ -2,13 +2,15 @@
  * Transport layer: the single door between React and the Python core.
  *
  * In the packaged app this is the pywebview JS bridge (window.pywebview.api).
- * In a plain browser (vite dev, no Python attached) a deterministic mock
+ * In a headless service (app/service.py) the HTTP transport stands in —
+ * JSON-RPC over POST /api + Server-Sent Events, same vocabulary.
+ * In a plain browser with no backend (vite dev) a deterministic mock
  * stands in, so the entire flow is explorable without the desktop runtime:
  * a sample folder + report are used, and sort/undo events are simulated.
  * The mock data is clearly surfaced in the UI (dev banner, sample badge),
  * and destructive/sorting actions only ever run against the sample data.
  *
- * Method names deliberately mirror Api methods in main_web.py — the two
+ * Method names deliberately mirror Api methods in app/api.py — the two
  * sides of the protocol share one vocabulary.
  */
 
@@ -36,6 +38,8 @@ import type {
   WatchItem,
 } from './protocol';
 import { STRINGS_MIRROR } from './generated/strings';
+import { emit, isDesktop } from './events';
+import { createHttpBridge, isHttpConfigured } from './http';
 
 // ── pywebview bridge typing ─────────────────────────────────────
 
@@ -77,39 +81,28 @@ declare global {
   }
 }
 
-export type SortEvent = { kind: EventKind; payload: unknown };
+// ── Transport selection ─────────────────────────────────────────
+//
+// 1. Desktop (pywebview window)   -> native bridge
+// 2. Headless service reachable   -> HTTP transport (JSON-RPC + SSE)
+// 3. Plain browser, no backend    -> deterministic mock (dev preview)
 
-// ── Detection ───────────────────────────────────────────────────
+export type TransportKind = 'desktop' | 'service' | 'mock';
 
-export function isDesktop(): boolean {
-  return typeof window !== 'undefined' && !!window.pywebview?.api;
-}
+export const transportKind: TransportKind = isDesktop()
+  ? 'desktop'
+  : isHttpConfigured()
+    ? 'service'
+    : 'mock';
 
 export const bridge: BridgeApi = isDesktop()
   ? (window.pywebview!.api as BridgeApi)
-  : createMockBridge();
+  : isHttpConfigured()
+    ? createHttpBridge()
+    : createMockBridge();
 
-// One listener registry shared by both transports: desktop pushes events
-// through window.onSortEvent, the mock emits on a timer.
-const listeners = new Set<(msg: SortEvent) => void>();
-
-export function subscribeEvents(cb: (msg: SortEvent) => void): () => void {
-  listeners.add(cb);
-  if (isDesktop()) {
-    window.onSortEvent = cb;
-  }
-  return () => {
-    listeners.delete(cb);
-    if (isDesktop() && window.onSortEvent === cb) {
-      window.onSortEvent = undefined;
-    }
-  };
-}
-
-function emit(kind: EventKind, payload: unknown): void {
-  const msg: SortEvent = { kind, payload };
-  listeners.forEach((cb) => cb(msg));
-}
+export { isDesktop, subscribeEvents } from './events';
+export type { SortEvent } from './events';
 
 // ── Browser-only mock (dev preview, no Python attached) ─────────
 
@@ -130,7 +123,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.5.0',
+  version: '5.6.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],

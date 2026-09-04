@@ -11,6 +11,7 @@ import DiskPanel from './components/DiskPanel';
 import CleanupPanel from './components/CleanupPanel';
 import OperationPanel from './components/OperationPanel';
 import Toasts from './components/Toasts';
+import { t } from './i18n';
 import './App.css';
 
 export default function App() {
@@ -33,7 +34,12 @@ export default function App() {
         <FolderPicker store={store} />
         {busy ? <OperationPanel /> : <CategoryGrid store={store} />}
       </main>
-      {!store.desktop && (
+      {store.transport === 'service' && (
+        <footer className="dev-note">
+          {t(store.strings, 'service_note')}
+        </footer>
+      )}
+      {store.transport === 'mock' && (
         <footer className="dev-note">
           Browser preview — sorting runs against sample data; for real
           folders run the desktop runtime (python main_web.py).
