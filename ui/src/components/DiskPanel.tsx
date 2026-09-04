@@ -1,8 +1,10 @@
 import type { UIState } from '../store';
 import {
+  cancelDiskScan,
   closeDiskPanel,
   diskScanBrowse,
   diskScanCurrent,
+  diskScanDrive,
 } from '../store';
 import { inline, t } from '../i18n';
 import { formatSize, percent } from '../utils';
@@ -74,6 +76,48 @@ export default function DiskPanel({ store }: { store: UIState }) {
           </button>
         </div>
 
+        {store.drives.length > 0 && (
+          <div className="drives-section">
+            <h3 className="section-title">{inline(t(S, 'drives_heading'))}</h3>
+            <div className="drive-list">
+              {store.drives.map((d) => {
+                const used = d.total - d.free;
+                const usedPct =
+                  d.total > 0 ? Math.round((used / d.total) * 100) : 0;
+                return (
+                  <div className="drive-card" key={d.letter}>
+                    <span className="drive-letter">{d.letter}</span>
+                    <div className="drive-info">
+                      <div className="drive-meta">
+                        <span className="drive-path" dir="ltr">
+                          {d.path}
+                        </span>
+                        <span className="drive-free">
+                          {formatSize(d.free)} {inline(t(S, 'drive_free'))}
+                        </span>
+                      </div>
+                      <div className="drive-track">
+                        <div
+                          className="drive-fill"
+                          style={{ width: `${Math.max(usedPct, 2)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={diskScanning}
+                      onClick={() => void diskScanDrive(d)}
+                    >
+                      {inline(t(S, 'drive_scan_btn'))}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="dup-actions">
           {store.folder && (
             <button
@@ -116,11 +160,23 @@ export default function DiskPanel({ store }: { store: UIState }) {
                 }}
               />
             </div>
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              onClick={() => void cancelDiskScan()}
+            >
+              {inline(t(S, 'cancel_scan_btn'))}
+            </button>
           </div>
         )}
 
         {diskReport && (
           <div className="space-results">
+            {diskReport.cancelled && (
+              <div className="scan-cancelled-note">
+                {inline(t(S, 'scan_cancelled'))}
+              </div>
+            )}
             <div className="space-summary">
               <div className="stat-pill">
                 <span className="stat-num">{diskReport.files_scanned}</span>

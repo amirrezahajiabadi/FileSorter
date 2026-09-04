@@ -171,6 +171,14 @@ export interface SpaceDone {
   top_files: SpaceTopFile[];
   files_scanned: number;
   total_bytes: number;
+  cancelled?: boolean;
+}
+
+export interface DriveInfo {
+  letter: string;
+  path: string;
+  total: number;
+  free: number;
 }
 
 // ── Temp / cache cleanup (Api.scan_cleanup) ─────────────────────

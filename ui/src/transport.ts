@@ -24,6 +24,7 @@ import type {
   DupDeleteResult,
   DupDone,
   DupFile,
+  DriveInfo,
   DupGroup,
   EventKind,
   LangCode,
@@ -59,7 +60,9 @@ export interface BridgeApi {
   undo_sort(): Promise<boolean>;
   find_duplicates(path: string): Promise<boolean>;
   delete_duplicates(paths: string[]): Promise<DupDeleteResult>;
+  list_drives(): Promise<DriveInfo[]>;
   scan_disk(path: string): Promise<boolean>;
+  cancel_scan(): Promise<boolean>;
   scan_cleanup(): Promise<boolean>;
   delete_cleanup(paths: string[]): Promise<CleanDeleteResult>;
   add_watch_folder(path: string): Promise<boolean>;
@@ -123,7 +126,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.6.0',
+  version: '5.7.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],
@@ -392,10 +395,24 @@ function createMockBridge(): BridgeApi {
       }
       return { deleted, failed };
     },
+    async list_drives(): Promise<DriveInfo[]> {
+      const GB = 1024 * 1024 * 1024;
+      return [
+        { letter: 'C', path: 'C:\\', total: 512 * GB, free: 96 * GB },
+        { letter: 'D', path: 'D:\\', total: 1024 * GB, free: 318 * GB },
+      ];
+    },
+    async cancel_scan(): Promise<boolean> {
+      const wasRunning = mockDiskRunning;
+      mockDiskCancel = true;
+      return wasRunning;
+    },
     async scan_disk(): Promise<boolean> {
       // Simulate a live disk scan: stream counters, then report a
       // deterministic sample breakdown (bytes kept consistent between
       // category totals, the total, and the largest files).
+      // cancel_scan() flips the flag; the loop stops and reports a
+      // partial space_done marked cancelled, like the real backend.
       const MB = 1024 * 1024;
       const SAMPLE_SPACE: SpaceDone = {
         by_category: {
@@ -416,9 +433,16 @@ function createMockBridge(): BridgeApi {
         files_scanned: 134,
         total_bytes: 2067 * MB,
       };
+      mockDiskRunning = true;
+      mockDiskCancel = false;
       const steps = 6;
+      let stoppedAt = 0;
       for (let i = 1; i <= steps; i++) {
         await sleep(140);
+        if (mockDiskCancel) {
+          stoppedAt = i;
+          break;
+        }
         const frac = i / steps;
         emit('space_progress', {
           phase: 'scanning',
@@ -426,7 +450,18 @@ function createMockBridge(): BridgeApi {
           bytes: Math.round(SAMPLE_SPACE.total_bytes * frac),
         });
       }
-      emit('space_done', SAMPLE_SPACE);
+      mockDiskRunning = false;
+      if (stoppedAt > 0) {
+        const frac = stoppedAt / steps;
+        emit('space_done', {
+          ...SAMPLE_SPACE,
+          files_scanned: Math.round(SAMPLE_SPACE.files_scanned * frac),
+          total_bytes: Math.round(SAMPLE_SPACE.total_bytes * frac),
+          cancelled: true,
+        });
+      } else {
+        emit('space_done', SAMPLE_SPACE);
+      }
       return true;
     },
     async scan_cleanup(): Promise<boolean> {
@@ -560,6 +595,10 @@ function createMockBridge(): BridgeApi {
 }
 
 let mockTimer: ReturnType<typeof setInterval> | null = null;
+
+// Cancel support for the mock disk scan (mirrors the real backend).
+let mockDiskRunning = false;
+let mockDiskCancel = false;
 let dupState: DupGroup[] = makeSampleDupGroups();
 
 // Mutable mock junk locations: id -> { size-bytes per fake file name }.

@@ -16,6 +16,7 @@ import type {
   CategoryMeta,
   CleanDone,
   CleanLocationId,
+  DriveInfo,
   DuplicateMode,
   DupDone,
   LangCode,
@@ -118,6 +119,8 @@ export interface UIState {
   dupTotal: number;
   dupGroups: DupGroupRow[];
   diskOpen: boolean;
+  drives: DriveInfo[];
+  drivesLoaded: boolean;
   diskScanning: boolean;
   diskScanFolder: string | null;
   diskProcessed: number;
@@ -170,6 +173,8 @@ const initial: UIState = {
   dupTotal: 0,
   dupGroups: [],
   diskOpen: false,
+  drives: [],
+  drivesLoaded: false,
   diskScanning: false,
   diskScanFolder: null,
   diskProcessed: 0,
@@ -987,6 +992,20 @@ export async function deleteSelectedDupes(): Promise<void> {
 
 export function openDiskPanel(): void {
   set({ diskOpen: true });
+  if (!state.drivesLoaded) {
+    void loadDrives();
+  }
+}
+
+export async function loadDrives(): Promise<void> {
+  try {
+    const drives = await bridge.list_drives();
+    set({ drives, drivesLoaded: true });
+  } catch (err) {
+    // Non-Windows or a service hiccup — the panel just shows folder scans.
+    set({ drivesLoaded: true });
+    showNotice('error', String(err));
+  }
 }
 
 export function closeDiskPanel(): void {
@@ -1025,6 +1044,23 @@ export async function diskScanBrowse(): Promise<void> {
   const path = await bridge.browse_folder();
   if (!path) return;
   await startDiskScan(path);
+}
+
+export async function diskScanDrive(drive: DriveInfo): Promise<void> {
+  if (diskScanning()) return;
+  await startDiskScan(drive.path);
+}
+
+export async function cancelDiskScan(): Promise<void> {
+  try {
+    await bridge.cancel_scan();
+  } catch (err) {
+    showNotice('error', String(err));
+  }
+}
+
+function diskScanning(): boolean {
+  return state.diskScanning;
 }
 
 export async function diskScanFolder(): Promise<void> {
