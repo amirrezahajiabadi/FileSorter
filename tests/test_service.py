@@ -123,7 +123,7 @@ def test_events_requires_token(service):
 def test_get_state(service):
     resp = rpc(service, "get_state")
     state = resp["result"]
-    assert state["version"] == "5.6.0"
+    assert state["version"] == "5.7.0"
     assert "categories" in state and "smartRules" in state
     assert state["language"] in ("fa", "en")
 
@@ -215,3 +215,43 @@ def test_unknown_path_returns_404(service):
     with pytest.raises(urllib.error.HTTPError) as exc:
         urllib.request.urlopen(service.url() + "nope", timeout=5)
     assert exc.value.code == 404
+
+# ══════════════════════════════════════════════════════════════════
+#  v5.7.0 — drive-wide scans over the wire
+# ══════════════════════════════════════════════════════════════════
+
+def test_list_drives_rpc(service):
+    resp = rpc(service, "list_drives")
+    drives = resp["result"]
+    assert isinstance(drives, list)
+    for d in drives:
+        assert set(d) == {"letter", "path", "total", "free"}
+        assert len(d["letter"]) == 1 and d["total"] > 0
+
+
+def test_cancel_scan_returns_false_when_idle(service):
+    resp = rpc(service, "cancel_scan")
+    assert resp["result"] is False
+
+
+def test_disk_scan_cancel_streams_partial_done(service, tmp_path):
+    """A cancelled drive scan streams space_progress then a space_done
+    marked cancelled with the partial counts."""
+    folder = tmp_path / "big"
+    folder.mkdir()
+    for i in range(2000):
+        (folder / f"f{i:04d}.txt").write_text("x" * 8)
+
+    def cancel_after_start():
+        rpc(service, "scan_disk", [str(folder)])
+        rpc(service, "cancel_scan")
+
+    events = read_sse_until(
+        service, cancel_after_start,
+        lambda ev: ev["kind"] == "space_done", timeout=20,
+    )
+    kinds = [ev["kind"] for ev in events]
+    assert "space_progress" in kinds, f"expected progress ticks, got {kinds}"
+    done = events[-1]["payload"]
+    assert done["cancelled"] is True
+    assert done["files_scanned"] < 2000  # partial, not the full walk

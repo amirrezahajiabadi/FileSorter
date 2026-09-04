@@ -22,7 +22,7 @@ from pathlib import Path
 from app.constants import DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings, add_recent_folder
 from app.duplicates import delete_files, scan_duplicates
-from app.disk_scan import scan_space
+from app.disk_scan import list_drives, scan_space
 from app.cleanup import delete_junk, scan_junk
 from app.sorter import analyze_folder, plan_sort
 
@@ -126,12 +126,23 @@ class AppController:
     #  Sort
     # ══════════════════════════════════════════════════════════════
 
-    def scan_space(self, path: str, on_event=None) -> dict:
-        """Analyze disk usage of `path`: per-category totals and the
-        largest files, bucketed by the current sort categories. Emits
-        ("space_progress", ...) events during the walk. Read-only.
+    def list_drives(self) -> list:
+        """Enumerate local drives (Windows): letter, root path, and
+        total/free bytes. Empty list on non-Windows platforms.
         """
-        return scan_space(Path(path), self.categories, on_event=on_event)
+        return list_drives()
+
+    def scan_space(self, path: str, on_event=None, cancel_event=None) -> dict:
+        """Analyze disk usage of `path` — a folder or a whole drive root:
+        per-category totals and the largest files, bucketed by the
+        current sort categories. Emits ("space_progress", ...) events
+        during the walk; when cancel_event gets set, the walk stops at
+        the next file boundary and returns partial results with
+        "cancelled": True. Read-only.
+        """
+        return scan_space(
+            Path(path), self.categories, on_event=on_event, cancel_event=cancel_event
+        )
 
     def scan_cleanup(self, on_event=None) -> dict:
         """Scan known junk locations (user temp, caches, crash dumps),

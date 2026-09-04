@@ -145,3 +145,84 @@ def test_controller_scan_space_uses_current_categories():
         assert res["by_category"][get_category(".png", cats)]["bytes"] == 40
         assert res["by_category"][get_category(".xyz", cats)]["bytes"] == 8
         assert res["files_scanned"] == 2
+
+
+# ══════════════════════════════════════════════════════════════════
+#  v5.7.0 — drive-wide scans: cancel support + drive enumeration
+# ══════════════════════════════════════════════════════════════════
+
+def test_cancel_stops_scan_and_returns_partial():
+    """Setting the cancel event stops the walk and marks the result."""
+    import threading
+
+    from app.disk_scan import scan_space
+    from app.constants import DEFAULT_CATEGORIES
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for i in range(200):
+            (root / f"f{i:03d}.txt").write_text("x" * 4)
+
+        cancel = threading.Event()
+        cancel.set()  # already cancelled before the walk starts
+        res = scan_space(root, DEFAULT_CATEGORIES, cancel_event=cancel)
+        assert res["cancelled"] is True
+        assert res["files_scanned"] == 0  # stopped before scanning anything
+
+        cancel = threading.Event()
+        res = scan_space(root, DEFAULT_CATEGORIES, cancel_event=cancel)
+        assert res["cancelled"] is False
+        assert res["files_scanned"] == 200
+
+
+def test_cancel_mid_scan_reports_partial_counts():
+    """A cancel set during the walk returns what was found so far."""
+    import threading
+
+    from app.disk_scan import scan_space
+    from app.constants import DEFAULT_CATEGORIES
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for i in range(500):
+            (root / f"f{i:03d}.txt").write_text("x" * 4)
+
+        cancel = threading.Event()
+
+        def cancel_soon():
+            # fire after the walk has started processing files
+            import time
+            time.sleep(0.01)
+            cancel.set()
+
+        t = threading.Thread(target=cancel_soon, daemon=True)
+        t.start()
+        res = scan_space(root, DEFAULT_CATEGORIES, cancel_event=cancel)
+        assert res["cancelled"] is True
+        assert res["files_scanned"] < 500  # stopped partway, still counted some
+        assert res["total_bytes"] > 0
+
+
+def test_scan_without_cancel_event_never_cancels():
+    """Backwards compat: no cancel_event -> cancelled is False."""
+    from app.disk_scan import scan_space
+    from app.constants import DEFAULT_CATEGORIES
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "a.txt").write_text("hi")
+        res = scan_space(root, DEFAULT_CATEGORIES)
+        assert res["cancelled"] is False
+        assert res["files_scanned"] == 1
+
+
+def test_list_drives_shape():
+    """list_drives returns the documented shape (may be empty off-Windows)."""
+    from app.disk_scan import list_drives
+
+    drives = list_drives()
+    for d in drives:
+        assert set(d) == {"letter", "path", "total", "free"}
+        assert len(d["letter"]) == 1
+        assert d["total"] > 0
+        assert d["free"] >= 0

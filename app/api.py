@@ -33,6 +33,7 @@ class BaseApi:
 
     def __init__(self):
         self.controller = AppController()
+        self._disk_cancel = None  # set per scan by scan_disk(); read by cancel_scan()
         self.watch_manager = WatchManager(
             get_categories=lambda: self.controller.categories,
             on_event=self._push,
@@ -192,21 +193,39 @@ class BaseApi:
 
     # ── Disk space analysis ─────────────────────────────────────
 
+    def list_drives(self) -> list:
+        """Enumerate local drives (letter, root path, total/free bytes)."""
+        return self.controller.list_drives()
+
     def scan_disk(self, path: str) -> bool:
-        """Kick off a disk-space scan on a background thread. Returns
-        immediately; live counters and the final report arrive via
-        _push() (space_progress / space_done)."""
+        """Kick off a disk-space scan (folder or whole drive) on a
+        background thread. Returns immediately; live counters and the
+        final report arrive via _push() (space_progress / space_done).
+        The scan can be aborted mid-walk with cancel_scan()."""
+        self._disk_cancel = threading.Event()
         threading.Thread(
             target=self._run_disk_scan, args=(path,), daemon=True
         ).start()
         return True
+
+    def cancel_scan(self) -> bool:
+        """Ask the currently running disk-space scan to stop at the next
+        file boundary; its partial results arrive via space_done with
+        "cancelled": True. Returns False if nothing is running."""
+        ev = getattr(self, "_disk_cancel", None)
+        if ev is not None and not ev.is_set():
+            ev.set()
+            return True
+        return False
 
     def _run_disk_scan(self, path: str) -> None:
         def on_event(kind, payload):
             self._push(kind, payload)
 
         try:
-            result = self.controller.scan_space(path, on_event=on_event)
+            result = self.controller.scan_space(
+                path, on_event=on_event, cancel_event=self._disk_cancel
+            )
             self._push("space_done", result)
         except Exception as e:
             self._push("error", str(e))
