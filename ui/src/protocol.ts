@@ -216,7 +216,29 @@ export type CleanLocationId =
   | 'chrome_cache'
   | 'edge_cache'
   | 'firefox_cache'
-  | 'thumbnails';
+  | 'thumbnails'
+  | 'win_temp';
+
+/** System-scope clean locations — rendered apart from user-scope ones. */
+export const SYSTEM_CLEAN_IDS: ReadonlySet<CleanLocationId> = new Set([
+  'win_temp',
+]);
+
+/** Recycle Bin query result (Windows shell32). */
+export interface BinStatus {
+  available: boolean;
+  files: number;
+  bytes: number;
+  error?: string;
+}
+
+/** Result of emptying the Recycle Bin (pre-empty totals). */
+export interface BinEmptyResult {
+  ok: boolean;
+  files: number;
+  bytes: number;
+  error?: string | null;
+}
 
 export interface CleanLocation {
   id: CleanLocationId;

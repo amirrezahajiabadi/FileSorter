@@ -1,6 +1,8 @@
 import type { UIState } from '../store';
 import {
   closeCleanPanel,
+  emptyRecycleBin,
+  refreshRecycleBin,
   runCleanDelete,
   runCleanScan,
   setCleanAll,
@@ -8,7 +10,10 @@ import {
 } from '../store';
 import { fmt, inline, t } from '../i18n';
 import { formatSize } from '../utils';
-import type { CleanLocationId } from '../protocol';
+import {
+  SYSTEM_CLEAN_IDS,
+  type CleanLocationId,
+} from '../protocol';
 
 const LOC_ICONS: Record<CleanLocationId, string> = {
   user_temp: '🗑',
@@ -17,6 +22,7 @@ const LOC_ICONS: Record<CleanLocationId, string> = {
   edge_cache: '🧭',
   firefox_cache: '🦊',
   thumbnails: '🖼',
+  win_temp: '🪟',
 };
 
 const LOC_KEY: Record<CleanLocationId, string> = {
@@ -26,19 +32,34 @@ const LOC_KEY: Record<CleanLocationId, string> = {
   edge_cache: 'clean_loc_edge_cache',
   firefox_cache: 'clean_loc_firefox_cache',
   thumbnails: 'clean_loc_thumbnails',
+  win_temp: 'clean_loc_win_temp',
 };
 
 export default function CleanupPanel({ store }: { store: UIState }) {
   const S = store.strings;
   if (!store.cleanOpen) return null;
 
-  const { cleanScanning, cleanReport, cleanSel, cleanArmed, cleanDeleting } =
-    store;
+  const {
+    cleanScanning,
+    cleanReport,
+    cleanSel,
+    cleanArmed,
+    cleanDeleting,
+    binStatus,
+    binLoading,
+    binArmed,
+    binEmptying,
+  } = store;
   const selBytes = (cleanReport?.locations ?? [])
     .filter((l) => cleanSel.has(l.id))
     .reduce((n, l) => n + l.bytes, 0);
   const allLive = cleanReport?.locations ?? [];
   const allSelected = allLive.length > 0 && cleanSel.size === allLive.length;
+  const userRows = allLive.filter((l) => !SYSTEM_CLEAN_IDS.has(l.id));
+  const systemRows = allLive.filter((l) => SYSTEM_CLEAN_IDS.has(l.id));
+
+  const binReady = binStatus?.available === true;
+  const binHasItems = (binStatus?.files ?? 0) > 0;
 
   return (
     <div
@@ -123,7 +144,7 @@ export default function CleanupPanel({ store }: { store: UIState }) {
                 </div>
 
                 <div className="clean-list">
-                  {allLive.map((loc) => {
+                  {userRows.map((loc) => {
                     const checked = cleanSel.has(loc.id);
                     const sub = fmt(t(S, 'clean_row_hint'), {
                       files: loc.files,
@@ -154,6 +175,44 @@ export default function CleanupPanel({ store }: { store: UIState }) {
                       </label>
                     );
                   })}
+                  {systemRows.length > 0 && (
+                    <>
+                      <div className="clean-group-head">
+                        {inline(t(S, 'clean_system_group'))}
+                      </div>
+                      {systemRows.map((loc) => {
+                        const checked = cleanSel.has(loc.id);
+                        const sub = fmt(t(S, 'clean_row_hint'), {
+                          files: loc.files,
+                          bytes: formatSize(loc.bytes),
+                        });
+                        return (
+                          <label
+                            key={loc.id}
+                            className={`clean-row${checked ? ' is-checked' : ''}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleCleanLoc(loc.id)}
+                            />
+                            <span className="clean-row-icon" aria-hidden="true">
+                              {LOC_ICONS[loc.id] ?? '🗑'}
+                            </span>
+                            <span className="clean-row-main">
+                              <span className="clean-row-name">
+                                {inline(t(S, LOC_KEY[loc.id] ?? 'clean_loc_win_temp'))}
+                              </span>
+                              <span className="clean-row-note">
+                                {inline(t(S, 'clean_loc_win_temp_note'))}
+                              </span>
+                            </span>
+                            <span className="clean-row-meta">{inline(sub)}</span>
+                          </label>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
 
                 <div className="modal-foot dup-foot">
@@ -184,6 +243,56 @@ export default function CleanupPanel({ store }: { store: UIState }) {
             )}
           </div>
         )}
+
+        <div className="bin-block">
+          <div className="bin-head">
+            <span className="bin-icon" aria-hidden="true">
+              🗑️
+            </span>
+            <span className="bin-main">
+              <span className="bin-name">{inline(t(S, 'clean_bin_title'))}</span>
+              <span className="bin-desc">{inline(t(S, 'clean_bin_desc'))}</span>
+            </span>
+            <span className="bin-meta">
+              {binLoading
+                ? inline(t(S, 'clean_bin_loading'))
+                : !binReady
+                  ? inline(t(S, 'clean_bin_unavailable'))
+                  : binHasItems
+                    ? inline(
+                        fmt(t(S, 'clean_bin_hint'), {
+                          files: binStatus?.files ?? 0,
+                          bytes: formatSize(binStatus?.bytes ?? 0),
+                        }),
+                      )
+                    : inline(t(S, 'clean_bin_none'))}
+            </span>
+            <button
+              type="button"
+              className={`btn btn-sm${binArmed ? ' btn-danger' : ' btn-secondary'}`}
+              disabled={
+                binLoading || binEmptying || !binReady || !binHasItems
+              }
+              onClick={() => void emptyRecycleBin()}
+            >
+              {binEmptying
+                ? inline(t(S, 'clean_bin_emptying'))
+                : binArmed
+                  ? inline(t(S, 'clean_bin_arm'))
+                  : inline(t(S, 'clean_bin_empty'))}
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => void refreshRecycleBin()}
+              disabled={binLoading || binEmptying}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              ⟳
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

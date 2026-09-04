@@ -15,6 +15,8 @@ import { emit } from './events';
 import type {
   AnalysisReport,
   AppState,
+  BinEmptyResult,
+  BinStatus,
   CleanDeleteResult,
   DriveInfo,
   DupDeleteResult,
@@ -91,6 +93,8 @@ export function createHttpBridge(): BridgeApi {
     cancel_scan: () => call<boolean>('cancel_scan'),
     scan_cleanup: () => call<boolean>('scan_cleanup'),
     delete_cleanup: (ids) => call<CleanDeleteResult>('delete_cleanup', ids),
+    recycle_bin_status: () => call<BinStatus>('recycle_bin_status'),
+    empty_recycle_bin: () => call<BinEmptyResult>('empty_recycle_bin'),
     add_watch_folder: (path) => call<boolean>('add_watch_folder', path),
     remove_watch_folder: (path) => call<boolean>('remove_watch_folder', path),
     start_watch: () => call<boolean>('start_watch'),

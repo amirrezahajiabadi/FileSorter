@@ -123,7 +123,7 @@ def test_events_requires_token(service):
 def test_get_state(service):
     resp = rpc(service, "get_state")
     state = resp["result"]
-    assert state["version"] == "6.0.0"
+    assert state["version"] == "6.1.0"
     assert "categories" in state and "smartRules" in state
     assert state["language"] in ("fa", "en")
 
@@ -308,3 +308,18 @@ def test_run_task_now_streams_sched_done(service, tmp_path):
     # history endpoint records the run
     hist = rpc(service, "get_task_history")["result"]
     assert hist and hist[0]["task_id"] == task["id"]
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Recycle Bin over the wire (read-only — never empty it in tests!)
+# ══════════════════════════════════════════════════════════════════
+
+def test_rpc_recycle_bin_status_read_only(service):
+    """recycle_bin_status is a safe query and must round-trip over HTTP
+    without touching the bin's contents. (empty_recycle_bin is covered
+    at the unit level only — it would destroy real user data.)"""
+    payload = rpc(service, "recycle_bin_status")
+    res = payload["result"]
+    assert "available" in res
+    assert res["available"] is True
+    assert res["files"] >= 0 and res["bytes"] >= 0

@@ -22,6 +22,8 @@ import type {
   CleanDone,
   DuplicateMode,
   DupDeleteResult,
+  BinEmptyResult,
+  BinStatus,
   DupDone,
   DupFile,
   DriveInfo,
@@ -68,6 +70,8 @@ export interface BridgeApi {
   cancel_scan(): Promise<boolean>;
   scan_cleanup(): Promise<boolean>;
   delete_cleanup(paths: string[]): Promise<CleanDeleteResult>;
+  recycle_bin_status(): Promise<BinStatus>;
+  empty_recycle_bin(): Promise<BinEmptyResult>;
   add_watch_folder(path: string): Promise<boolean>;
   remove_watch_folder(path: string): Promise<boolean>;
   start_watch(): Promise<boolean>;
@@ -138,7 +142,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '6.0.0',
+  version: '6.1.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],
@@ -534,6 +538,16 @@ function createMockBridge(): BridgeApi {
       }
       return { deleted, failed, freed_bytes: freedBytes };
     },
+    async recycle_bin_status(): Promise<BinStatus> {
+      await sleep(250);
+      return { ...binState };
+    },
+    async empty_recycle_bin(): Promise<BinEmptyResult> {
+      await sleep(500);
+      const prev = { ...binState };
+      binState = { available: true, files: 0, bytes: 0 };
+      return { ok: true, files: prev.files, bytes: prev.bytes, error: null };
+    },
     async undo_sort(): Promise<boolean> {
       const items: SortItemEvent[] = [
         { status: 'removed', name: 'menu.pdf' },
@@ -737,6 +751,7 @@ const CLEAN_LOC_IDS = [
   'edge_cache',
   'firefox_cache',
   'thumbnails',
+  'win_temp',
 ] as const;
 
 function makeSampleJunk(): Record<string, CleanMockFile[]> {
@@ -769,8 +784,15 @@ function makeSampleJunk(): Record<string, CleanMockFile[]> {
       { name: 'thumbcache_256.db', bytes: 6 * MB },
       { name: 'thumbcache_1024.db', bytes: 38 * MB },
     ],
+    win_temp: [
+      { name: '~DF5C2B.TMP', bytes: 3 * MB },
+      { name: 'msix-xyz.log', bytes: 1 * MB },
+    ],
   };
 }
+
+// Recycle Bin mock state — one shared object the empty action resets.
+let binState: BinStatus = { available: true, files: 7, bytes: 212 * 1024 * 1024 };
 
 let junkState: Record<string, CleanMockFile[]> = makeSampleJunk();
 

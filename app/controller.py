@@ -23,7 +23,12 @@ from app.constants import DEFAULT_CATEGORIES
 from app.settings_manager import load_settings, save_settings, add_recent_folder
 from app.duplicates import delete_files, scan_duplicates
 from app.disk_scan import list_drives, scan_space
-from app.cleanup import delete_junk, scan_junk
+from app.cleanup import (
+    delete_junk,
+    empty_recycle_bin as _empty_recycle_bin,
+    recycle_bin_status as _recycle_bin_status,
+    scan_junk,
+)
 from app.sorter import analyze_folder, plan_sort
 
 
@@ -253,6 +258,18 @@ class AppController:
             whitelist.update(loc_paths)
             paths.extend(str(p) for p in loc_paths)
         return delete_junk(paths, whitelist)
+
+    def recycle_bin_status(self) -> dict:
+        """Query the Recycle Bin (all drives): total files and bytes.
+        Read-only; {"available": False} off-Windows.
+        """
+        return _recycle_bin_status()
+
+    def empty_recycle_bin(self) -> dict:
+        """Empty the Recycle Bin permanently (all drives). The UI must
+        arm a confirmation first; this is intentionally not reversible.
+        """
+        return _empty_recycle_bin()
 
     def scan_duplicates(self, path: str, on_event=None, cancel_event=None) -> dict:
         """Find duplicate files under `path` (identical content), reporting

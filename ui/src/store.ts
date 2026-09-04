@@ -14,6 +14,8 @@ import type {
   AnalysisReport,
   AppState,
   CategoryMeta,
+  BinEmptyResult,
+  BinStatus,
   CleanDone,
   CleanLocationId,
   DriveInfo,
@@ -163,6 +165,10 @@ export interface UIState {
   cleanSel: Set<CleanLocationId>;
   cleanArmed: boolean;
   cleanDeleting: boolean;
+  binStatus: BinStatus | null;
+  binLoading: boolean;
+  binArmed: boolean;
+  binEmptying: boolean;
   tasks: TaskDef[];
   tasksHistory: TaskHistoryEntry[];
   tasksOpen: boolean;
@@ -222,6 +228,10 @@ const initial: UIState = {
   cleanSel: new Set<CleanLocationId>(),
   cleanArmed: false,
   cleanDeleting: false,
+  binStatus: null,
+  binLoading: false,
+  binArmed: false,
+  binEmptying: false,
   notice: null,
   tasks: [],
   tasksHistory: [],
@@ -1219,7 +1229,8 @@ export async function diskScanFolder(): Promise<void> {
 // ── Temp / cache cleanup ──────────────────────────────────────
 
 export function openCleanPanel(): void {
-  set({ cleanOpen: true });
+  set({ cleanOpen: true, binArmed: false });
+  void refreshRecycleBin();
 }
 
 export function closeCleanPanel(): void {
@@ -1230,7 +1241,52 @@ export function closeCleanPanel(): void {
     cleanSel: new Set(),
     cleanArmed: false,
     cleanDeleting: false,
+    binStatus: null,
+    binLoading: false,
+    binArmed: false,
+    binEmptying: false,
   });
+}
+
+export async function refreshRecycleBin(): Promise<void> {
+  set({ binLoading: true });
+  try {
+    const status = await bridge.recycle_bin_status();
+    set({ binStatus: status, binLoading: false, binArmed: false });
+  } catch (err) {
+    set({ binLoading: false });
+    showNotice('error', String(err));
+  }
+}
+
+export async function emptyRecycleBin(): Promise<void> {
+  if (state.binEmptying) return;
+  const s = state.binStatus;
+  if (!s?.available || s.files === 0) return;
+  if (!state.binArmed) {
+    set({ binArmed: true });
+    return;
+  }
+  set({ binEmptying: true, binArmed: false });
+  try {
+    const res: BinEmptyResult = await bridge.empty_recycle_bin();
+    set({ binEmptying: false });
+    if (res.ok) {
+      const msg = inline(
+        fmt(t(state.strings, 'clean_bin_done_toast'), {
+          size: formatSize(res.bytes),
+        }),
+      );
+      pushLog('success', msg);
+      showNotice('success', msg);
+      set({ binStatus: { available: true, files: 0, bytes: 0 } });
+    } else {
+      showNotice('error', inline(t(state.strings, 'clean_failed_toast')));
+    }
+  } catch (err) {
+    set({ binEmptying: false });
+    showNotice('error', String(err));
+  }
 }
 
 export async function runCleanScan(): Promise<void> {

@@ -369,6 +369,18 @@ class BaseApi:
                 "freed_bytes": 0,
             }
 
+    def recycle_bin_status(self) -> dict:
+        """Query the Recycle Bin (all drives): files and total bytes.
+        Read-only; {"available": False} off-Windows."""
+        return self.controller.recycle_bin_status()
+
+    def empty_recycle_bin(self) -> dict:
+        """Empty the Recycle Bin permanently. Callers arm a two-step
+        confirmation first; the backend performs no extra check because
+        the RPC is only reachable from the local UI.
+        """
+        return self.controller.empty_recycle_bin()
+
     # ── Watch mode ─────────────────────────────────────────────
 
     def add_watch_folder(self, path: str) -> bool:
