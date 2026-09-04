@@ -35,6 +35,31 @@ def service(tmp_path, monkeypatch):
     svc.shutdown()
 
 
+def _open(req, timeout=5):
+    """urlopen with a bounded retry on transient connection aborts.
+
+    Windows occasionally resets a fresh loopback connection when many
+    ephemeral services start and stop in quick succession across the
+    full suite (WinError 10053 / 10054). One or two retries keep the
+    HTTP-layer tests deterministic. HTTP error responses (401/400/404)
+    are real responses — they raise HTTPError and are never retried.
+    """
+    last = None
+    for attempt in range(3):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            last = e
+            time.sleep(0.05 * (attempt + 1))
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, (ConnectionAbortedError, ConnectionResetError)):
+                last = e
+                time.sleep(0.05 * (attempt + 1))
+            else:
+                raise
+    raise last
+
+
 def rpc(service, method, params=None, token="test-token"):
     """POST a JSON-RPC call; returns the parsed response dict, raising
     AssertionError with the body on non-200."""
@@ -45,7 +70,7 @@ def rpc(service, method, params=None, token="test-token"):
         headers={"X-Api-Token": token, "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with _open(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         payload = e.read().decode("utf-8", "replace")
@@ -93,7 +118,7 @@ def read_sse_until(service, action, predicate, timeout=15):
 def test_api_requires_token(service):
     req = urllib.request.Request(service.url() + "api", data=b"{}")
     with pytest.raises(urllib.error.HTTPError) as exc:
-        urllib.request.urlopen(req, timeout=5)
+        _open(req)
     assert exc.value.code == 401
 
 
@@ -104,7 +129,7 @@ def test_api_rejects_wrong_token(service):
         headers={"X-Api-Token": "wrong-token"},
     )
     with pytest.raises(urllib.error.HTTPError) as exc:
-        urllib.request.urlopen(req, timeout=5)
+        _open(req)
     assert exc.value.code == 401
 
 
@@ -141,7 +166,7 @@ def _expect_http(service, code, method, params=None):
         headers={"X-Api-Token": "test-token"},
     )
     with pytest.raises(urllib.error.HTTPError) as exc:
-        urllib.request.urlopen(req, timeout=5)
+        _open(req)
     assert exc.value.code == code
 
 
@@ -206,14 +231,14 @@ def test_sort_streams_events_over_sse(service, tmp_path):
 # ══════════════════════════════════════════════════════════════════
 
 def test_index_served_with_token_injected(service):
-    with urllib.request.urlopen(service.url(), timeout=5) as resp:
+    with _open(service.url()) as resp:
         html = resp.read().decode("utf-8")
     assert '<meta name="api-token" content="test-token">' in html
 
 
 def test_unknown_path_returns_404(service):
     with pytest.raises(urllib.error.HTTPError) as exc:
-        urllib.request.urlopen(service.url() + "nope", timeout=5)
+        _open(service.url() + "nope")
     assert exc.value.code == 404
 
 # ══════════════════════════════════════════════════════════════════
