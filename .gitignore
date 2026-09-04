@@ -30,3 +30,6 @@ desktop.ini
 # IDE
 .vscode/
 .idea/
+
+# Agent scratch dir (dev server logs)
+.freebuff/
