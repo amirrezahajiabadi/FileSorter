@@ -33,7 +33,7 @@ class BaseApi:
 
     def __init__(self):
         self.controller = AppController()
-        self._disk_cancel = None  # set per scan by scan_disk(); read by cancel_scan()
+        self._scan_cancel = None  # set per scan by find_duplicates()/scan_disk(); read by cancel_scan()
         self.watch_manager = WatchManager(
             get_categories=lambda: self.controller.categories,
             on_event=self._push,
@@ -162,9 +162,11 @@ class BaseApi:
     # ── Duplicate finder ───────────────────────────────────────
 
     def find_duplicates(self, path: str) -> bool:
-        """Kick off a duplicate scan on a background thread. Returns
-        immediately; progress and the final groups arrive via _push()
-        (dup_progress / dup_done)."""
+        """Kick off a duplicate scan (folder or whole drive) on a
+        background thread. Returns immediately; progress and the final
+        groups arrive via _push() (dup_progress / dup_done). The scan
+        can be aborted mid-walk with cancel_scan()."""
+        self._scan_cancel = threading.Event()
         threading.Thread(
             target=self._run_dup_scan, args=(path,), daemon=True
         ).start()
@@ -175,7 +177,9 @@ class BaseApi:
             self._push(kind, payload)
 
         try:
-            result = self.controller.scan_duplicates(path, on_event=on_event)
+            result = self.controller.scan_duplicates(
+                path, on_event=on_event, cancel_event=self._scan_cancel
+            )
             self._push("dup_done", result)
         except Exception as e:
             self._push("error", str(e))
@@ -202,17 +206,18 @@ class BaseApi:
         background thread. Returns immediately; live counters and the
         final report arrive via _push() (space_progress / space_done).
         The scan can be aborted mid-walk with cancel_scan()."""
-        self._disk_cancel = threading.Event()
+        self._scan_cancel = threading.Event()
         threading.Thread(
             target=self._run_disk_scan, args=(path,), daemon=True
         ).start()
         return True
 
     def cancel_scan(self) -> bool:
-        """Ask the currently running disk-space scan to stop at the next
-        file boundary; its partial results arrive via space_done with
-        "cancelled": True. Returns False if nothing is running."""
-        ev = getattr(self, "_disk_cancel", None)
+        """Ask the currently running disk/duplicate scan to stop at the
+        next file boundary; its partial results arrive via space_done /
+        dup_done with "cancelled": True. Returns False if nothing is
+        running."""
+        ev = getattr(self, "_scan_cancel", None)
         if ev is not None and not ev.is_set():
             ev.set()
             return True
@@ -224,7 +229,7 @@ class BaseApi:
 
         try:
             result = self.controller.scan_space(
-                path, on_event=on_event, cancel_event=self._disk_cancel
+                path, on_event=on_event, cancel_event=self._scan_cancel
             )
             self._push("space_done", result)
         except Exception as e:

@@ -5,6 +5,7 @@ files that share a size but differ in content must NOT be grouped, and
 identical content must be found across different subfolders/names.
 """
 
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -145,3 +146,64 @@ def test_controller_scan_then_delete(controller, tmp_path):
     out2 = controller.delete_duplicates([str(other)])
     assert out2["deleted"] == []
     assert other.exists()
+
+
+# ══════════════════════════════════════════════════════════════════
+#  v5.8.0 — drive-wide duplicate scans: cancel support
+# ══════════════════════════════════════════════════════════════════
+
+def _dup_tree(root, pairs=3, copies=3):
+    """pairs groups × copies files each, identical content per group."""
+    root = Path(root)
+    for g in range(pairs):
+        content = f"group-{g} content".encode() * 1000
+        for c in range(copies):
+            f = root / f"g{g}_copy{c}.dat"
+            f.write_bytes(content)
+    return root
+
+
+def test_dup_cancel_before_scan_returns_empty():
+    import threading
+
+    from app.duplicates import scan_duplicates
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = _dup_tree(tmp)
+        cancel = threading.Event()
+        cancel.set()
+        res = scan_duplicates(root, cancel_event=cancel)
+        assert res["cancelled"] is True
+        assert res["groups"] == []
+
+
+def test_dup_cancel_mid_hash_returns_partial():
+    import threading
+
+    from app.duplicates import scan_duplicates
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = _dup_tree(tmp, pairs=30, copies=2)  # 60 files to hash
+        cancel = threading.Event()
+
+        def cancel_soon():
+            import time
+            time.sleep(0.01)
+            cancel.set()
+
+        t = threading.Thread(target=cancel_soon, daemon=True)
+        t.start()
+        res = scan_duplicates(root, cancel_event=cancel)
+        assert res["cancelled"] is True
+        # some groups may already be complete; the result stays valid
+        assert isinstance(res["groups"], list)
+
+
+def test_dup_scan_without_cancel_never_cancels():
+    from app.duplicates import scan_duplicates
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = _dup_tree(tmp)
+        res = scan_duplicates(root)
+        assert res["cancelled"] is False
+        assert len(res["groups"]) == 3

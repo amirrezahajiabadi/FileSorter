@@ -43,34 +43,52 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None) -> dict:
+def _skip_walk_error(_exc: OSError) -> None:
+    """os.walk onerror hook: ignore unreadable directories instead of
+    aborting the whole scan (common on drive roots: system folders,
+    permissions)."""
+
+
+def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
+                    cancel_event=None) -> dict:
     """Find groups of files with identical content under `root`.
 
     Args:
-        root: Folder to scan recursively.
+        root: Folder (or drive root) to scan recursively.
         on_event: Optional callback for ("dup_progress", {...}) events:
             {"phase": "listing" | "hashing",
              "processed": int, "total": int}
+        cancel_event: Optional threading.Event — when set, scanning stops
+            at the next file boundary and returns what was found so far
+            with "cancelled": True (drive-wide scans can take minutes).
 
     Returns:
         {"groups": [{"id": short_hash, "size": int,
                      "files": [{"path": str, "size": int}, ...]}],
          "wasted_bytes": int,   # bytes reclaimable by deleting all
                                 # but one copy of every group
-         "files_scanned": int}
+         "files_scanned": int,
+         "cancelled": bool}
         groups only contain 2+ files.
     """
     def emit(phase: str, processed: int, total: int) -> None:
         if on_event:
             on_event("dup_progress", {"phase": phase, "processed": processed, "total": total})
 
+    def cancelled() -> bool:
+        return cancel_event is not None and cancel_event.is_set()
+
     root = Path(root)
 
     # ── Phase 1: list files, bucket by size ─────────────────────
     by_size: Dict[int, List[Tuple[Path, int]]] = {}
     scanned = 0
-    for dirpath, _dirnames, filenames in os.walk(root):
+    listing_cancelled = False
+    for dirpath, _dirnames, filenames in os.walk(root, onerror=_skip_walk_error):
         for name in filenames:
+            if cancelled():
+                listing_cancelled = True
+                break
             path = Path(dirpath) / name
             try:
                 size = path.stat().st_size
@@ -79,6 +97,8 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None) -> dic
             scanned += 1
             if size > 0:  # zero-byte files are noise, never "duplicates"
                 by_size.setdefault(size, []).append((path, size))
+        if listing_cancelled:
+            break
 
     candidates: List[Tuple[Path, int]] = []
     for entries in by_size.values():
@@ -86,12 +106,16 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None) -> dic
             candidates.extend(entries)
 
     emit("listing", 0, len(candidates))
+    if listing_cancelled:
+        return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned, "cancelled": True}
     if not candidates:
-        return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned}
+        return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned, "cancelled": False}
 
     # ── Phase 2: head-hash each candidate, re-bucket ────────────
     head_buckets: Dict[Tuple[int, str], List[Tuple[Path, int]]] = {}
     for path, size in candidates:
+        if cancelled():
+            return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned, "cancelled": True}
         try:
             with open(path, "rb") as f:
                 head = f.read(CHUNK)
@@ -106,12 +130,16 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None) -> dic
 
     emit("hashing", 0, len(to_hash))
     if not to_hash:
-        return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned}
+        return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned, "cancelled": False}
 
     # ── Phase 3: full hash only the near-misses ─────────────────
     full_buckets: Dict[str, List[Tuple[Path, int]]] = {}
     processed = 0
+    hashing_cancelled = False
     for path, size in to_hash:
+        if cancelled():
+            hashing_cancelled = True
+            break
         try:
             digest = _sha256(path)
         except OSError:
@@ -134,7 +162,12 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None) -> dic
         })
     groups.sort(key=lambda g: g["size"], reverse=True)
 
-    return {"groups": groups, "wasted_bytes": wasted, "files_scanned": scanned}
+    return {
+        "groups": groups,
+        "wasted_bytes": wasted,
+        "files_scanned": scanned,
+        "cancelled": hashing_cancelled,
+    }
 
 
 # ── Deletion (whitelisted) ───────────────────────────────────────

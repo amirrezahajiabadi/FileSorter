@@ -180,7 +180,7 @@ class AppController:
             paths.extend(str(p) for p in loc_paths)
         return delete_junk(paths, whitelist)
 
-    def scan_duplicates(self, path: str, on_event=None) -> dict:
+    def scan_duplicates(self, path: str, on_event=None, cancel_event=None) -> dict:
         """Find duplicate files under `path` (identical content), reporting
         progress through on_event(kind, payload):
 
@@ -191,7 +191,7 @@ class AppController:
         the flagged file paths as the deletion whitelist for
         delete_duplicates().
         """
-        result = scan_duplicates(Path(path), on_event=on_event)
+        result = scan_duplicates(Path(path), on_event=on_event, cancel_event=cancel_event)
         self.last_dup_paths = {
             Path(f["path"])
             for group in result["groups"]

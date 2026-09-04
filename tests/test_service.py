@@ -123,7 +123,7 @@ def test_events_requires_token(service):
 def test_get_state(service):
     resp = rpc(service, "get_state")
     state = resp["result"]
-    assert state["version"] == "5.7.0"
+    assert state["version"] == "5.8.0"
     assert "categories" in state and "smartRules" in state
     assert state["language"] in ("fa", "en")
 
@@ -255,3 +255,26 @@ def test_disk_scan_cancel_streams_partial_done(service, tmp_path):
     done = events[-1]["payload"]
     assert done["cancelled"] is True
     assert done["files_scanned"] < 2000  # partial, not the full walk
+
+
+def test_dup_scan_cancel_streams_partial_done(service, tmp_path):
+    """A cancelled duplicate scan streams dup_progress then a dup_done
+    marked cancelled (drive-wide scans stop at the next file boundary)."""
+    folder = tmp_path / "dups"
+    folder.mkdir()
+    content = b"dup-content" * 200
+    for i in range(40):
+        (folder / f"copy{i:02d}.dat").write_bytes(content)
+
+    def cancel_after_start():
+        rpc(service, "find_duplicates", [str(folder)])
+        rpc(service, "cancel_scan")
+
+    events = read_sse_until(
+        service, cancel_after_start,
+        lambda ev: ev["kind"] == "dup_done", timeout=20,
+    )
+    kinds = [ev["kind"] for ev in events]
+    assert "dup_progress" in kinds, f"expected progress ticks, got {kinds}"
+    done = events[-1]["payload"]
+    assert done["cancelled"] is True
