@@ -5,6 +5,7 @@ Pure functions only — no Tkinter here — so this module is easy to unit
 test in isolation (see tests/test_sorter.py).
 """
 
+import re
 import time
 from pathlib import Path
 
@@ -20,8 +21,57 @@ def get_category(suffix: str, categories: dict) -> str:
     return "others"
 
 
-def analyze_folder(base_dir: Path, categories: dict) -> dict:
-    """Scan folder and return an analysis report with smart suggestions."""
+def _stem_tokens(name: str) -> set:
+    """Lowercased whole-word tokens of a file's stem (no extension).
+
+    Splits on anything that is not a letter/digit, so dashes, dots,
+    spaces and underscores are all separators and Persian words work
+    the same as English ones ("faktor-1403.pdf" -> {"faktor", "1403"}).
+    """
+    stem = Path(name).stem
+    return {t for t in re.split(r"[^\w]+|_+", stem.casefold()) if t}
+
+
+def match_rule_category(name: str, categories: dict, rules: list) -> str | None:
+    """Return the category of the first smart rule whose keyword appears as a
+    whole word in the file's stem, or None if no rule matches.
+
+    Rules are checked in order (first match wins). A rule whose target
+    category no longer exists in `categories` is skipped, so deleting a
+    category silently deactivates the rules that pointed at it.
+    """
+    if not rules:
+        return None
+    tokens = _stem_tokens(name)
+    if not tokens:
+        return None
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        cat = rule.get("category")
+        if cat not in categories:
+            continue  # inactive rule — category was deleted
+        for kw in rule.get("keywords") or []:
+            if kw and str(kw).casefold() in tokens:
+                return cat
+    return None
+
+
+def category_for_file(name: str, suffix: str, categories: dict, rules: list) -> str:
+    """Category a file belongs to: first matching smart rule (by filename),
+    then the extension-based fallback."""
+    rule_cat = match_rule_category(name, categories, rules)
+    if rule_cat is not None:
+        return rule_cat
+    return get_category(suffix, categories)
+
+
+def analyze_folder(base_dir: Path, categories: dict, rules: list = None) -> dict:
+    """Scan folder and return an analysis report with smart suggestions.
+
+    rules: optional smart rules — a matching rule overrides the
+    extension-based category for that file (see match_rule_category).
+    """
     now = time.time()
     result = {
         "total": 0,
@@ -45,7 +95,7 @@ def analyze_folder(base_dir: Path, categories: dict) -> dict:
         size = file.stat().st_size
         result["total_size"] += size
 
-        category = get_category(file.suffix, categories)
+        category = category_for_file(file.name, file.suffix, categories, rules)
         result["by_category"][category] = result["by_category"].get(category, 0) + 1
 
         if size > LARGE_FILE_THRESHOLD:
@@ -133,7 +183,7 @@ def resolve_duplicate(dest: Path, mode: str, reserved: set) -> tuple:
     return "rename", candidate
 
 
-def plan_sort(base_dir: Path, categories: dict, duplicate_mode: str = "skip") -> list:
+def plan_sort(base_dir: Path, categories: dict, duplicate_mode: str = "skip", rules: list = None) -> list:
     """Compute what a real sort would do, without touching the filesystem.
 
     Args:
@@ -157,7 +207,7 @@ def plan_sort(base_dir: Path, categories: dict, duplicate_mode: str = "skip") ->
         if not file.is_file():
             continue
 
-        category = get_category(file.suffix, categories)
+        category = category_for_file(file.name, file.suffix, categories, rules)
         dest = target_dir / category / file.name
         action, final_dest = resolve_duplicate(dest, duplicate_mode, reserved)
 

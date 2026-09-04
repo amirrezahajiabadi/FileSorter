@@ -38,6 +38,7 @@ class AppController:
         self.theme_name = self.settings.get("theme", "light")
         self.recent_folders = self.settings.get("recent_folders", [])
         self.watch_folders = self.settings.get("watched_folders", [])
+        self.smart_rules = self.settings.get("smart_rules", [])
         self.last_sort_log = []  # for undo: list of {"action", "source", "final_dest"}
         self.last_dup_paths = set()  # whitelist of paths the last duplicate scan flagged
         self.last_clean_by_loc = {}  # {location_id: [paths]} flagged by the last cleanup scan
@@ -62,6 +63,26 @@ class AppController:
         if meta is not None:
             self.category_meta = meta
             self.settings["category_meta"] = meta
+        # Drop smart rules whose target category was removed — they can no
+        # longer match anything (match_rule_category skips them anyway).
+        if self.smart_rules:
+            self.smart_rules = [
+                r for r in self.smart_rules if r.get("category") in categories
+            ]
+            self.settings["smart_rules"] = self.smart_rules
+        save_settings(self.settings)
+
+    def update_smart_rules(self, rules: list) -> None:
+        """Persist the ordered smart-rule list (keywords -> category)."""
+        self.smart_rules = [
+            {
+                "keywords": [str(k).strip() for k in r.get("keywords") or [] if str(k).strip()],
+                "category": r.get("category", ""),
+            }
+            for r in rules or []
+            if r.get("category") in self.categories
+        ]
+        self.settings["smart_rules"] = self.smart_rules
         save_settings(self.settings)
 
     def record_recent_folder(self, path: str) -> list:
@@ -93,13 +114,13 @@ class AppController:
 
     def analyze(self, path: str) -> dict:
         """Scan a folder and return the smart-analysis report."""
-        return analyze_folder(Path(path), self.categories)
+        return analyze_folder(Path(path), self.categories, rules=self.smart_rules)
 
     def plan(self, path: str, duplicate_mode: str = "skip") -> list:
         """Compute what a real sort would do, without touching the filesystem
         (used for the Dry Run preview).
         """
-        return plan_sort(Path(path), self.categories, duplicate_mode)
+        return plan_sort(Path(path), self.categories, duplicate_mode, rules=self.smart_rules)
 
     # ══════════════════════════════════════════════════════════════
     #  Sort
@@ -212,7 +233,7 @@ class AppController:
             for category in self.categories:
                 (target_dir / category).mkdir(parents=True, exist_ok=True)
 
-            plan = plan_sort(base_dir, self.categories, duplicate_mode)
+            plan = plan_sort(base_dir, self.categories, duplicate_mode, rules=self.smart_rules)
             emit("total", len(plan))
 
             copied = skipped = errors = processed = 0

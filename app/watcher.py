@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from app.sorter import get_category
+from app.sorter import category_for_file
 
 DEFAULT_INTERVAL_SECONDS = 2.0
 
@@ -71,9 +71,11 @@ class WatchManager:
         on_event: Optional[Callable[[str, object], None]] = None,
         interval: float = DEFAULT_INTERVAL_SECONDS,
         retry_delay: float = DEFAULT_RETRY_SECONDS,
+        get_rules: Optional[Callable[[], List[dict]]] = None,
     ):
         self._get_categories = get_categories
         self._on_event = on_event
+        self._get_rules = get_rules
         self._interval = interval
         self._retry_delay = retry_delay
         self._folders: List[str] = []
@@ -118,13 +120,14 @@ class WatchManager:
         """One full poll pass over every watched folder."""
         folders = self.folders
         categories = self._get_categories()
+        rules = self._get_rules() if self._get_rules else None
         for folder in folders:
             path = Path(folder)
             if not path.is_dir():
                 self._emit_error(folder, "folder no longer exists")
                 continue
             try:
-                self._process_folder(path, categories)
+                self._process_folder(path, categories, rules)
             except Exception as exc:  # never kill the poll loop
                 self._emit_error(folder, str(exc))
 
@@ -137,7 +140,7 @@ class WatchManager:
             except Exception:
                 pass  # tick already guards per-folder failures
 
-    def _process_folder(self, path: Path, categories: Dict[str, List[str]]) -> None:
+    def _process_folder(self, path: Path, categories: Dict[str, List[str]], rules: list = None) -> None:
         key = str(path)
         current = snapshot_folder(path)
         prev = self._known.get(key, {})
@@ -154,7 +157,7 @@ class WatchManager:
                 continue  # already sorted/skipped
             if name in retrying and now - retrying[name] < self._retry_delay:
                 continue  # cooling down after a failed move
-            action = self._handle_new_file(path, name, categories)
+            action = self._handle_new_file(path, name, categories, rules)
             if action == "error":
                 retrying[name] = now
             else:
@@ -166,10 +169,11 @@ class WatchManager:
             del self._retrying[key]
 
     def _handle_new_file(
-        self, path: Path, name: str, categories: Dict[str, List[str]]
+        self, path: Path, name: str, categories: Dict[str, List[str]],
+        rules: list = None,
     ) -> None:
         source = path / name
-        category = get_category(source.suffix.lower(), categories)
+        category = category_for_file(name, source.suffix.lower(), categories, rules)
         dest = path / category / name
 
         def emit_item(action: str, **extra) -> None:

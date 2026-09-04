@@ -187,3 +187,79 @@ def test_undo_emits_events_in_order(controller, tmp_path):
     assert "item" in events
     assert "progress" in events
     assert events[-1] == "done"
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Smart rules
+# ══════════════════════════════════════════════════════════════════
+
+def test_update_smart_rules_persists(controller):
+    controller.update_categories(
+        {**controller.categories, "invoices": []}, meta=None
+    )
+    controller.update_smart_rules([
+        {"keywords": ["invoice", "فاکتور"], "category": "invoices"},
+        {"keywords": ["receipt"], "category": "nope"},  # dropped: no such category
+    ])
+    assert controller.smart_rules == [
+        {"keywords": ["invoice", "فاکتور"], "category": "invoices"},
+    ]
+
+
+def test_smart_rules_survive_reload(controller, tmp_path):
+    controller.update_categories(
+        {**controller.categories, "invoices": []}, meta=None
+    )
+    controller.update_smart_rules([{"keywords": ["invoice"], "category": "invoices"}])
+    fresh = AppController()
+    assert fresh.smart_rules == [{"keywords": ["invoice"], "category": "invoices"}]
+
+
+def test_update_categories_prunes_rules_of_removed_categories(controller):
+    controller.update_categories(
+        {**controller.categories, "invoices": []}, meta=None
+    )
+    controller.update_smart_rules([{"keywords": ["invoice"], "category": "invoices"}])
+    # remove "invoices" again — the rule must vanish too
+    controller.update_categories(
+        {k: v for k, v in controller.categories.items() if k != "invoices"}, meta=None
+    )
+    assert controller.smart_rules == []
+
+
+def test_plan_applies_smart_rules(controller, tmp_path):
+    controller.update_categories(
+        {**controller.categories, "invoices": []}, meta=None
+    )
+    controller.update_smart_rules([{"keywords": ["invoice"], "category": "invoices"}])
+    (tmp_path / "invoice-2024.pdf").write_text("x")
+    (tmp_path / "letter.pdf").write_text("y")
+    plan = controller.plan(str(tmp_path))
+    by_name = {p["name"]: p["category"] for p in plan}
+    assert by_name["invoice-2024.pdf"] == "invoices"
+    assert by_name["letter.pdf"] == "documents"
+
+
+def test_analyze_applies_smart_rules(controller, tmp_path):
+    controller.update_categories(
+        {**controller.categories, "invoices": []}, meta=None
+    )
+    controller.update_smart_rules([{"keywords": ["invoice"], "category": "invoices"}])
+    (tmp_path / "invoice-2024.pdf").write_text("x")
+    report = controller.analyze(str(tmp_path))
+    assert report["by_category"]["invoices"] == 1
+
+
+def test_sort_applies_smart_rules(controller, tmp_path):
+    controller.update_categories(
+        {**controller.categories, "invoices": []}, meta=None
+    )
+    controller.update_smart_rules([{"keywords": ["invoice"], "category": "invoices"}])
+    # sort a subfolder so the settings file written into tmp_path stays out of it
+    base = tmp_path / "inbox"
+    base.mkdir()
+    (base / "invoice-2024.pdf").write_text("x")
+    result = controller.sort(str(base), move=True)
+    assert (base / "sorted" / "invoices" / "invoice-2024.pdf").exists()
+    assert result["copied"] == 1 and result["errors"] == 0
+    assert result["sort_log"][0]["category"] == "invoices"

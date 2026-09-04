@@ -71,12 +71,24 @@ class CategoryMeta(TypedDict):
     nameFa: str
 
 
+class SmartRule(TypedDict):
+    """One smart rule: filename keywords routed to a category.
+
+    Rules are ordered — the first rule whose keyword appears as a whole
+    word in the file's stem wins, before the extension fallback.
+    """
+
+    keywords: List[str]
+    category: str
+
+
 class AppState(TypedDict):
     """Payload of Api.get_state(): everything the page needs on load."""
 
     version: str
     categories: Dict[str, List[str]]
     categoryMeta: Dict[str, CategoryMeta]
+    smartRules: List[SmartRule]
     recentFolders: List[str]
     watchedFolders: List[str]
     theme: str  # "light" | "dark"

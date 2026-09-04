@@ -183,3 +183,41 @@ def test_controller_watch_list_persists(tmp_path, monkeypatch):
     # A fresh controller reads the persisted list.
     c2 = AppController()
     assert c2.watch_folders == ["D:/downloads"]
+
+
+def test_tick_applies_smart_rules(tmp_path):
+    """A file matching a smart-rule keyword goes to the rule's category,
+    beating the extension fallback."""
+    watched = tmp_path / "inbox"
+    watched.mkdir()
+    events = []
+
+    cats = {"documents": [".pdf"], "invoices": [], "others": []}
+    rules = [{"keywords": ["invoice", "فاکتور"], "category": "invoices"}]
+
+    mgr = WatchManager(
+        get_categories=lambda: cats,
+        on_event=lambda kind, payload: events.append((kind, payload)),
+        get_rules=lambda: rules,
+    )
+    mgr.update_folders([str(watched)])
+    (watched / "invoice-2024.pdf").write_text("x")
+    (watched / "letter.pdf").write_text("y")
+
+    mgr.tick()
+
+    assert (watched / "invoices" / "invoice-2024.pdf").exists()
+    assert (watched / "documents" / "letter.pdf").exists()
+    cats_by_name = {
+        p[1]["name"]: p[1]["category"]
+        for p in events if p[0] == "watch_item" and p[1]["action"] == "moved"
+    }
+    assert cats_by_name == {"invoice-2024.pdf": "invoices", "letter.pdf": "documents"}
+
+
+def test_tick_no_rules_matches_extension(manager):
+    mgr, watched, events = manager
+    (watched / "holiday-2023.mp4").write_text("x")
+    mgr.tick()
+    moved = [e for e in events if e[0] == "watch_item" and e[1]["action"] == "moved"]
+    assert moved and moved[0][1]["category"] == "videos"

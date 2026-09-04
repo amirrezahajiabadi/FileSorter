@@ -73,6 +73,7 @@ class Api:
         self.watch_manager = WatchManager(
             get_categories=lambda: self.controller.categories,
             on_event=self._push,
+            get_rules=lambda: self.controller.smart_rules,
         )
         self.watch_manager.update_folders(self.controller.watch_folders)
 
@@ -82,6 +83,7 @@ class Api:
             "version": APP_VERSION,
             "categories": self.controller.categories,
             "categoryMeta": self.controller.category_meta,
+            "smartRules": self.controller.smart_rules,
             "recentFolders": self.controller.recent_folders,
             "watchedFolders": self.controller.watch_folders,
             "theme": self.controller.theme_name,
@@ -311,6 +313,11 @@ class Api:
     def save_categories(self, categories: dict, meta: dict = None) -> bool:
         """Persist updated categories (and optional display metadata) to settings."""
         self.controller.update_categories(categories, meta)
+        return True
+
+    def save_smart_rules(self, rules: list) -> bool:
+        """Persist the ordered smart-rule list (filename keywords -> category)."""
+        self.controller.update_smart_rules(rules)
         return True
 
     def restore_defaults(self) -> dict:

@@ -300,3 +300,34 @@ def test_delete_cleanup_deletes_flagged_location(api, tmp_path, monkeypatch):
     assert len(result["deleted"]) == 1
     assert result["freed_bytes"] == 7
     assert not victim.exists()
+
+
+def test_get_state_includes_smart_rules(api):
+    state = api.get_state()
+    assert "smartRules" in state
+    assert state["smartRules"] == []
+
+
+def test_save_smart_rules_round_trip(api, tmp_path):
+    api.save_categories({**api.get_state()["categories"], "invoices": []}, {})
+    assert api.save_smart_rules([{"keywords": ["invoice"], "category": "invoices"}]) is True
+    state = api.get_state()
+    assert state["smartRules"] == [{"keywords": ["invoice"], "category": "invoices"}]
+
+
+def test_save_smart_rules_drops_unknown_category(api, tmp_path):
+    assert api.save_smart_rules([{"keywords": ["invoice"], "category": "ghost"}]) is True
+    assert api.get_state()["smartRules"] == []
+
+
+def test_plan_via_api_applies_smart_rules(api, tmp_path):
+    api.save_categories({**api.get_state()["categories"], "invoices": []}, {})
+    api.save_smart_rules([{"keywords": ["invoice"], "category": "invoices"}])
+    base = tmp_path / "inbox"
+    base.mkdir()
+    (base / "invoice-2024.pdf").write_text("x")
+    (base / "letter.pdf").write_text("y")
+    plan = api.plan_sort(str(base))
+    by_name = {p["name"]: p["category"] for p in plan}
+    assert by_name["invoice-2024.pdf"] == "invoices"
+    assert by_name["letter.pdf"] == "documents"
