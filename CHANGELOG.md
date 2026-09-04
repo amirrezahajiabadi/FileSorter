@@ -10,6 +10,43 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.1.2] — 2026
+
+### Fixed
+- **Minute-long freeze on duplicate results.** Rendering a duplicate scan
+  computed a full group re-filter *inside every file row* — O(n²) per render —
+  and mounted an unbounded `<li>` per duplicate, so a drive-wide scan with
+  thousands of identical files locked the page for minutes (reproduced live:
+  25,000 rows, tab unresponsive for minutes). The duplicates panel now hoists
+  the per-group keeper count out of the row loop, caps each group at 150
+  rendered rows with a paged "show more" control, and pages groups (60 per
+  load).
+- **Undo preview froze on huge sorts.** `UndoModal` rendered every moved file
+  name (25k+ rows after a drive sort); it now caps each category at 400 rows
+  with a "… and N more" note.
+- **Per-file events still re-rendered the whole tree.** The service coalescer
+  (v6.1.1) bounded wire traffic, but the browser handled each `item` frame
+  individually — up to three full store updates per file. `store.ts` now
+  batches item/watch events client-side and applies them in one update per
+  ~120 ms tick, so a burst of N files costs one render instead of ~3N
+  (25,000-file sort: 239 ms worst stall before → sub-100 ms after).
+- **No way to pick a folder without a native dialog.** The headless service
+  `browse_folder()` returns `null` and the old UI silently did nothing;
+  clicking browse now falls back to an inline typed-path field, so any
+  transport can select any folder (not just the recent list).
+- **Error events left panels on eternal spinners.** A failed disk/cleanup job
+  only reset the sort state; `error` now clears every operation flag
+  (duplicates, disk scan, cleanup, empty-bin).
+
+### Verification
+- 251 Python tests pass (1 skip); `tsc` strict and `vite build` clean.
+- Live on the real service: 25,000-file analysis, sort and duplicate scan all
+  stream with no main-thread stall over 110 ms; opening a 25,000-row
+  duplicate result renders instantly (1,400 DOM nodes vs ~200,000 before),
+  paging adds 150 rows per ~125 ms click, and per-row toggles land in ~70 ms.
+
+---
+
 ## [6.1.1] — 2026
 
 ### Fixed

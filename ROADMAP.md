@@ -158,10 +158,13 @@ a different category of tool wearing the same UI.
   sometimes" into "something that's just always running and useful."
 
 > ✅ **Done** — shipped in v5.9.0 (scheduled scans) and v6.0.0 (tray + autostart).
-> The remaining known item is **UI responsiveness under heavy scans**,
-> fixed in v6.1.1: per-file events are now coalesced and the log list is
-> bounded, so a 20k-file sort no longer freezes the page (measured live:
-> 40 s main-thread stalls → 90 ms max).
+> **UI responsiveness under heavy scans** was the remaining known item:
+> v6.1.1 coalesced per-file events and bounded the log list (20k-file sort:
+> 40 s main-thread stalls → 90 ms max), and v6.1.2 removed the remaining
+> freeze — duplicate results no longer render O(n²)/unbounded rows
+> (25k-row group: minutes of lock-up → instant, paged), undo previews are
+> bounded, item events are batched client-side, and folder selection works
+> without a native dialog.
 - **Sort history in SQLite** instead of a plain text log — a natural bridge to
   the SQL stage of the personal learning roadmap, and it enables a real
   "view past sorts" feature.
