@@ -142,7 +142,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '6.1.0',
+  version: '6.1.1',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],

@@ -260,9 +260,15 @@ function getSnapshot(): UIState {
 
 // ── Localized helpers bound to the current state ────────────────
 
+// Sorting a big folder emits one log row per file; rendering them all
+// unbounded grows the DOM to tens of thousands of nodes and re-renders
+// them on every event, which freezes the page. Keep a bounded ring so
+// the tail of the log stays live and the DOM stays cheap.
+const MAX_LOG_LINES = 250;
+
 function pushLog(kind: LogKind, text: string): void {
   logId += 1;
-  set({ logs: [...state.logs, { id: logId, kind, text }] });
+  set({ logs: [...state.logs.slice(-(MAX_LOG_LINES - 1)), { id: logId, kind, text }] });
 }
 
 function showNotice(kind: Notice['kind'], text: string): void {
