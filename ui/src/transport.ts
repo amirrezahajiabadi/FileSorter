@@ -126,7 +126,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.7.0',
+  version: '5.8.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],
@@ -355,25 +355,39 @@ function createMockBridge(): BridgeApi {
     async find_duplicates(): Promise<boolean> {
       // Simulate a live scan over the current sample duplicates: list,
       // then hash each candidate with progress ticks, then report.
+      // cancel_scan() flips the flag; the loop stops and reports a
+      // dup_done marked cancelled, like the real backend.
       const { groups } = dupSummary(dupState);
       const fileCount = groups.reduce((n, g) => n + g.files.length, 0);
+      mockScanRunning = true;
+      mockScanCancel = false;
       await sleep(120);
+      if (mockScanCancel) {
+        mockScanRunning = false;
+        emit('dup_done', { groups: [], wasted_bytes: 0, files_scanned: 0, cancelled: true });
+        return true;
+      }
       emit('dup_progress', { phase: 'listing', processed: 0, total: fileCount });
       await sleep(150);
+      if (mockScanCancel) {
+        mockScanRunning = false;
+        emit('dup_done', { groups: [], wasted_bytes: 0, files_scanned: 0, cancelled: true });
+        return true;
+      }
       for (let i = 0; i < fileCount; i++) {
         await sleep(70);
+        if (mockScanCancel) break;
         emit('dup_progress', {
           phase: 'hashing',
           processed: i + 1,
           total: fileCount,
         });
       }
+      mockScanRunning = false;
       const done = dupSummary(dupState);
-      const payload: DupDone = {
-        groups: done.groups,
-        wasted_bytes: done.wasted,
-        files_scanned: 34,
-      };
+      const payload: DupDone = mockScanCancel
+        ? { groups: [], wasted_bytes: 0, files_scanned: 34, cancelled: true }
+        : { groups: done.groups, wasted_bytes: done.wasted, files_scanned: 34 };
       emit('dup_done', payload);
       return true;
     },
@@ -403,8 +417,8 @@ function createMockBridge(): BridgeApi {
       ];
     },
     async cancel_scan(): Promise<boolean> {
-      const wasRunning = mockDiskRunning;
-      mockDiskCancel = true;
+      const wasRunning = mockScanRunning;
+      mockScanCancel = true;
       return wasRunning;
     },
     async scan_disk(): Promise<boolean> {
@@ -433,13 +447,13 @@ function createMockBridge(): BridgeApi {
         files_scanned: 134,
         total_bytes: 2067 * MB,
       };
-      mockDiskRunning = true;
-      mockDiskCancel = false;
+      mockScanRunning = true;
+      mockScanCancel = false;
       const steps = 6;
       let stoppedAt = 0;
       for (let i = 1; i <= steps; i++) {
         await sleep(140);
-        if (mockDiskCancel) {
+        if (mockScanCancel) {
           stoppedAt = i;
           break;
         }
@@ -450,7 +464,7 @@ function createMockBridge(): BridgeApi {
           bytes: Math.round(SAMPLE_SPACE.total_bytes * frac),
         });
       }
-      mockDiskRunning = false;
+      mockScanRunning = false;
       if (stoppedAt > 0) {
         const frac = stoppedAt / steps;
         emit('space_done', {
@@ -596,9 +610,9 @@ function createMockBridge(): BridgeApi {
 
 let mockTimer: ReturnType<typeof setInterval> | null = null;
 
-// Cancel support for the mock disk scan (mirrors the real backend).
-let mockDiskRunning = false;
-let mockDiskCancel = false;
+// Cancel support for the mock disk/dup scans (mirrors the real backend).
+let mockScanRunning = false;
+let mockScanCancel = false;
 let dupState: DupGroup[] = makeSampleDupGroups();
 
 // Mutable mock junk locations: id -> { size-bytes per fake file name }.

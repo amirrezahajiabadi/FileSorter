@@ -118,6 +118,7 @@ export interface UIState {
   dupProcessed: number;
   dupTotal: number;
   dupGroups: DupGroupRow[];
+  dupCancelled: boolean;
   diskOpen: boolean;
   drives: DriveInfo[];
   drivesLoaded: boolean;
@@ -172,6 +173,7 @@ const initial: UIState = {
   dupProcessed: 0,
   dupTotal: 0,
   dupGroups: [],
+  dupCancelled: false,
   diskOpen: false,
   drives: [],
   drivesLoaded: false,
@@ -446,7 +448,7 @@ function handleEvent(msg: SortEvent): void {
           markDelete: i > 0, // keep the first copy of each group by default
         })),
       }));
-      set({ dupScanning: false, dupPhase: 'idle', dupGroups: rows });
+      set({ dupScanning: false, dupPhase: 'idle', dupGroups: rows, dupCancelled: p.cancelled === true });
       break;
     }
     case 'space_progress': {
@@ -874,6 +876,9 @@ export async function watchStop(): Promise<void> {
 
 export function openDupPanel(): void {
   set({ dupOpen: true });
+  if (!state.drivesLoaded) {
+    void loadDrives();
+  }
 }
 
 export function closeDupPanel(): void {
@@ -894,6 +899,7 @@ async function startDupScan(path: string): Promise<void> {
     dupProcessed: 0,
     dupTotal: 0,
     dupGroups: [],
+    dupCancelled: false,
   });
   try {
     await bridge.find_duplicates(path);
@@ -906,6 +912,11 @@ async function startDupScan(path: string): Promise<void> {
 export async function dupScanCurrent(): Promise<void> {
   if (!state.folder) return;
   await startDupScan(state.folder);
+}
+
+export async function dupScanDrive(drive: DriveInfo): Promise<void> {
+  if (state.dupScanning) return;
+  await startDupScan(drive.path);
 }
 
 export async function dupScanBrowse(): Promise<void> {
@@ -1051,7 +1062,7 @@ export async function diskScanDrive(drive: DriveInfo): Promise<void> {
   await startDiskScan(drive.path);
 }
 
-export async function cancelDiskScan(): Promise<void> {
+export async function cancelScan(): Promise<void> {
   try {
     await bridge.cancel_scan();
   } catch (err) {

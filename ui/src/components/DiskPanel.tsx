@@ -1,6 +1,6 @@
 import type { UIState } from '../store';
 import {
-  cancelDiskScan,
+  cancelScan,
   closeDiskPanel,
   diskScanBrowse,
   diskScanCurrent,
@@ -163,7 +163,7 @@ export default function DiskPanel({ store }: { store: UIState }) {
             <button
               type="button"
               className="btn btn-danger btn-sm"
-              onClick={() => void cancelDiskScan()}
+              onClick={() => void cancelScan()}
             >
               {inline(t(S, 'cancel_scan_btn'))}
             </button>

@@ -141,6 +141,7 @@ export interface DupDone {
   groups: DupGroup[];
   wasted_bytes: number;
   files_scanned: number;
+  cancelled?: boolean;
 }
 
 export interface DupDeleteResult {

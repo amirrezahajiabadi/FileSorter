@@ -2,10 +2,12 @@ import { useState } from 'react';
 
 import type { UIState } from '../store';
 import {
+  cancelScan,
   closeDupPanel,
   deleteSelectedDupes,
   dupScanBrowse,
   dupScanCurrent,
+  dupScanDrive,
   toggleDupFile,
 } from '../store';
 import { fmt, inline, t } from '../i18n';
@@ -69,6 +71,48 @@ export default function DuplicatesPanel({ store }: { store: UIState }) {
           </button>
         </div>
 
+        {store.drives.length > 0 && (
+          <div className="drives-section">
+            <h3 className="section-title">{inline(t(S, 'drives_heading'))}</h3>
+            <div className="drive-list">
+              {store.drives.map((d) => {
+                const used = d.total - d.free;
+                const usedPct =
+                  d.total > 0 ? Math.round((used / d.total) * 100) : 0;
+                return (
+                  <div className="drive-card" key={d.letter}>
+                    <span className="drive-letter">{d.letter}</span>
+                    <div className="drive-info">
+                      <div className="drive-meta">
+                        <span className="drive-path" dir="ltr">
+                          {d.path}
+                        </span>
+                        <span className="drive-free">
+                          {formatSize(d.free)} {inline(t(S, 'drive_free'))}
+                        </span>
+                      </div>
+                      <div className="drive-track">
+                        <div
+                          className="drive-fill"
+                          style={{ width: `${Math.max(usedPct, 2)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={dupScanning}
+                      onClick={() => void dupScanDrive(d)}
+                    >
+                      {inline(t(S, 'drive_scan_btn'))}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="dup-actions">
           {store.folder && (
             <button
@@ -119,15 +163,29 @@ export default function DuplicatesPanel({ store }: { store: UIState }) {
                 }}
               />
             </div>
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              onClick={() => void cancelScan()}
+            >
+              {inline(t(S, 'cancel_scan_btn'))}
+            </button>
           </div>
-        ) : dupGroups.length === 0 ? (
-          <p className="dup-none">
-            {store.dupScanFolder
-              ? inline(t(S, 'dup_none_found'))
-              : inline(t(S, 'dup_no_folder'))}
-          </p>
         ) : (
           <div className="dup-results">
+            {store.dupCancelled && (
+              <div className="scan-cancelled-note">
+                {inline(t(S, 'scan_cancelled'))}
+              </div>
+            )}
+            {dupGroups.length === 0 ? (
+              <p className="dup-none">
+                {store.dupScanFolder
+                  ? inline(t(S, 'dup_none_found'))
+                  : inline(t(S, 'dup_no_folder'))}
+              </p>
+            ) : (
+            <>
             <div className="dup-summary">
               <span className="dup-summary-item">
                 {inline(fmt(t(S, 'dup_summary_groups'), { n: dupGroups.length }))}
@@ -220,6 +278,8 @@ export default function DuplicatesPanel({ store }: { store: UIState }) {
                   : inline(fmt(t(S, 'dup_delete_selected'), { n: extraCopies }))}
               </button>
             </div>
+            </>
+            )}
           </div>
         )}
       </div>
