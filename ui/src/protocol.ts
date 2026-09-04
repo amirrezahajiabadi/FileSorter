@@ -52,10 +52,16 @@ export interface CategoryMeta {
   nameFa: string;
 }
 
+export interface SmartRule {
+  keywords: string[];
+  category: string;
+}
+
 export interface AppState {
   version: string;
   categories: Record<string, string[]>;
   categoryMeta: Record<string, Partial<CategoryMeta>>;
+  smartRules: SmartRule[];
   recentFolders: string[];
   watchedFolders: string[];
   theme: ThemeName;

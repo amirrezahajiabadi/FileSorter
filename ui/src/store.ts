@@ -659,6 +659,21 @@ export interface CategoryDraft {
   extensions: string[];
 }
 
+export interface RuleDraft {
+  keywords: string; // comma-separated raw text while editing
+  category: string;
+}
+
+/** Raw editable snapshot of the smart rules. */
+export function rulesSnapshot(): RuleDraft[] {
+  const app = appState;
+  if (!app) return [];
+  return (app.smartRules ?? []).map((r) => ({
+    keywords: (r.keywords ?? []).join(', '),
+    category: r.category,
+  }));
+}
+
 /** Raw editable snapshot of the categories (incl. built-in fallbacks). */
 export function settingsSnapshot(): CategoryDraft[] {
   const app = appState;
@@ -696,15 +711,28 @@ function syncFromApp(app: AppState): void {
   });
 }
 
-export async function saveSettings(drafts: CategoryDraft[]): Promise<boolean> {
+export async function saveSettings(
+  drafts: CategoryDraft[],
+  rules: RuleDraft[] = [],
+): Promise<boolean> {
   const categories: Record<string, string[]> = {};
   const meta: Record<string, Partial<CategoryMeta>> = {};
   for (const d of drafts) {
     categories[d.id] = d.extensions;
     meta[d.id] = { icon: d.icon, nameEn: d.nameEn, nameFa: d.nameFa };
   }
+  const cleanRules = rules
+    .map((r) => ({
+      keywords: r.keywords
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean),
+      category: r.category,
+    }))
+    .filter((r) => r.keywords.length > 0 && categories[r.category] !== undefined);
   try {
     await bridge.save_categories(categories, meta);
+    await bridge.save_smart_rules(cleanRules);
     const fresh = await bridge.get_state();
     appState = fresh;
     syncFromApp(fresh);

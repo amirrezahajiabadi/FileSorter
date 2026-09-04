@@ -28,6 +28,7 @@ import type {
   PlanItem,
   SortDone,
   SortItemEvent,
+  SmartRule,
   SpaceDone,
   ThemeName,
   UndoDone,
@@ -65,6 +66,7 @@ export interface BridgeApi {
     categories: Record<string, string[]>,
     meta?: Record<string, unknown>,
   ): Promise<boolean>;
+  save_smart_rules(rules: SmartRule[]): Promise<boolean>;
   restore_defaults(): Promise<Record<string, string[]>>;
 }
 
@@ -128,9 +130,10 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 const SAMPLE_STATE: AppState = {
-  version: '5.4.0',
+  version: '5.5.0',
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
+  smartRules: [],
   recentFolders: [],
   watchedFolders: [],
   theme: 'dark',
@@ -175,6 +178,8 @@ const SAMPLE_PLAN: PlanItem[] = [
   { name: 'song.mp3', category: 'audio', action: 'ok', final_name: 'song.mp3' },
   { name: 'main.ts', category: 'code', action: 'ok', final_name: 'main.ts' },
   { name: '2022-tax.pdf', category: 'documents', action: 'overwrite', final_name: '2022-tax.pdf' },
+  { name: 'invoice-2024.pdf', category: 'documents', action: 'ok', final_name: 'invoice-2024.pdf' },
+  { name: 'فاکتور-1403.pdf', category: 'documents', action: 'ok', final_name: 'فاکتور-1403.pdf' },
   { name: 'menu.pdf', category: 'documents', action: 'ok', final_name: 'menu.pdf' },
 ];
 
@@ -234,8 +239,41 @@ function dupSummary(groups: DupGroup[]): { groups: DupGroup[]; wasted: number } 
   return { groups: live, wasted };
 }
 
+function stemTokens(name: string): Set<string> {
+  // Whole-word tokens of the stem (no extension); unicode letters/digits
+  // count as word chars so Persian filenames split the same as English.
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const parts = stem
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  return new Set(parts);
+}
+
+function matchRuleCategory(name: string, categories: Record<string, string[]>, rules: SmartRule[]): string | null {
+  if (!rules || rules.length === 0) return null;
+  const tokens = stemTokens(name);
+  if (tokens.size === 0) return null;
+  for (const rule of rules) {
+    const cat = rule?.category ?? '';
+    if (!(cat in categories)) continue; // inactive rule — category was deleted
+    for (const kw of rule?.keywords ?? []) {
+      if (kw && tokens.has(kw.toLowerCase())) return cat;
+    }
+  }
+  return null;
+}
+
+function applyRulesToPlan(plan: PlanItem[]): PlanItem[] {
+  return plan.map((item) => {
+    const cat = matchRuleCategory(item.name, SAMPLE_STATE.categories, SAMPLE_STATE.smartRules);
+    return cat ? { ...item, category: cat } : item;
+  });
+}
+
 function makeItems(): SortItemEvent[] {
-  return SAMPLE_PLAN.map((p) => {
+  return applyRulesToPlan(SAMPLE_PLAN).map((p) => {
     if (p.action === 'skip') {
       return { status: 'skip', name: p.name, category: p.category };
     }
@@ -295,7 +333,7 @@ function createMockBridge(): BridgeApi {
       return SAMPLE_REPORT;
     },
     async plan_sort(_path: string, _mode?: DuplicateMode): Promise<PlanItem[]> {
-      return SAMPLE_PLAN;
+      return applyRulesToPlan(SAMPLE_PLAN);
     },
     async start_sort(): Promise<boolean> {
       void simulateStream(makeItems()).then(() => {
@@ -308,7 +346,7 @@ function createMockBridge(): BridgeApi {
           category: i.category ?? 'others',
         }));
         const payload: SortDone = {
-          copied: 8,
+          copied: 10,
           skipped: 1,
           errors: 1,
           target_dir: 'D:/Sample Folder/sorted',
@@ -465,9 +503,17 @@ function createMockBridge(): BridgeApi {
       SAMPLE_STATE.categoryMeta = (meta ?? {}) as Record<string, CategoryMeta>;
       return true;
     },
+    async save_smart_rules(rules: SmartRule[]): Promise<boolean> {
+      SAMPLE_STATE.smartRules = rules.map((r) => ({
+        keywords: [...r.keywords],
+        category: r.category,
+      }));
+      return true;
+    },
     async restore_defaults(): Promise<Record<string, string[]>> {
       SAMPLE_STATE.categories = { ...SAMPLE_DEFAULT_CATEGORIES };
       SAMPLE_STATE.categoryMeta = {};
+      SAMPLE_STATE.smartRules = [];
       return SAMPLE_STATE.categories;
     },
 
