@@ -1,10 +1,15 @@
 """Temp / cache cleanup: find and delete well-known junk files.
 
-Scans a fixed set of *user-scope* junk locations (no admin rights
-needed): the user temp folder, crash dumps, browser caches, and the
-Windows thumbnail cache. System-wide locations (the Windows Temp folder,
-other users' profiles) are deliberately excluded — cleaning those needs
-elevation and belongs to the headless-service stage, not this panel.
+Scans junk locations in two scopes:
+  * user scope (no admin rights): the user temp folder, crash dumps,
+    browser caches and the Windows thumbnail cache;
+  * system scope (Windows Temp — C:/Windows/Temp): readable in full
+    by most users, but individual files usually need elevation to
+    delete, so per-file failures are reported and kept, exactly like
+    locked/in-use files.
+
+Also exposes the Recycle Bin (shell32) — a per-user system-level
+location whose size needs no elevation at all.
 
 Safety model mirrors app/duplicates.py exactly:
   1. scan_junk() only *looks*: it resolves the known locations that
@@ -14,7 +19,8 @@ Safety model mirrors app/duplicates.py exactly:
      A compromised or mistaken UI can never delete arbitrary files.
 
 Deletion is best-effort per file (like a temp cleaner): locked/in-use
-files raise OSError and are counted as failures, never retried here.
+or permission-denied files raise OSError and are counted as failures,
+never retried here. Unreadable sub-directories are skipped silently.
 
 Progress flows through the same on_event(kind, payload) contract used
 everywhere else: ("clean_progress", {"phase": "scanning"|"deleting",
@@ -25,15 +31,21 @@ This module is UI-free and safe to call from any thread.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
+
+_windows = sys.platform == "win32"
 
 ProgressEvent = Callable[[str, dict], None]
 
 # Location ids are wire-stable; display names come from the UI's i18n
 # tables (cleanup_loc_* keys), never from Python.
 LOCATION_IDS = ("user_temp", "crash_dumps", "chrome_cache",
-                "edge_cache", "firefox_cache", "thumbnails")
+                "edge_cache", "firefox_cache", "thumbnails", "win_temp")
+
+# System-scope ids: rendered in a separate section of the Clean panel.
+SYSTEM_LOCATION_IDS = ("win_temp",)
 
 _EMIT_EVERY = 200  # throttle progress events: one per N files
 
@@ -69,6 +81,9 @@ def known_locations() -> List[dict]:
             if (la / "Mozilla" / "Firefox" / "Profiles").is_dir() else []
         add("firefox_cache", list(firefox))
         add("thumbnails", [la / "Microsoft" / "Windows" / "Explorer"])
+    system_root = os.environ.get("SystemRoot") or (r"C:\Windows" if _windows else None)
+    if system_root:
+        add("win_temp", [Path(system_root) / "Temp"])
     return out
 
 
@@ -91,7 +106,9 @@ def _iter_junk_files(location: dict):
                 if p.is_file():
                     yield p
             continue
-        for dirpath, _dirnames, filenames in os.walk(base):
+        # Unreadable sub-directories (common under Windows Temp for a
+        # non-elevated user) are skipped silently, never fatal.
+        for dirpath, _dirnames, filenames in os.walk(base, onerror=lambda _e: None):
             for name in filenames:
                 yield Path(dirpath) / name
 
@@ -193,3 +210,64 @@ def delete_junk(paths: List[str], allowed: Set[Path]) -> dict:
             failed.append({"path": raw, "error": str(e)})
 
     return {"deleted": deleted, "failed": failed, "freed_bytes": freed}
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Recycle Bin (shell32, Windows only)
+# ══════════════════════════════════════════════════════════════════
+
+def _shell32():
+    """Return the shell32 library handle, or None off-Windows."""
+    if not _windows:
+        return None
+    import ctypes
+
+    return ctypes.windll.shell32
+
+
+def recycle_bin_status() -> dict:
+    """Query the Recycle Bin's total size and item count (all drives).
+
+    Read-only and always safe. Returns {\"available\": bool, \"files\": int,
+    \"bytes\": int} — \"available\" is False on non-Windows platforms.
+    """
+    shell32 = _shell32()
+    if shell32 is None:
+        return {"available": False, "files": 0, "bytes": 0}
+    import ctypes
+    from ctypes import wintypes
+
+    class _QueryInfo(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("i64Size", ctypes.c_int64),
+            ("i64NumItems", ctypes.c_int64),
+        ]
+
+    info = _QueryInfo()
+    info.cbSize = ctypes.sizeof(_QueryInfo)
+    # pszRootPath=None -> the whole recycle bin across drives.
+    ret = shell32.SHQueryRecycleBinW(None, ctypes.byref(info))
+    if ret != 0:
+        return {"available": True, "files": 0, "bytes": 0, "error": f"0x{ret & 0xFFFFFFFF:08x}"}
+    return {"available": True, "files": int(info.i64NumItems), "bytes": int(info.i64Size)}
+
+
+def empty_recycle_bin() -> dict:
+    """Empty the Recycle Bin (all drives). Permanent — callers must arm
+    a confirmation first. Returns {\"ok\": bool, \"files\": int, \"bytes\": int}
+    (pre-empty totals; the API reports no per-item result).
+    """
+    shell32 = _shell32()
+    if shell32 is None:
+        return {"ok": False, "files": 0, "bytes": 0, "error": "not available"}
+    before = recycle_bin_status()
+    # SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND
+    flags = 0x1 | 0x2 | 0x4
+    ret = shell32.SHEmptyRecycleBinW(None, None, flags)
+    return {
+        "ok": ret == 0,
+        "files": before.get("files", 0),
+        "bytes": before.get("bytes", 0),
+        "error": None if ret == 0 else f"0x{ret & 0xFFFFFFFF:08x}",
+    }

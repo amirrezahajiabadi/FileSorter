@@ -204,3 +204,150 @@ def test_controller_delete_only_location_that_was_scanned(tmp_path):
         assert victim.exists()  # never touched
     finally:
         __import__("app.cleanup", fromlist=["x"]).known_locations = orig
+
+
+# ══════════════════════════════════════════════════════════════════
+#  System scope: Windows Temp
+# ══════════════════════════════════════════════════════════════════
+
+def test_win_temp_in_known_locations_when_systemroot_present(monkeypatch, tmp_path):
+    sysroot = tmp_path / "Windows"
+    temp = sysroot / "Temp"
+    temp.mkdir(parents=True)
+    (temp / "x.tmp").write_text("abc")
+    monkeypatch.setenv("SystemRoot", str(sysroot))
+    from app import cleanup
+
+    res = cleanup.known_locations()
+    ids = {loc["id"] for loc in res}
+    if cleanup._windows:
+        assert "win_temp" in ids
+        win = next(l for l in res if l["id"] == "win_temp")
+        assert win["dirs"] == [str(temp)]
+    # non-windows: win_temp only when the dir exists (guarded by _windows)
+    monkeypatch.setattr(cleanup, "_windows", False)
+    monkeypatch.delenv("SystemRoot", raising=False)
+    res2 = cleanup.known_locations()
+    assert all(l["id"] != "win_temp" for l in res2)
+
+
+def test_win_temp_scan_and_delete_whitelist(monkeypatch, tmp_path):
+    sysroot = tmp_path / "Windows"
+    temp = sysroot / "Temp"
+    (temp / "sub").mkdir(parents=True)
+    (temp / "a.log").write_text("x" * 5)
+    (temp / "sub" / "b.tmp").write_text("y" * 10)
+    monkeypatch.setenv("SystemRoot", str(sysroot))
+    from app import cleanup
+    from app.cleanup import scan_junk, delete_junk
+
+    locs = [{"id": "win_temp", "dirs": [str(temp)]}]
+    res = scan_junk(locations=locs, want_paths=True)
+    assert res["total_files"] == 2
+    assert res["total_bytes"] == 15
+    paths = [Path(p) for p in res["paths"]["win_temp"]]
+    out = delete_junk([str(p) for p in paths], set(paths))
+    assert out["deleted"] and not out["failed"]
+    assert not temp.exists() or not (temp / "a.log").exists()
+
+
+def test_scan_skips_unreadable_subdirs(monkeypatch, tmp_path):
+    """A permission-denied dir must be skipped, not fatal (Windows Temp)."""
+    from app import cleanup
+    from app.cleanup import scan_junk
+
+    root = tmp_path / "loc"
+    root.mkdir()
+    (root / "ok.tmp").write_text("x")
+    bad = root / "locked"
+    bad.mkdir()
+    (bad / "secret.tmp").write_text("y" * 8)
+
+    import os as _os
+
+    real_scandir = _os.scandir
+
+    def flaky_scandir(path):
+        if str(path).endswith("locked"):
+            raise PermissionError(13, "access denied", str(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(_os, "scandir", flaky_scandir)
+    res = scan_junk(locations=[{"id": "win_temp", "dirs": [str(root)]}])
+    assert res["total_files"] == 1  # ok.tmp counted, locked/secret skipped
+    assert res["locations"] == [{"id": "win_temp", "files": 1, "bytes": 1}]
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Recycle Bin
+# ══════════════════════════════════════════════════════════════════
+
+class FakeShell32:
+    """Records calls; the empty call returns 0 (S_OK) by default."""
+
+    def __init__(self, size=1000, items=3, empty_ret=0):
+        self.size, self.items, self.empty_ret = size, items, empty_ret
+        self.query_calls = 0
+        self.empty_calls = 0
+
+    def SHQueryRecycleBinW(self, root, info):
+        self.query_calls += 1
+        # The real call passes ctypes.byref(info); unwrap the wrapper.
+        if not hasattr(info, "i64Size"):
+            info = info._obj
+        info.i64Size = self.size
+        info.i64NumItems = self.items
+        return 0
+
+    def SHEmptyRecycleBinW(self, root, flags, opts):
+        self.empty_calls += 1
+        return self.empty_ret
+
+
+def test_recycle_bin_status_returns_counts(monkeypatch):
+    from app import cleanup
+
+    fake = FakeShell32(size=2048, items=4)
+    monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
+    res = cleanup.recycle_bin_status()
+    assert res == {"available": True, "files": 4, "bytes": 2048}
+    assert fake.query_calls == 1
+
+
+def test_recycle_bin_status_off_windows(monkeypatch):
+    from app import cleanup
+
+    monkeypatch.setattr(cleanup, "_shell32", lambda: None)
+    assert cleanup.recycle_bin_status() == {"available": False, "files": 0, "bytes": 0}
+
+
+def test_empty_recycle_bin_reports_pre_empty_totals(monkeypatch):
+    from app import cleanup
+
+    fake = FakeShell32(size=500000, items=9)
+    monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
+    res = cleanup.empty_recycle_bin()
+    assert res == {"ok": True, "files": 9, "bytes": 500000, "error": None}
+    assert fake.empty_calls == 1
+
+
+def test_empty_recycle_bin_surfaces_failure(monkeypatch):
+    from app import cleanup
+
+    fake = FakeShell32(size=7, items=1, empty_ret=1)  # nonzero -> error
+    monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
+    res = cleanup.empty_recycle_bin()
+    assert res["ok"] is False
+    assert res["error"] is not None
+
+
+def test_controller_recycle_pass_through(monkeypatch):
+    from app import cleanup
+    from app.controller import AppController
+
+    fake = FakeShell32(size=123, items=2)
+    monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
+    c = AppController()
+    assert c.recycle_bin_status() == {"available": True, "files": 2, "bytes": 123}
+    res = c.empty_recycle_bin()
+    assert res["ok"] is True and fake.empty_calls == 1
