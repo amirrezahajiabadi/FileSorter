@@ -7,7 +7,6 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-*.spec
 
 # Testing
 .pytest_cache/
@@ -21,6 +20,9 @@ env/
 
 # App settings (user-specific, not project data)
 .filesorter_settings.json
+
+# Application data
+*.log
 
 # OS files
 .DS_Store
