@@ -159,7 +159,7 @@ class FileSorterService:
         dist = _require_build()
 
         class Handler(_DistHandler):
-            server_version = "FileSorterService/5.6.0"
+            server_version = "FileSorterService/6.0.0"
             protocol_version = "HTTP/1.1"
 
             def _authorized(self, parsed=None):
