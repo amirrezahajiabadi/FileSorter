@@ -12,6 +12,13 @@ frontends subclass it:
 The transport layer in the frontend (``ui/src/transport.ts``) mirrors
 these method names one-to-one, so the same React bundle drives both
 frontends unchanged.
+
+High-frequency kinds (per-file "item" rows, "progress" counters) are
+coalesced by ``push_event`` before they reach ``_push``: "last" kinds
+keep only the newest payload (counters), "batch" kinds accumulate
+every payload and flush them together (log rows). A sort of 20,000
+files then costs a handful of UI round-trips per second instead of one
+per file, which is what kept freezing the UI.
 """
 
 import threading
@@ -26,6 +33,20 @@ from app.watcher import WatchManager
 
 TASK_HISTORY_LIMIT = 20
 
+# Kinds that stream once per file / per directory during a sort, undo or
+# scan. Delivering each one separately saturates the UI bridge (evaluate_js
+# round-trips in the windowed app, SSE frames in the service) and freezes
+# the page on folders with many files. Coalescing modes:
+#   "last"  — only the newest payload matters (monotonic counters).
+#   "batch" — every payload is a distinct log row; accumulate and flush
+#             them together so no row is lost but the rate is bounded.
+COALESCE_LAST_KINDS = {"progress", "space_progress", "dup_progress", "clean_progress"}
+COALESCE_BATCH_KINDS = {"item", "watch_item"}
+# Terminal events must never beat the buffered progress ticks they follow,
+# or the UI would see "done" before the last counter update.
+COALESCE_FLUSH_BEFORE = {"done", "dup_done", "space_done", "clean_done", "sched_done", "error"}
+COALESCE_INTERVAL = 0.12  # seconds — flushes at most ~8 event bursts/sec
+
 
 class BaseApi:
     """Everything the UI can ask the Python core to do.
@@ -37,11 +58,16 @@ class BaseApi:
 
     def __init__(self):
         self.controller = AppController()
+        # Coalescing buffer for push_event(); fields must exist before the
+        # WatchManager below starts wiring callbacks into it.
+        self._coalesced = {}
+        self._coalesce_lock = threading.Lock()
+        self._coalesce_timer = None
         self._scan_cancel = None  # set per scan by find_duplicates()/scan_disk(); read by cancel_scan()
         self._task_history = []  # ring of recent scheduled-run reports
         self.watch_manager = WatchManager(
             get_categories=lambda: self.controller.categories,
-            on_event=self._push,
+            on_event=self.push_event,
             get_rules=lambda: self.controller.smart_rules,
         )
         self.watch_manager.update_folders(self.controller.watch_folders)
@@ -56,6 +82,52 @@ class BaseApi:
     def _push(self, kind: str, payload) -> None:
         """Deliver a live event (sort_item, dup_done, ...) to the UI."""
         raise NotImplementedError
+
+    # ── Event coalescing (v6.1.1) ────────────────────────────────
+
+    def push_event(self, kind: str, payload) -> None:
+        """Deliver a live event, coalescing chatty kinds.
+
+        Rare kinds (done/error/sched_*) pass straight through to
+        _push(). High-frequency kinds are buffered and flushed at most
+        every COALESCE_INTERVAL seconds, so a fast scan cannot flood the
+        UI bridge with one round-trip per file.
+        """
+        if kind in COALESCE_FLUSH_BEFORE:
+            # Deliver any pending ticks first so ordering stays honest:
+            # progress counters always land before the event that ends them.
+            self._flush_coalesced()
+            self._push(kind, payload)
+            return
+        if kind not in COALESCE_LAST_KINDS and kind not in COALESCE_BATCH_KINDS:
+            self._push(kind, payload)
+            return
+        with self._coalesce_lock:
+            if kind in COALESCE_BATCH_KINDS:
+                self._coalesced.setdefault(kind, []).append(payload)
+            else:
+                self._coalesced[kind] = payload  # latest wins
+            if self._coalesce_timer is None:
+                self._coalesce_timer = threading.Timer(
+                    COALESCE_INTERVAL, self._flush_coalesced
+                )
+                self._coalesce_timer.daemon = True
+                self._coalesce_timer.start()
+
+    def _flush_coalesced(self) -> None:
+        """Deliver everything buffered since the last flush. Runs on a
+        daemon timer thread; the queue/JS bridge must be thread-safe
+        (both adapters' _push are)."""
+        with self._coalesce_lock:
+            items = list(self._coalesced.items())
+            self._coalesced.clear()
+            self._coalesce_timer = None
+        for kind, payload in items:
+            if isinstance(payload, list):
+                for one in payload:
+                    self._push(kind, one)
+            else:
+                self._push(kind, payload)
 
     def browse_folder(self):
         """Open a native folder-picker dialog.
@@ -116,21 +188,21 @@ class BaseApi:
             "task_id": task.get("id"), "kind": kind, "folder": folder,
         })
         if kind == "cleanup":
-            result = self.controller.scan_cleanup(on_event=self._push)
+            result = self.controller.scan_cleanup(on_event=self.push_event)
             return {
                 "kind": "cleanup", "folder": None,
                 "files": result.get("total_files", 0),
                 "bytes": result.get("total_bytes", 0),
             }
         if kind == "disk_scan":
-            result = self.controller.scan_space(folder, on_event=self._push)
+            result = self.controller.scan_space(folder, on_event=self.push_event)
             return {
                 "kind": "disk_scan", "folder": folder,
                 "files": result.get("files_scanned", 0),
                 "bytes": result.get("total_bytes", 0),
             }
         if kind == "dup_scan":
-            result = self.controller.scan_duplicates(folder, on_event=self._push)
+            result = self.controller.scan_duplicates(folder, on_event=self.push_event)
             return {
                 "kind": "dup_scan", "folder": folder,
                 "groups": len(result.get("groups", [])),
@@ -233,14 +305,14 @@ class BaseApi:
     def _run_sort(self, path: str, move: bool, duplicate_mode: str) -> None:
         """Background-thread body: stream every AppController event."""
         def on_event(kind, payload):
-            self._push(kind, payload)
+            self.push_event(kind, payload)
 
         try:
             self.controller.sort(
                 path, move=move, duplicate_mode=duplicate_mode, on_event=on_event
             )
         except Exception as e:
-            self._push("error", str(e))
+            self.push_event("error", str(e))
 
     # ── Undo ───────────────────────────────────────────────────
 
@@ -254,12 +326,12 @@ class BaseApi:
     def _run_undo(self) -> None:
         """Background-thread body for undo."""
         def on_event(kind, payload):
-            self._push(kind, payload)
+            self.push_event(kind, payload)
 
         try:
             self.controller.undo(on_event=on_event)
         except Exception as e:
-            self._push("error", str(e))
+            self.push_event("error", str(e))
 
     # ── Duplicate finder ───────────────────────────────────────
 
@@ -276,15 +348,15 @@ class BaseApi:
 
     def _run_dup_scan(self, path: str) -> None:
         def on_event(kind, payload):
-            self._push(kind, payload)
+            self.push_event(kind, payload)
 
         try:
             result = self.controller.scan_duplicates(
                 path, on_event=on_event, cancel_event=self._scan_cancel
             )
-            self._push("dup_done", result)
+            self.push_event("dup_done", result)
         except Exception as e:
-            self._push("error", str(e))
+            self.push_event("error", str(e))
 
     def delete_duplicates(self, paths: list) -> dict:
         """Permanently delete the given duplicate copies (whitelisted to
@@ -327,15 +399,15 @@ class BaseApi:
 
     def _run_disk_scan(self, path: str) -> None:
         def on_event(kind, payload):
-            self._push(kind, payload)
+            self.push_event(kind, payload)
 
         try:
             result = self.controller.scan_space(
                 path, on_event=on_event, cancel_event=self._scan_cancel
             )
-            self._push("space_done", result)
+            self.push_event("space_done", result)
         except Exception as e:
-            self._push("error", str(e))
+            self.push_event("error", str(e))
 
     # ── Temp / cache cleanup ────────────────────────────────────
 
@@ -348,13 +420,13 @@ class BaseApi:
 
     def _run_clean_scan(self) -> None:
         def on_event(kind, payload):
-            self._push(kind, payload)
+            self.push_event(kind, payload)
 
         try:
             result = self.controller.scan_cleanup(on_event=on_event)
-            self._push("clean_done", result)
+            self.push_event("clean_done", result)
         except Exception as e:
-            self._push("error", str(e))
+            self.push_event("error", str(e))
 
     def delete_cleanup(self, location_ids: list) -> dict:
         """Permanently delete everything the last cleanup scan flagged

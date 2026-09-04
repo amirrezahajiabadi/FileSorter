@@ -123,7 +123,7 @@ def test_events_requires_token(service):
 def test_get_state(service):
     resp = rpc(service, "get_state")
     state = resp["result"]
-    assert state["version"] == "6.1.0"
+    assert state["version"] == "6.1.1"
     assert "categories" in state and "smartRules" in state
     assert state["language"] in ("fa", "en")
 
