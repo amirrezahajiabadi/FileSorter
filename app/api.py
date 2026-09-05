@@ -63,7 +63,12 @@ class BaseApi:
         self._coalesced = {}
         self._coalesce_lock = threading.Lock()
         self._coalesce_timer = None
-        self._scan_cancel = None  # set per scan by find_duplicates()/scan_disk(); read by cancel_scan()
+        self._scan_lock = threading.Lock()
+        self._scan_cancel = None  # threading.Event for the active disk/dup scan
+        self._scan_kind = None
+        self._operation_lock = threading.Lock()
+        self._sort_running = False
+        self._cleanup_running = False
         self._task_history = []  # ring of recent scheduled-run reports
         self.watch_manager = WatchManager(
             get_categories=lambda: self.controller.categories,
@@ -137,6 +142,58 @@ class BaseApi:
         """
         return None
 
+    def record_recent_folder(self, path: str) -> list:
+        """Persist a folder selected through a non-native transport."""
+        clean = str(path or "").strip()
+        if not clean:
+            return self.controller.recent_folders
+        return self.controller.record_recent_folder(clean)
+
+    def _begin_scan(self, kind: str):
+        """Reserve the single shared scan slot and return its cancel event."""
+        with self._scan_lock:
+            if self._scan_kind is not None:
+                return None
+            event = threading.Event()
+            self._scan_cancel = event
+            self._scan_kind = kind
+            return event
+
+    def _finish_scan(self, event) -> None:
+        with self._scan_lock:
+            if self._scan_cancel is event:
+                self._scan_cancel = None
+                self._scan_kind = None
+
+    def _begin_operation(self, name: str) -> bool:
+        with self._operation_lock:
+            if name == "sort":
+                if self._sort_running:
+                    return False
+                self._sort_running = True
+                return True
+            if name == "cleanup":
+                if self._cleanup_running:
+                    return False
+                self._cleanup_running = True
+                return True
+            raise ValueError(f"unknown operation: {name}")
+
+    def _finish_operation(self, name: str) -> None:
+        with self._operation_lock:
+            if name == "sort":
+                self._sort_running = False
+            elif name == "cleanup":
+                self._cleanup_running = False
+
+    def shutdown(self) -> None:
+        """Stop background workers owned by this API adapter."""
+        self.watch_manager.stop()
+        self.task_scheduler.stop()
+        self.cancel_scan()
+        self._flush_coalesced()
+
+
     # ── Scheduled tasks (v5.9.0) ───────────────────────────────
 
     def start_tasks(self) -> None:
@@ -153,17 +210,16 @@ class BaseApi:
                  interval_minutes: int = 1440) -> dict:
         """Create a scheduled task (persisted). cleanup needs no folder;
         disk_scan/dup_scan need one."""
-        try:
-            task = self.controller.add_task(kind, folder, interval_minutes)
-            self.start_tasks()
-            return task
-        except ValueError:
-            return {"error": "invalid task"}
+        task = self.controller.add_task(kind, folder, interval_minutes)
+        self.start_tasks()
+        return task
 
     def update_task(self, task_id: str, patch: dict = None) -> dict:
         """Update a task ({enabled, interval_minutes, folder})."""
         task = self.controller.update_task(task_id, patch)
-        return task if task is not None else {"error": "not found"}
+        if task is None:
+            raise ValueError("task not found")
+        return task
 
     def remove_task(self, task_id: str) -> bool:
         """Delete a scheduled task."""
@@ -187,6 +243,7 @@ class BaseApi:
         self._push("sched_run", {
             "task_id": task.get("id"), "kind": kind, "folder": folder,
         })
+        if kind == "cleanup":
         if kind == "cleanup":
             result = self.controller.scan_cleanup(on_event=self.push_event)
             return {
@@ -291,10 +348,10 @@ class BaseApi:
 
     def start_sort(self, path: str, move: bool = False,
                    duplicate_mode: str = "skip") -> bool:
-        """Kick off a sort on a background thread. Returns immediately —
-        progress/log/completion are pushed separately via _push(), not
-        through this call's return value.
-        """
+        """Kick off a sort on a background thread; return False if another
+        sort/undo operation is still running."""
+        if not self._begin_operation("sort"):
+            return False
         threading.Thread(
             target=self._run_sort,
             args=(path, move, duplicate_mode),
@@ -313,13 +370,16 @@ class BaseApi:
             )
         except Exception as e:
             self.push_event("error", str(e))
+        finally:
+            self._finish_operation("sort")
 
     # ── Undo ───────────────────────────────────────────────────
 
     def undo_sort(self) -> bool:
-        """Kick off an undo on a background thread. Returns immediately —
-        progress/completion arrive via _push().
-        """
+        """Kick off an undo on a background thread; return False if another
+        sort/undo operation is still running."""
+        if not self._begin_operation("sort"):
+            return False
         threading.Thread(target=self._run_undo, daemon=True).start()
         return True
 
@@ -332,31 +392,36 @@ class BaseApi:
             self.controller.undo(on_event=on_event)
         except Exception as e:
             self.push_event("error", str(e))
+        finally:
+            self._finish_operation("sort")
 
     # ── Duplicate finder ───────────────────────────────────────
 
     def find_duplicates(self, path: str) -> bool:
-        """Kick off a duplicate scan (folder or whole drive) on a
-        background thread. Returns immediately; progress and the final
-        groups arrive via _push() (dup_progress / dup_done). The scan
-        can be aborted mid-walk with cancel_scan()."""
-        self._scan_cancel = threading.Event()
+        """Kick off a duplicate scan. Only one disk/duplicate scan may run
+        at a time; the returned boolean tells the UI whether it started."""
+        cancel = self._begin_scan("duplicates")
+        if cancel is None:
+            return False
         threading.Thread(
-            target=self._run_dup_scan, args=(path,), daemon=True
+            target=self._run_dup_scan, args=(path, cancel), daemon=True
         ).start()
         return True
 
-    def _run_dup_scan(self, path: str) -> None:
+    def _run_dup_scan(self, path: str, cancel_event=None) -> None:
+        cancel_event = cancel_event or self._scan_cancel
         def on_event(kind, payload):
             self.push_event(kind, payload)
 
         try:
             result = self.controller.scan_duplicates(
-                path, on_event=on_event, cancel_event=self._scan_cancel
+                path, on_event=on_event, cancel_event=cancel_event
             )
             self.push_event("dup_done", result)
         except Exception as e:
             self.push_event("error", str(e))
+        finally:
+            self._finish_scan(cancel_event)
 
     def delete_duplicates(self, paths: list) -> dict:
         """Permanently delete the given duplicate copies (whitelisted to
@@ -376,45 +441,45 @@ class BaseApi:
         return self.controller.list_drives()
 
     def scan_disk(self, path: str) -> bool:
-        """Kick off a disk-space scan (folder or whole drive) on a
-        background thread. Returns immediately; live counters and the
-        final report arrive via _push() (space_progress / space_done).
-        The scan can be aborted mid-walk with cancel_scan()."""
-        self._scan_cancel = threading.Event()
+        """Kick off a disk-space scan. Only one disk/duplicate scan may run."""
+        cancel = self._begin_scan("disk")
+        if cancel is None:
+            return False
         threading.Thread(
-            target=self._run_disk_scan, args=(path,), daemon=True
+            target=self._run_disk_scan, args=(path, cancel), daemon=True
         ).start()
         return True
 
     def cancel_scan(self) -> bool:
-        """Ask the currently running disk/duplicate scan to stop at the
-        next file boundary; its partial results arrive via space_done /
-        dup_done with "cancelled": True. Returns False if nothing is
-        running."""
-        ev = getattr(self, "_scan_cancel", None)
-        if ev is not None and not ev.is_set():
+        """Ask the active disk/duplicate scan to stop at the next file."""
+        with self._scan_lock:
+            ev = self._scan_cancel
+            if ev is None or ev.is_set():
+                return False
             ev.set()
             return True
-        return False
 
-    def _run_disk_scan(self, path: str) -> None:
+    def _run_disk_scan(self, path: str, cancel_event=None) -> None:
+        cancel_event = cancel_event or self._scan_cancel
         def on_event(kind, payload):
             self.push_event(kind, payload)
 
         try:
             result = self.controller.scan_space(
-                path, on_event=on_event, cancel_event=self._scan_cancel
+                path, on_event=on_event, cancel_event=cancel_event
             )
             self.push_event("space_done", result)
         except Exception as e:
             self.push_event("error", str(e))
+        finally:
+            self._finish_scan(cancel_event)
 
     # ── Temp / cache cleanup ────────────────────────────────────
 
     def scan_cleanup(self) -> bool:
-        """Kick off a junk-location scan on a background thread. Returns
-        immediately; live counters and the final report arrive via
-        _push() (clean_progress / clean_done)."""
+        """Kick off a junk-location scan, unless one is already running."""
+        if not self._begin_operation("cleanup"):
+            return False
         threading.Thread(target=self._run_clean_scan, daemon=True).start()
         return True
 
@@ -427,7 +492,8 @@ class BaseApi:
             self.push_event("clean_done", result)
         except Exception as e:
             self.push_event("error", str(e))
-
+        finally:
+            self._finish_operation("cleanup")
     def delete_cleanup(self, location_ids: list) -> dict:
         """Permanently delete everything the last cleanup scan flagged
         under the given location ids. Returns {"deleted": [...],

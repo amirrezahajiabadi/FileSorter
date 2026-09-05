@@ -8,7 +8,7 @@
  * through subscribeEvents (registered once at init).
  */
 
-import { useSyncExternalStore } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 
 import type {
   AnalysisReport,
@@ -1491,7 +1491,41 @@ export async function runCleanDelete(): Promise<void> {
   }
 }
 
-// React bindings: components re-render on any store change.
+// React bindings. Selectors prevent unrelated high-frequency progress events
+// from re-rendering the entire application tree.
+export function useStoreSelector<T>(
+  selector: (snapshot: UIState) => T,
+  isEqual: (a: T, b: T) => boolean = Object.is,
+): T {
+  const selected = useRef<{ source: UIState; value: T } | null>(null);
+
+  const getSelected = (): T => {
+    const current = selected.current;
+    if (current && current.source === state) return current.value;
+    const next = selector(state);
+    if (current && isEqual(current.value, next)) {
+      current.source = state;
+      return current.value;
+    }
+    selected.current = { source: state, value: next };
+    return next;
+  };
+
+  const subscribeSelected = (onChange: () => void): (() => void) =>
+    subscribe(() => {
+      const next = selector(state);
+      const current = selected.current;
+      if (current && isEqual(current.value, next)) {
+        current.source = state;
+        return;
+      }
+      selected.current = { source: state, value: next };
+      onChange();
+    });
+
+  return useSyncExternalStore(subscribeSelected, getSelected, () => selector(initial));
+}
+
 export function useStore(): UIState {
   return useSyncExternalStore(subscribe, getSnapshot);
 }

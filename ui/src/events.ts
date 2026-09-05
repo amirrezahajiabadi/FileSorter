@@ -16,19 +16,25 @@ export type SortEvent = { kind: EventKind; payload: unknown };
 
 const listeners = new Set<(msg: SortEvent) => void>();
 
+function syncDesktopHandler(): void {
+  if (typeof window === 'undefined') return;
+  // pywebview can inject its API after this module subscribes. Assigning the
+  // callback eagerly is safe in a normal browser and prevents the desktop
+  // bridge from losing every progress/completion event during startup.
+  window.onSortEvent = listeners.values().next().value;
+}
+
 export function isDesktop(): boolean {
   return typeof window !== 'undefined' && !!window.pywebview?.api;
 }
 
 export function subscribeEvents(cb: (msg: SortEvent) => void): () => void {
   listeners.add(cb);
-  if (isDesktop()) {
-    window.onSortEvent = cb;
-  }
+  syncDesktopHandler();
   return () => {
     listeners.delete(cb);
-    if (isDesktop() && window.onSortEvent === cb) {
-      window.onSortEvent = undefined;
+    if (typeof window !== 'undefined' && window.onSortEvent === cb) {
+      syncDesktopHandler();
     }
   };
 }

@@ -130,7 +130,7 @@ function waitForDesktopBridge(timeoutMs: number): Promise<boolean> {
       window.removeEventListener('pywebviewready', onReady);
       resolve(ok);
     };
-    const onReady = () => finish(true);
+    const onReady = () => finish(isDesktop());
     const deadline = Date.now() + timeoutMs;
     const poll = () => {
       if (isDesktop()) {
@@ -155,23 +155,33 @@ export let transportKind: TransportKind = 'mock';
 /** The active bridge; valid only after initTransport() has run. */
 export let bridge: BridgeApi = createMockBridge();
 
+let transportPromise: Promise<TransportKind> | null = null;
+
 /**
  * Resolve the transport once, at startup, and bind `bridge`. Called
  * (and awaited) by store.init() before any bridge call is made.
- * Idempotent.
+ * Idempotent. A service page can identify itself immediately through its
+ * token meta tag; only a windowed desktop page needs the bounded bridge wait.
  */
-export async function initTransport(): Promise<TransportKind> {
-  if (await waitForDesktopBridge(DESKTOP_BRIDGE_TIMEOUT_MS)) {
-    transportKind = 'desktop';
-    bridge = window.pywebview!.api as BridgeApi;
-  } else if (isHttpConfigured()) {
-    transportKind = 'service';
-    bridge = createHttpBridge();
-  } else {
-    transportKind = 'mock';
-    bridge = createMockBridge();
-  }
-  return transportKind;
+export function initTransport(): Promise<TransportKind> {
+  if (transportPromise) return transportPromise;
+  transportPromise = (async () => {
+    if (isDesktop()) {
+      transportKind = 'desktop';
+      bridge = window.pywebview!.api as BridgeApi;
+    } else if (isHttpConfigured()) {
+      transportKind = 'service';
+      bridge = createHttpBridge();
+    } else if (await waitForDesktopBridge(DESKTOP_BRIDGE_TIMEOUT_MS)) {
+      transportKind = 'desktop';
+      bridge = window.pywebview!.api as BridgeApi;
+    } else {
+      transportKind = 'mock';
+      bridge = createMockBridge();
+    }
+    return transportKind;
+  })();
+  return transportPromise;
 }
 
 export { isDesktop, subscribeEvents } from './events';
