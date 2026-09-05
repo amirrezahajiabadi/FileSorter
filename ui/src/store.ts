@@ -35,7 +35,7 @@ import type {
   WatchItem,
 } from './protocol';
 import { DEFAULT_CATEGORY_META } from './protocol';
-import { bridge, isDesktop, subscribeEvents, transportKind } from './transport';
+import { bridge, initTransport, subscribeEvents, transportKind, isDesktop } from './transport';
 import type { TransportKind } from './transport';
 import type { SortEvent } from './transport';
 import type { StringTable } from './i18n';
@@ -178,7 +178,7 @@ export interface UIState {
 
 const initial: UIState = {
   ready: false,
-  desktop: isDesktop(),
+  desktop: false,
   transport: transportKind,
   theme: 'dark',
   lang: 'en',
@@ -691,6 +691,10 @@ export async function init(): Promise<void> {
   // register first, then fetch state/strings.
   subscribeEvents(handleEvent);
   try {
+    // pywebview injects its bridge asynchronously, so the transport must
+    // be resolved (with a short wait for the desktop bridge) before the
+    // first call — otherwise the desktop app silently runs on the mock.
+    await initTransport();
     const app = await bridge.get_state();
     appState = app;
     const strings = await bridge.get_strings(app.language);
@@ -699,6 +703,7 @@ export async function init(): Promise<void> {
     document.documentElement.dir = app.language === 'fa' ? 'rtl' : 'ltr';
     set({
       ready: true,
+      desktop: isDesktop(),
       theme: app.theme,
       lang: app.language,
       version: app.version,
@@ -1270,6 +1275,11 @@ export function openTasksPanel(): void {
   if (state.tasksHistory.length === 0) {
     void loadTaskHistory();
   }
+  // Drive candidates for disk_scan/dup_scan tasks load once, here —
+  // not during render (which would re-fire on every store update).
+  if (!state.drivesLoaded) {
+    void loadDrives();
+  }
 }
 
 export function closeTasksPanel(): void {
@@ -1384,8 +1394,12 @@ export async function emptyRecycleBin(): Promise<void> {
   set({ binEmptying: true, binArmed: false });
   try {
     const res: BinEmptyResult = await bridge.empty_recycle_bin();
-    set({ binEmptying: false });
-    if (res.ok) {
+    // Verify against the real bin instead of optimistically zeroing:
+    // a shell failure (or a partially-failed empty) must surface.
+    const fresh = await bridge.recycle_bin_status();
+    set({ binEmptying: false, binStatus: fresh });
+    const actuallyEmpty = (fresh.files ?? 0) === 0;
+    if (res.ok && actuallyEmpty) {
       const msg = inline(
         fmt(t(state.strings, 'clean_bin_done_toast'), {
           size: formatSize(res.bytes),
@@ -1393,7 +1407,6 @@ export async function emptyRecycleBin(): Promise<void> {
       );
       pushLog('success', msg);
       showNotice('success', msg);
-      set({ binStatus: { available: true, files: 0, bytes: 0 } });
     } else {
       showNotice('error', inline(t(state.strings, 'clean_failed_toast')));
     }
@@ -1439,15 +1452,14 @@ export async function runCleanDelete(): Promise<void> {
     set({ cleanArmed: true });
     return;
   }
+  const ids = [...state.cleanSel];
   const byId = new Map(
     (state.cleanReport?.locations ?? []).map((l) => [l.id, l]),
   );
-  const ids = [...state.cleanSel];
   const freedBytes = ids.reduce(
     (n, id) => n + (byId.get(id)?.bytes ?? 0),
     0,
   );
-  set({ cleanDeleting: true, cleanArmed: false });
   try {
     // Delete by location id: the backend (and the mock) remove only
     // what the last scan flagged under those locations.
@@ -1455,10 +1467,13 @@ export async function runCleanDelete(): Promise<void> {
     const totalDeleted = res.deleted.length;
     set({ cleanDeleting: false });
     if (totalDeleted > 0) {
+      // Report what the backend says was actually freed, not the
+      // pre-delete estimate — locked/failed files skew the estimate.
+      const freed = res.freed_bytes ?? freedBytes;
       const msg = inline(
         fmt(t(state.strings, 'clean_deleted_toast'), {
           n: totalDeleted,
-          freed: formatSize(freedBytes),
+          freed: formatSize(freed),
         }),
       );
       pushLog('success', msg);

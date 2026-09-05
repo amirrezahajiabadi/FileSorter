@@ -105,20 +105,74 @@ declare global {
 // 1. Desktop (pywebview window)   -> native bridge
 // 2. Headless service reachable   -> HTTP transport (JSON-RPC + SSE)
 // 3. Plain browser, no backend    -> deterministic mock (dev preview)
+//
+// pywebview injects window.pywebview.api asynchronously — usually after
+// the page has finished loading and well after module evaluation — so
+// the transport cannot be chosen once at import time (the old behaviour
+// made the desktop app silently run on the mock: no native folder
+// dialog, and destructive buttons only "worked" on sample data).
+// resolveTransport() waits briefly for the bridge to appear before
+// falling back, and store.init() awaits it before first paint.
 
 export type TransportKind = 'desktop' | 'service' | 'mock';
 
-export const transportKind: TransportKind = isDesktop()
-  ? 'desktop'
-  : isHttpConfigured()
-    ? 'service'
-    : 'mock';
+const DESKTOP_BRIDGE_TIMEOUT_MS = 5000;
 
-export const bridge: BridgeApi = isDesktop()
-  ? (window.pywebview!.api as BridgeApi)
-  : isHttpConfigured()
-    ? createHttpBridge()
-    : createMockBridge();
+/** Wait (bounded) for pywebview to inject its API, if it ever will. */
+function waitForDesktopBridge(timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let done = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      if (pollTimer !== null) clearTimeout(pollTimer);
+      window.removeEventListener('pywebviewready', onReady);
+      resolve(ok);
+    };
+    const onReady = () => finish(true);
+    const deadline = Date.now() + timeoutMs;
+    const poll = () => {
+      if (isDesktop()) {
+        finish(true);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        finish(false);
+        return;
+      }
+      pollTimer = setTimeout(poll, 50);
+    };
+    // React to the official ready event when it fires, but keep the
+    // poll as a safety net for webviews that never emit it.
+    window.addEventListener('pywebviewready', onReady);
+    poll();
+  });
+}
+
+export let transportKind: TransportKind = 'mock';
+
+/** The active bridge; valid only after initTransport() has run. */
+export let bridge: BridgeApi = createMockBridge();
+
+/**
+ * Resolve the transport once, at startup, and bind `bridge`. Called
+ * (and awaited) by store.init() before any bridge call is made.
+ * Idempotent.
+ */
+export async function initTransport(): Promise<TransportKind> {
+  if (await waitForDesktopBridge(DESKTOP_BRIDGE_TIMEOUT_MS)) {
+    transportKind = 'desktop';
+    bridge = window.pywebview!.api as BridgeApi;
+  } else if (isHttpConfigured()) {
+    transportKind = 'service';
+    bridge = createHttpBridge();
+  } else {
+    transportKind = 'mock';
+    bridge = createMockBridge();
+  }
+  return transportKind;
+}
 
 export { isDesktop, subscribeEvents } from './events';
 export type { SortEvent } from './events';

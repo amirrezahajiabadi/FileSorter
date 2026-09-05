@@ -260,14 +260,23 @@ def empty_recycle_bin() -> dict:
     """
     shell32 = _shell32()
     if shell32 is None:
-        return {"ok": False, "files": 0, "bytes": 0, "error": "not available"}
+        return {"ok": False, "files": 0, "bytes": 0, "remaining_files": 0,
+                "error": "not available"}
     before = recycle_bin_status()
     # SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND
     flags = 0x1 | 0x2 | 0x4
     ret = shell32.SHEmptyRecycleBinW(None, None, flags)
+    # Some shell builds return a non-zero HRESULT when the bin was
+    # already empty; a post-call re-query of 0 items means it worked.
+    # The re-query doubles as verification so a silent shell failure can
+    # never be reported as success — the UI refreshes from this result
+    # instead of optimistically assuming the bin is now empty.
+    after = recycle_bin_status()
+    empty_ok = ret == 0 or after.get("files", 0) == 0
     return {
-        "ok": ret == 0,
+        "ok": empty_ok,
         "files": before.get("files", 0),
         "bytes": before.get("bytes", 0),
-        "error": None if ret == 0 else f"0x{ret & 0xFFFFFFFF:08x}",
+        "remaining_files": after.get("files", 0),
+        "error": None if empty_ok else f"0x{ret & 0xFFFFFFFF:08x}",
     }

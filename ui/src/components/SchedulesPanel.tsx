@@ -60,6 +60,9 @@ export default function SchedulesPanel({ store }: { store: UIState }) {
     }
   }
   if (!store.drivesLoaded && store.drives.length === 0) {
+    // Rendering guard: loadDrives is normally kicked off by
+    // openTasksPanel(); this fallback only runs when the panel was
+    // opened by another path that missed it.
     void loadDrives();
   }
 

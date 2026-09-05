@@ -283,7 +283,8 @@ def test_scan_skips_unreadable_subdirs(monkeypatch, tmp_path):
 # ══════════════════════════════════════════════════════════════════
 
 class FakeShell32:
-    """Records calls; the empty call returns 0 (S_OK) by default."""
+    """Records calls; the empty call returns 0 (S_OK) by default and
+    zeroes the bin contents, like the real shell."""
 
     def __init__(self, size=1000, items=3, empty_ret=0):
         self.size, self.items, self.empty_ret = size, items, empty_ret
@@ -295,12 +296,15 @@ class FakeShell32:
         # The real call passes ctypes.byref(info); unwrap the wrapper.
         if not hasattr(info, "i64Size"):
             info = info._obj
-        info.i64Size = self.size
+        info.i64Size = self.size if self.items else 0
         info.i64NumItems = self.items
         return 0
 
     def SHEmptyRecycleBinW(self, root, flags, opts):
         self.empty_calls += 1
+        if self.empty_ret == 0:
+            self.items = 0
+            self.size = 0
         return self.empty_ret
 
 
@@ -327,18 +331,45 @@ def test_empty_recycle_bin_reports_pre_empty_totals(monkeypatch):
     fake = FakeShell32(size=500000, items=9)
     monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
     res = cleanup.empty_recycle_bin()
-    assert res == {"ok": True, "files": 9, "bytes": 500000, "error": None}
+    assert res["ok"] is True
+    assert res["files"] == 9 and res["bytes"] == 500000
+    assert res["remaining_files"] == 0
     assert fake.empty_calls == 1
 
 
 def test_empty_recycle_bin_surfaces_failure(monkeypatch):
     from app import cleanup
 
-    fake = FakeShell32(size=7, items=1, empty_ret=1)  # nonzero -> error
+    # Shell reports failure AND the re-query still shows items left.
+    fake = FakeShell32(size=7, items=1, empty_ret=1)
     monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
     res = cleanup.empty_recycle_bin()
     assert res["ok"] is False
     assert res["error"] is not None
+    assert res["remaining_files"] == 1
+
+
+def test_empty_recycle_bin_succeeds_when_query_reports_zero(monkeypatch):
+    """Some shell builds return a non-zero HRESULT on an already-empty
+    bin; a post-call re-query of 0 items must count as success."""
+    from app import cleanup
+
+    fake = FakeShell32(size=7, items=1, empty_ret=1)
+    monkeypatch.setattr(cleanup, "_shell32", lambda: fake)
+    # Second query (after the empty call) reports nothing left.
+    real_query = fake.SHQueryRecycleBinW
+
+    def query_then_empty(root, info):
+        if fake.empty_calls == 0:
+            fake.items = 1
+        else:
+            fake.items = 0
+        return real_query(root, info)
+
+    fake.SHQueryRecycleBinW = query_then_empty
+    res = cleanup.empty_recycle_bin()
+    assert res["ok"] is True
+    assert res["remaining_files"] == 0
 
 
 def test_controller_recycle_pass_through(monkeypatch):
@@ -351,3 +382,4 @@ def test_controller_recycle_pass_through(monkeypatch):
     assert c.recycle_bin_status() == {"available": True, "files": 2, "bytes": 123}
     res = c.empty_recycle_bin()
     assert res["ok"] is True and fake.empty_calls == 1
+    assert res["remaining_files"] == 0
