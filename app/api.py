@@ -46,6 +46,22 @@ COALESCE_BATCH_KINDS = {"item", "watch_item"}
 # or the UI would see "done" before the last counter update.
 COALESCE_FLUSH_BEFORE = {"done", "dup_done", "space_done", "clean_done", "sched_done", "error"}
 COALESCE_INTERVAL = 0.12  # seconds — flushes at most ~8 event bursts/sec
+# Idle flushes before the coalescing thread retires. The flusher is one
+# long-lived thread per burst of activity (a 5-minute sort used to spawn a
+# fresh threading.Timer every COALESCE_INTERVAL — ~2,500 threads and their
+# locks), and it exits on its own so an idle app parks no extra thread.
+FLUSHER_IDLE_TICKS = 40  # ~4.8s of quiet after the last event
+# Last-resort guard on rows buffered between flushes. Rows are normally
+# delivered in full every flush; this only bites when a sort outruns the
+# bridge for a sustained period, in which case the oldest rows drop so
+# the backlog can never grow without bound. (A pure os.rename sort can
+# exceed 10k rows/sec, so the guard sits well above realistic per-flush
+# accumulation rather than at the UI log's tail of ~250 lines.)
+MAX_BUFFERED_ITEMS = 20_000
+# Rows delivered per bridge round trip. A flush of N rows used to cost N
+# blocking pywebview evaluate_js calls; chunking them into one script per
+# call keeps a burst bounded while staying well under script-size limits.
+FLUSH_CHUNK = 400
 
 
 class BaseApi:
@@ -62,7 +78,14 @@ class BaseApi:
         # WatchManager below starts wiring callbacks into it.
         self._coalesced = {}
         self._coalesce_lock = threading.Lock()
-        self._coalesce_timer = None
+        self._flusher = None
+        self._flusher_lock = threading.Lock()
+        self._flush_stop = threading.Event()
+        # Serializes flushes: a timer flush and an inline terminal flush
+        # (sort thread flushes pending rows before pushing "done") must
+        # never deliver concurrently or ordering breaks and the desktop
+        # bridge gets overlapping evaluate_js calls.
+        self._delivery_lock = threading.Lock()
         self._scan_lock = threading.Lock()
         self._scan_cancel = None  # threading.Event for the active disk/dup scan
         self._scan_kind = None
@@ -88,6 +111,19 @@ class BaseApi:
         """Deliver a live event (sort_item, dup_done, ...) to the UI."""
         raise NotImplementedError
 
+    def _push_many(self, kind: str, payloads: list) -> None:
+        """Deliver a burst of same-kind event rows (log rows from a sort,
+        watch items, ...) to the UI.
+
+        Default implementation keeps per-event semantics (one _push per
+        row) so SSE fan-out and recording test adapters behave exactly as
+        before. A subclass whose channel is round-trip bound (pywebview
+        evaluate_js) should override this to deliver the whole chunk in
+        one round trip.
+        """
+        for payload in payloads:
+            self._push(kind, payload)
+
     # ── Event coalescing (v6.1.1) ────────────────────────────────
 
     def push_event(self, kind: str, payload) -> None:
@@ -109,30 +145,86 @@ class BaseApi:
             return
         with self._coalesce_lock:
             if kind in COALESCE_BATCH_KINDS:
-                self._coalesced.setdefault(kind, []).append(payload)
+                buf = self._coalesced.get(kind)
+                if buf is None:
+                    buf = []
+                    self._coalesced[kind] = buf
+                buf.append(payload)
+                if len(buf) > MAX_BUFFERED_ITEMS:
+                    del buf[: len(buf) - MAX_BUFFERED_ITEMS]  # keep newest
             else:
                 self._coalesced[kind] = payload  # latest wins
-            if self._coalesce_timer is None:
-                self._coalesce_timer = threading.Timer(
-                    COALESCE_INTERVAL, self._flush_coalesced
-                )
-                self._coalesce_timer.daemon = True
-                self._coalesce_timer.start()
+        self._ensure_flusher()
 
-    def _flush_coalesced(self) -> None:
-        """Deliver everything buffered since the last flush. Runs on a
-        daemon timer thread; the queue/JS bridge must be thread-safe
-        (both adapters' _push are)."""
+    def _ensure_flusher(self) -> None:
+        """Start the coalescing thread unless it is already running.
+
+        Callers must have buffered their event *before* calling this, so the
+        thread can never decide the buffer is empty and retire while the
+        event that woke it is still on its way in (both sides serialize on
+        ``_flusher_lock``).
+        """
+        with self._flusher_lock:
+            if self._flusher is not None and self._flusher.is_alive():
+                return
+            self._flush_stop.clear()
+            self._flusher = threading.Thread(
+                target=self._flusher_loop, name="filesorter-flush", daemon=True
+            )
+            self._flusher.start()
+
+    def _flusher_loop(self) -> None:
+        """Flush the buffer on a fixed cadence, then retire when idle.
+
+        A fixed cadence keeps the output rate bounded (~8 bursts/sec) instead
+        of tracking every arrival, and the whole loop is one sleeping thread
+        rather than a timer object per burst.
+        """
+        idle_ticks = 0
+        while not self._flush_stop.wait(COALESCE_INTERVAL):
+            if self._flush_coalesced():
+                idle_ticks = 0
+                continue
+            idle_ticks += 1
+            if idle_ticks < FLUSHER_IDLE_TICKS:
+                continue
+            with self._flusher_lock:
+                with self._coalesce_lock:
+                    pending = bool(self._coalesced)
+                if pending:
+                    idle_ticks = 0  # raced with a new event — keep flushing
+                    continue
+                self._flusher = None
+                return
+
+    def _flush_coalesced(self) -> bool:
+        """Deliver everything buffered since the last flush; True if anything
+        was delivered. Runs on the flusher thread (and inline on terminal
+        events); the queue/JS bridge must be thread-safe (both adapters'
+        _push are).
+        """
         with self._coalesce_lock:
             items = list(self._coalesced.items())
             self._coalesced.clear()
-            self._coalesce_timer = None
-        for kind, payload in items:
-            if isinstance(payload, list):
-                for one in payload:
-                    self._push(kind, one)
-            else:
-                self._push(kind, payload)
+        if not items:
+            return False
+        with self._delivery_lock:
+            for kind, payload in items:
+                try:
+                    if kind in COALESCE_BATCH_KINDS:
+                        # Deliver the whole burst in bounded chunks: every
+                        # row reaches the UI (counters/category counts
+                        # derive from item rows) while each chunk stays a
+                        # single bridge round trip.
+                        for i in range(0, len(payload), FLUSH_CHUNK):
+                            self._push_many(kind, payload[i:i + FLUSH_CHUNK])
+                    else:
+                        self._push(kind, payload)
+                except Exception:
+                    # One failing frame must not drop the rest of the
+                    # flush (a desktop webview hiccup, a closed SSE queue).
+                    continue
+        return True
 
     def browse_folder(self):
         """Open a native folder-picker dialog.
@@ -191,6 +283,7 @@ class BaseApi:
         self.watch_manager.stop()
         self.task_scheduler.stop()
         self.cancel_scan()
+        self._flush_stop.set()  # retire the coalescing thread
         self._flush_coalesced()
 
 
@@ -243,7 +336,6 @@ class BaseApi:
         self._push("sched_run", {
             "task_id": task.get("id"), "kind": kind, "folder": folder,
         })
-        if kind == "cleanup":
         if kind == "cleanup":
             result = self.controller.scan_cleanup(on_event=self.push_event)
             return {
@@ -322,7 +414,12 @@ class BaseApi:
     def analyze_folder(self, path: str) -> dict:
         """Scan a folder and return the smart-analysis report.
 
-        Returns a plain dict that JSON-serializes cleanly.
+        Returns synchronously: the previous implementation spawned a thread
+        and immediately join()'d it, which bought no concurrency (every
+        caller blocks on the return value either way) while paying for a
+        thread, a closure and a second result dict per call. The RPC contract
+        is unchanged — failures still surface as {"error": ...} instead of
+        raising across the bridge.
         """
         try:
             return self.controller.analyze(path)
@@ -334,15 +431,15 @@ class BaseApi:
     def plan_sort(self, path: str, duplicate_mode: str = "skip") -> list:
         """Compute what a real sort would do, without touching the filesystem.
 
-        Returns a list of dicts, each with: name, category, action,
-        final_name. Path objects are serialized as strings.
+        Returns a list of wire-safe dicts (name, category, action,
+        final_name). A failed plan is surfaced as [{"error": ...}]. See
+        analyze_folder for why this is synchronous.
         """
         try:
             plan = self.controller.plan(path, duplicate_mode)
-            # Build wire-safe rows through the shared protocol contract.
-            return [plan_item_wire(item) for item in plan]
         except Exception as e:
             return [{"error": str(e)}]
+        return [plan_item_wire(item) for item in plan]
 
     # ── Sort ───────────────────────────────────────────────────
 

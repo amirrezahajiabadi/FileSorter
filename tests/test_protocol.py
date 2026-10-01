@@ -123,3 +123,90 @@ class TestConstants:
         expected = ['total', 'item', 'progress', 'done']
         for kind in expected:
             assert kind in protocol.EVENT_KINDS
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Event-kind coverage
+#
+#  Regression: EVENT_KINDS drifted behind the kinds the app actually
+#  emits, so event_message() raised ValueError for clean_*/sched_* at the
+#  wire boundary and the TypeScript mirror lost sched_run/sched_done.
+# ══════════════════════════════════════════════════════════════════
+
+# Every kind app/ can emit, by push_event / _push call site. Update this
+# set (and EVENT_KINDS) together when a new event kind is introduced.
+EMITTED_KINDS = {
+    'total', 'item', 'progress', 'done', 'error',
+    'watch_item', 'watch_error',
+    'dup_progress', 'dup_done',
+    'space_progress', 'space_done',
+    'clean_progress', 'clean_done',
+    'sched_run', 'sched_done',
+}
+
+TERMINAL_KINDS = {
+    'done', 'error', 'dup_done', 'space_done', 'clean_done', 'sched_done',
+}
+
+
+class TestEventKindCoverage:
+    def test_every_emitted_kind_is_declared(self):
+        missing = EMITTED_KINDS - set(protocol.EVENT_KINDS)
+        assert not missing, (
+            f'emitted by the app but absent from EVENT_KINDS: {sorted(missing)}'
+        )
+
+    def test_event_message_accepts_every_emitted_kind(self):
+        # event_message() validates against EVENT_KINDS, so an undeclared
+        # kind is a hard failure at the boundary, not a silent no-op.
+        for kind in sorted(EMITTED_KINDS):
+            assert event_message(kind, {})['kind'] == kind
+
+    def test_terminal_kinds_are_the_declared_terminal_set(self):
+        assert protocol.TERMINAL_EVENT_KINDS == TERMINAL_KINDS
+        assert TERMINAL_KINDS <= set(protocol.EVENT_KINDS)
+
+    def test_terminal_kinds_flush_pending_rows_before_themselves(self):
+        # A terminal frame must never be overtaken by buffered progress ticks
+        # from the same run, or the UI closes the operation on stale counters.
+        from app.api import COALESCE_FLUSH_BEFORE
+
+        missing = TERMINAL_KINDS - COALESCE_FLUSH_BEFORE
+        assert not missing, f'must flush buffered rows first: {sorted(missing)}'
+
+    def test_typescript_mirror_declares_the_same_kinds(self):
+        """The UI's EventKind set must match Python's exactly.
+
+        Both sides validate against their own set, so a kind present on one
+        side and missing on the other is invisible until it silently drops at
+        runtime. Parses ui/src/protocol.ts deliberately: reformatting that
+        block should fail loudly here rather than drift.
+        """
+        import re
+
+        ts_path = (
+            Path(__file__).resolve().parents[1] / 'ui' / 'src' / 'protocol.ts'
+        )
+        source = ts_path.read_text(encoding='utf-8')
+        block = re.search(
+            r'export const EVENT_KINDS[^=]*=\s*new Set\(\[(.*?)\]\)', source, re.S
+        )
+        assert block, 'could not find the EVENT_KINDS set in ui/src/protocol.ts'
+        declared = set(re.findall(r"'([a-z_]+)'", block.group(1)))
+        assert declared == set(protocol.EVENT_KINDS)
+
+    def test_typescript_mirror_declares_the_same_terminal_kinds(self):
+        import re
+
+        ts_path = (
+            Path(__file__).resolve().parents[1] / 'ui' / 'src' / 'protocol.ts'
+        )
+        source = ts_path.read_text(encoding='utf-8')
+        block = re.search(
+            r'export const TERMINAL_EVENT_KINDS[^=]*=\s*new Set\(\[(.*?)\]\)',
+            source,
+            re.S,
+        )
+        assert block, 'could not find TERMINAL_EVENT_KINDS in ui/src/protocol.ts'
+        declared = set(re.findall(r"'([a-z_]+)'", block.group(1)))
+        assert declared == set(protocol.TERMINAL_EVENT_KINDS)

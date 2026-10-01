@@ -1,45 +1,75 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 
-import { openUndoModal, resetApp, useStore } from '../store';
+import { openUndoModal, resetApp, useStoreFields } from '../store';
 import type { LogLine } from '../store';
 import { fmt, inline, t } from '../i18n';
 import { percent } from '../utils';
 
-function LogList({ logs }: { logs: LogLine[] }) {
-  const endRef = useRef<HTMLDivElement>(null);
+// One memoized row per log line. The list itself gets a new array every batch,
+// but the LogLine objects inside it are reused, so memo keeps React from
+// touching the ~250 rows already on screen — only the new tail row renders.
+const LogRow = memo(function LogRow({ line }: { line: LogLine }) {
+  return <div className={`log-line log-${line.kind}`}>{line.text}</div>;
+});
+
+const LogList = memo(function LogList({ logs }: { logs: LogLine[] }) {
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'nearest' });
+    // Only auto-scroll if the reader is already at the bottom. Scroll by
+    // assigning scrollTop rather than scrollIntoView: a sort emits batches
+    // several times a second, and scrollIntoView re-runs layout for the whole
+    // list each time, which is what made the live log feel janky.
+    const container = listRef.current;
+    if (!container) return;
+    const threshold = 60; // pixels from bottom
+    const distance =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distance < threshold) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [logs.length]);
 
+  if (logs.length === 0) return null;
+
   return (
-    <div className="log-list" aria-live="polite">
+    <div className="log-list" aria-live="polite" ref={listRef}>
       {logs.map((line) => (
-        <div className={`log-line log-${line.kind}`} key={line.id}>
-          {line.text}
-        </div>
+        <LogRow key={line.id} line={line} />
       ))}
-      <div ref={endRef} />
     </div>
   );
-}
+});
 
-function Counter({ label, value, tone }: { label: string; value: number; tone: string }) {
+const Counter = memo(function Counter({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
     <div className={`counter counter-${tone}`}>
       <span className="counter-value">{value}</span>
       <span className="counter-label">{label}</span>
     </div>
   );
-}
+});
 
 export default function OperationPanel() {
-  const store = useStore();
+  const store = useStoreFields([
+    'strings',
+    'phase',
+    'result',
+    'logs',
+    'folder',
+    'processed',
+    'totalFiles',
+    'okCount',
+    'skipCount',
+    'errorCount',
+  ]);
   const { strings, phase } = store;
   const S = strings;
   const sorting = phase === 'sorting';
-  const pct = percent(store.processed, store.totalFiles);
   const result = store.result;
+
+  // Only compute progress when actually sorting
+  const pct = sorting ? percent(store.processed, store.totalFiles) : 0;
 
   return (
     <section className="op-panel" aria-label="Operation">

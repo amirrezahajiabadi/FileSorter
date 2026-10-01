@@ -37,11 +37,28 @@ EVENT_DUP_DONE = "dup_done"
 EVENT_SPACE_PROGRESS = "space_progress"
 EVENT_SPACE_DONE = "space_done"
 
+EVENT_CLEAN_PROGRESS = "clean_progress"
+EVENT_CLEAN_DONE = "clean_done"
+
+EVENT_SCHED_RUN = "sched_run"
+EVENT_SCHED_DONE = "sched_done"
+
 EVENT_KINDS = frozenset({
     EVENT_TOTAL, EVENT_ITEM, EVENT_PROGRESS, EVENT_DONE, EVENT_ERROR,
     EVENT_WATCH_ITEM, EVENT_WATCH_ERROR,
     EVENT_DUP_PROGRESS, EVENT_DUP_DONE,
     EVENT_SPACE_PROGRESS, EVENT_SPACE_DONE,
+    EVENT_CLEAN_PROGRESS, EVENT_CLEAN_DONE,
+    EVENT_SCHED_RUN, EVENT_SCHED_DONE,
+})
+
+# ── Terminal kinds ──────────────────────────────────────────────
+# Kinds that close an operation. A dropped terminal event leaves the UI on
+# an eternal spinner, so transports must deliver these reliably even when a
+# high-frequency stream has filled their buffer (see ServiceApi._push).
+TERMINAL_EVENT_KINDS = frozenset({
+    EVENT_DONE, EVENT_ERROR,
+    EVENT_DUP_DONE, EVENT_SPACE_DONE, EVENT_CLEAN_DONE, EVENT_SCHED_DONE,
 })
 
 # ── Duplicate-handling modes ────────────────────────────────────
@@ -115,13 +132,21 @@ class SortLogEntry(TypedDict):
 
 
 class SortDone(TypedDict):
-    """Payload of the "done" event after a successful sort."""
+    """Payload of the "done" event after a successful sort.
+
+    ``sort_log`` is the wire preview the UI renders in the Undo dialog; it
+    is capped at MAX_SORT_LOG_WIRE rows so a whole-drive sort does not ship a
+    multi-megabyte JSON frame. ``sort_log_total`` is the real entry count, and
+    undo always replays the controller's complete in-memory log — never this
+    preview — so truncation never changes what an undo does.
+    """
 
     copied: int
     skipped: int
     errors: int
     target_dir: str
     sort_log: List[SortLogEntry]
+    sort_log_total: int
 
 
 class WatchItem(TypedDict):
@@ -179,6 +204,7 @@ class DupDone(TypedDict):
     groups: List[DupGroup]
     wasted_bytes: int
     files_scanned: int
+    cancelled: bool  # True when the user cancelled; results are partial
 
 
 class SpaceCategory(TypedDict):
@@ -210,6 +236,7 @@ class SpaceDone(TypedDict):
     top_files: List[SpaceTopFile]
     files_scanned: int
     total_bytes: int
+    cancelled: bool  # True when the user cancelled; results are partial
 
 
 class DupDeleteResult(TypedDict):

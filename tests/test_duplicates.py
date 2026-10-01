@@ -87,11 +87,15 @@ def test_scan_reports_events(tmp_path):
     events = []
     scan_duplicates(tmp_path, on_event=lambda k, p: events.append((k, p)))
     kinds = [k for k, _ in events]
-    assert kinds == ["dup_progress"] * 4
+    assert kinds == ["dup_progress"] * 3
     phases = [p["phase"] for _, p in events]
-    # listing start, hashing start, then one event per hashed candidate
-    assert phases == ["listing", "hashing", "hashing", "hashing"]
+    # listing start, hashing start, then the closing hashing tick. Per-file
+    # hashing ticks are throttled (HASH_EMIT_EVERY) because the bridge
+    # coalescer keeps only the newest frame anyway, but the *final* tick is
+    # always emitted so the reported count is exact.
+    assert phases == ["listing", "hashing", "hashing"]
     assert events[-1][1]["processed"] == 2
+    assert events[-1][1]["total"] == 2
 
 
 def test_deterministic_group_order_and_id(tmp_path):

@@ -17,6 +17,8 @@ from app.api import (
     COALESCE_BATCH_KINDS,
     COALESCE_INTERVAL,
     COALESCE_LAST_KINDS,
+    FLUSH_CHUNK,
+    MAX_BUFFERED_ITEMS,
     BaseApi,
 )
 
@@ -159,3 +161,76 @@ def test_timer_respawns_for_later_bursts(api):
     while time.monotonic() < deadline and api.delivered == [("progress", 1)]:
         time.sleep(0.02)
     assert api.delivered == [("progress", 1), ("progress", 2)]
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Chunked round trips (_push_many) + bounded buffers
+# ══════════════════════════════════════════════════════════════════
+# The desktop adapter overrides _push_many to deliver a whole chunk in
+# one evaluate_js script. Regression: a fast sort must cost a handful of
+# bridge round trips per flush, never one per row, or the flush cannot
+# keep up and the backlog (and UI freeze) compounds without bound.
+
+
+class BatchedApi(BaseApi):
+    """BaseApi whose _push_many records chunk sizes per round trip —
+    like the pywebview adapter that delivers each chunk in one call."""
+
+    def __init__(self):
+        super().__init__()
+        self.round_trips = []  # each entry: (kind, [payloads]) per call
+
+    def _push(self, kind: str, payload) -> None:
+        self.round_trips.append((kind, [payload]))
+
+    def _push_many(self, kind: str, payloads: list) -> None:
+        self.round_trips.append((kind, list(payloads)))
+
+    def delivered_items(self):
+        return [p for kind, rows in self.round_trips if kind == "item" for p in rows]
+
+
+def test_batch_delivery_chunks_into_few_round_trips(tmp_path, monkeypatch):
+    import app.settings_manager as settings_manager
+
+    monkeypatch.setattr(settings_manager, "SETTINGS_FILE", tmp_path / "settings.json")
+    batched = BatchedApi()
+    n = FLUSH_CHUNK * 3 + 17  # not a multiple of the chunk size
+    for i in range(n):
+        batched.push_event("item", {"status": "ok", "name": f"f{i}.txt", "category": "docs"})
+    batched._flush_coalesced()
+
+    item_trips = [rows for kind, rows in batched.round_trips if kind == "item"]
+    # Each flush must cost a handful of round trips, not one per row.
+    assert len(item_trips) == (n + FLUSH_CHUNK - 1) // FLUSH_CHUNK
+    assert all(len(rows) <= FLUSH_CHUNK for rows in item_trips)
+    # Every row arrives, in order, nothing dropped.
+    names = [p["name"] for p in batched.delivered_items()]
+    assert names == [f"f{i}.txt" for i in range(n)]
+
+
+def test_batch_buffer_is_capped_to_newest_rows(tmp_path, monkeypatch):
+    import app.settings_manager as settings_manager
+
+    monkeypatch.setattr(settings_manager, "SETTINGS_FILE", tmp_path / "settings.json")
+    batched = BatchedApi()
+    n = MAX_BUFFERED_ITEMS + 500
+    for i in range(n):
+        batched.push_event("item", {"status": "ok", "name": f"f{i}.txt", "category": "docs"})
+    batched._flush_coalesced()
+
+    names = [p["name"] for p in batched.delivered_items()]
+    assert len(names) == MAX_BUFFERED_ITEMS
+    assert names[-1] == f"f{n - 1}.txt"  # newest row kept
+    assert names[0] == f"f{n - MAX_BUFFERED_ITEMS}.txt"  # oldest dropped
+
+
+def test_terminal_flush_still_ordered_with_batches(tmp_path, monkeypatch):
+    import app.settings_manager as settings_manager
+
+    monkeypatch.setattr(settings_manager, "SETTINGS_FILE", tmp_path / "settings.json")
+    batched = BatchedApi()
+    batched.push_event("item", {"status": "ok", "name": "a.txt", "category": "docs"})
+    batched.push_event("done", {"copied": 1, "skipped": 0, "errors": 0, "target_dir": "x"})
+    kinds = [kind for kind, _ in batched.round_trips]
+    assert kinds == ["item", "done"]

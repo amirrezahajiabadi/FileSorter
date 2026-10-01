@@ -125,11 +125,13 @@ def test_analyze_folder_returns_report(api, tmp_path):
     assert report["by_category"]["images"] == 1
 
 
-def test_analyze_folder_returns_empty_report_on_invalid_path(api):
+def test_analyze_folder_reports_error_on_invalid_path(api):
     result = api.analyze_folder("/nonexistent/path/that/does/not/exist")
-    # analyze_folder returns empty report for non-existent paths
-    assert result["total"] == 0
-    assert result["by_category"] == {}
+    # A missing folder is an error, not an empty report: reporting "0 files"
+    # for a typo'd or deleted path silently misled the user. The UI already
+    # renders report.error as a toast, and scan_space raises the same way.
+    assert "error" in result
+    assert "folder not found" in result["error"]
 
 
 # ══════════════════════════════════════════════════════════════════

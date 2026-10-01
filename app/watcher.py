@@ -22,6 +22,7 @@ public so tests can drive it without starting any threads.
 
 from __future__ import annotations
 
+import os
 import shutil
 import threading
 import time
@@ -42,13 +43,23 @@ def snapshot_folder(path: Path) -> Snapshot:
 
     Directories (including category folders and "sorted") are excluded:
     watch mode only organises loose files at the root of the folder.
+
+    os.scandir is used rather than Path.iterdir() because it yields DirEntry
+    objects: the stat needed for the fingerprint is cached on the entry, so
+    each child costs one metadata syscall per poll instead of two. Watch mode
+    re-snapshots every folder every couple of seconds forever, so this is the
+    single hottest loop in the app while it idles in the tray.
     """
     result: Snapshot = {}
     try:
-        for entry in path.iterdir():
-            if entry.is_file():
-                st = entry.stat()
-                result[entry.name] = (st.st_mtime, st.st_size)
+        with os.scandir(path) as entries:
+            for entry in entries:
+                try:
+                    if entry.is_file():
+                        st = entry.stat()
+                        result[entry.name] = (st.st_mtime, st.st_size)
+                except OSError:
+                    continue  # vanished mid-snapshot — treat as not there
     except OSError:
         pass  # handled by the caller via is_dir checks / watch_error
     return result

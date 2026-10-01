@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import type { DuplicateMode } from '../protocol';
 import {
-  useStore,
+  useStoreFields,
   closeAnalysis,
   loadPlan,
   runSort,
@@ -45,7 +45,17 @@ function resultLabel(strings: Record<string, string>, action: string, finalName:
 }
 
 export default function AnalysisModal() {
-  const store = useStore();
+  const store = useStoreFields([
+    'strings',
+    'report',
+    'phase',
+    'categories',
+    'folder',
+    'move',
+    'dupMode',
+    'dryRunOpen',
+    'plan',
+  ]);
   const { strings, report, phase, categories, folder } = store;
   const S = strings;
   const byCat = report?.by_category ?? {};

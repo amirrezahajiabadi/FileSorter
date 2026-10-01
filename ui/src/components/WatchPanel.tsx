@@ -1,4 +1,4 @@
-import type { UIState } from '../store';
+import { useStoreFields } from '../store';
 import {
   closeWatch,
   watchAddCurrent,
@@ -18,11 +18,19 @@ function EyeIcon() {
   );
 }
 
-export default function WatchPanel({ store }: { store: UIState }) {
-  const S = store.strings;
-  const { watchRunning, watchFolders, watchLog, folder } = store;
+export default function WatchPanel() {
+  const { strings, watchOpen, watchRunning, watchFolders, watchLog, folder } =
+    useStoreFields([
+      'strings',
+      'watchOpen',
+      'watchRunning',
+      'watchFolders',
+      'watchLog',
+      'folder',
+    ]);
+  const S = strings;
 
-  if (!store.watchOpen) return null;
+  if (!watchOpen) return null;
 
   const title = t(S, 'watch_title');
   const statusLabel = watchRunning ? t(S, 'watch_running') : t(S, 'watch_stopped');

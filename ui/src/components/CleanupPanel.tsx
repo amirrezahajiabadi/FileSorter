@@ -1,4 +1,4 @@
-import type { UIState } from '../store';
+import { useStoreFields } from '../store';
 import {
   closeCleanPanel,
   emptyRecycleBin,
@@ -35,7 +35,20 @@ const LOC_KEY: Record<CleanLocationId, string> = {
   win_temp: 'clean_loc_win_temp',
 };
 
-export default function CleanupPanel({ store }: { store: UIState }) {
+export default function CleanupPanel() {
+  const store = useStoreFields([
+    'cleanOpen',
+    'strings',
+    'cleanScanning',
+    'cleanReport',
+    'cleanSel',
+    'cleanArmed',
+    'cleanDeleting',
+    'binStatus',
+    'binLoading',
+    'binArmed',
+    'binEmptying',
+  ]);
   const S = store.strings;
   if (!store.cleanOpen) return null;
 

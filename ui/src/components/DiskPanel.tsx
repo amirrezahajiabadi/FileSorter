@@ -1,4 +1,6 @@
-import type { UIState } from '../store';
+import { useMemo } from 'react';
+
+import { useStoreFields } from '../store';
 import {
   cancelScan,
   closeDiskPanel,
@@ -37,21 +39,38 @@ function dirName(path: string): string {
   return path.split(/[\/]/).slice(0, -1).join('/');
 }
 
-export default function DiskPanel({ store }: { store: UIState }) {
+export default function DiskPanel() {
+  const store = useStoreFields([
+    'diskOpen',
+    'strings',
+    'folder',
+    'drives',
+    'diskScanning',
+    'diskProcessed',
+    'diskBytes',
+    'diskReport',
+    'diskScanFolder',
+    'categories',
+  ]);
   const S = store.strings;
-
-  if (!store.diskOpen) return null;
-
   const { diskScanning, diskProcessed, diskBytes, diskReport, categories } =
     store;
   const totalBytes = diskReport?.total_bytes ?? 0;
   const byCat = diskReport?.by_category ?? {};
 
-  // Chart rows: every category that has any bytes, largest first.
-  const chart = categories
-    .filter((c) => (byCat[c.id]?.bytes ?? 0) > 0)
-    .sort((a, b) => byCat[b.id].bytes - byCat[a.id].bytes);
+  // Chart rows: every category that has any bytes, largest first. Memoized so
+  // a running scan's progress ticks (which do not touch the report) cannot
+  // re-sort the chart on every frame.
+  const chart = useMemo(
+    () =>
+      categories
+        .filter((c) => (byCat[c.id]?.bytes ?? 0) > 0)
+        .sort((a, b) => byCat[b.id].bytes - byCat[a.id].bytes),
+    [categories, byCat],
+  );
   const topFiles = diskReport?.top_files ?? [];
+
+  if (!store.diskOpen) return null;
 
   return (
     <div

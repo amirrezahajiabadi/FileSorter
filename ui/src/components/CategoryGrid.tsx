@@ -1,14 +1,15 @@
-import type { UIState } from '../store';
+import { useStoreSelector } from '../store';
 import { t } from '../i18n';
 
-export default function CategoryGrid({ store }: { store: UIState }) {
-  const title = t(store.strings, 'categories_label');
+export default function CategoryGrid() {
+  const categories = useStoreSelector((s) => s.categories);
+  const title = useStoreSelector((s) => t(s.strings, 'categories_label'));
 
   return (
     <section className="categories" aria-label={title}>
       <h2 className="section-title">{title}</h2>
       <div className="category-grid">
-        {store.categories.map((cat) => (
+        {categories.map((cat) => (
           <div key={cat.id} className={`category-card category-${cat.id}`}>
             {cat.count > 0 && <span className="category-count">{cat.count}</span>}
             <span className="category-icon" aria-hidden="true">

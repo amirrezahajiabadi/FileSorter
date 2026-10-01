@@ -2,9 +2,14 @@
 pywebview
 
 # ── Dev-only ──────────────────────────────────────────────────────
-# To build a standalone .exe with PyInstaller:
+# To build the desktop app with PyInstaller (build the UI first):
 #   pip install pyinstaller
-#   pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py
+#   cd ui && npm install && npm run build && cd ..
+#   python -m PyInstaller --clean --noconfirm FileSorter.spec
+#   python tools/smoke_test_build.py      # verifies the frozen app runs
+#
+# FileSorter.spec is the only build recipe — it owns the hidden imports, the
+# bundled frontend, the icon and the version resource. See docs/build_installer.md.
 #
 # To run the test suite:
 #   pip install pytest

@@ -1,9 +1,10 @@
 """Disk space analysis: what's actually taking up space in a folder —
 or a whole drive (v5.7.0).
 
-Walks the tree once, buckets every file into a sort category (via the
-same extension rules the sorter uses), and returns per-category totals
-plus the largest files. Read-only — nothing here deletes or moves.
+Walks the tree once (via sorter.iter_files, one stat per file), buckets
+every file into a sort category (via the same extension rules the sorter
+uses), and returns per-category totals plus the largest files. Read-only —
+nothing here deletes or moves.
 
 Progress is reported through the same on_event(kind, payload) contract
 used by sort/duplicates: ("space_progress", {"phase", "processed",
@@ -17,19 +18,18 @@ stops at the next file boundary and returns the partial results with
 "cancelled": True, so the UI can show what was found so far. Walking a
 whole drive also means bumping into unreadable system directories
 (System Volume Information, $Recycle.Bin, ...) — those are skipped
-silently via os.walk's onerror hook.
+silently by the shared walk in sorter.iter_files.
 """
 
 from __future__ import annotations
 
-import os
 import shutil
 import string
 import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from app.sorter import get_category
+from app.sorter import get_category, iter_files
 
 TOP_N = 20  # how many largest files to report
 
@@ -66,10 +66,21 @@ def list_drives() -> list:
     return drives
 
 
-def _skip_walk_error(_exc: OSError) -> None:
-    """os.walk onerror hook: ignore unreadable directories instead of
-    aborting the whole scan (common on drive roots: system folders,
-    permissions)."""
+def _push_top(top_files: List[Dict[str, int]], entry: Dict[str, int],
+              top_n: int) -> None:
+    """Keep `top_files` as the `top_n` largest entries seen so far.
+
+    Insertion sort over a list this short beats re-sorting the whole list on
+    every candidate; a full sort used to run each time a new file entered the
+    window while the first `top_n` files were still being collected.
+    """
+    if len(top_files) < top_n:
+        top_files.append(entry)
+    elif entry["size"] > top_files[-1]["size"]:
+        top_files[-1] = entry
+    else:
+        return
+    top_files.sort(key=lambda e: e["size"], reverse=True)
 
 
 def scan_space(
@@ -115,36 +126,26 @@ def scan_space(
                 {"phase": "scanning", "processed": processed, "bytes": bytes_so_far},
             )
 
-    for dirpath, _dirnames, filenames in os.walk(root, onerror=_skip_walk_error):
-        for name in filenames:
-            if cancel_event is not None and cancel_event.is_set():
-                cancelled = True
-                break
-            path = Path(dirpath) / name
-            try:
-                size = path.stat().st_size
-            except OSError:
-                continue  # unreadable entry — not our problem
-            scanned += 1
-            total_bytes += size
-
-            cat = get_category(path.suffix, categories)
-            bucket = by_category.setdefault(cat, {"files": 0, "bytes": 0})
-            bucket["files"] += 1
-            bucket["bytes"] += size
-
-            entry = {"path": str(path), "size": size}
-            if len(top_files) < top_n:
-                top_files.append(entry)
-                top_files.sort(key=lambda e: e["size"], reverse=True)
-            elif size > top_files[-1]["size"]:
-                top_files[-1] = entry
-                top_files.sort(key=lambda e: e["size"], reverse=True)
-
-            if scanned % 128 == 0:
-                emit(scanned, total_bytes)
-        if cancelled:
+    # iter_files already prunes unreadable directories and unreadable entries
+    # (the old os.walk onerror hook), and hands back the stat it had to read
+    # anyway — so the walk costs one metadata syscall per file instead of two.
+    for path, st in iter_files(root):
+        if cancel_event is not None and cancel_event.is_set():
+            cancelled = True
             break
+        size = st.st_size
+        scanned += 1
+        total_bytes += size
+
+        cat = get_category(path.suffix, categories)
+        bucket = by_category.setdefault(cat, {"files": 0, "bytes": 0})
+        bucket["files"] += 1
+        bucket["bytes"] += size
+
+        _push_top(top_files, {"path": str(path), "size": size}, top_n)
+
+        if scanned % 128 == 0:
+            emit(scanned, total_bytes)
 
     emit(scanned, total_bytes)  # final tick — exactly what was scanned
     return {

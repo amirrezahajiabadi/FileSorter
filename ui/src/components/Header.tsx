@@ -1,4 +1,4 @@
-import type { UIState } from '../store';
+import { useStoreFields } from '../store';
 import {
   openCleanPanel,
   openDiskPanel,
@@ -28,7 +28,14 @@ function MoonIcon() {
   );
 }
 
-export default function Header({ store }: { store: UIState }) {
+export default function Header() {
+  const store = useStoreFields([
+    'strings',
+    'lang',
+    'theme',
+    'version',
+    'transport',
+  ]);
   const title = t(store.strings, 'app_title');
   const langLabel = store.lang === 'fa' ? 'EN' : 'فا';
 

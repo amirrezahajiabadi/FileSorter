@@ -52,6 +52,10 @@ import { createHttpBridge, isHttpConfigured } from './http';
 export interface BridgeApi {
   get_state(): Promise<AppState>;
   browse_folder(): Promise<string | null>;
+  /** Persist a folder the user typed/drove to, instead of picking it through
+   *  the native dialog (which records it server-side). Returns the updated
+   *  recent-folders list. */
+  record_recent_folder(path: string): Promise<string[]>;
   toggle_theme(): Promise<ThemeName>;
   toggle_language(): Promise<LangCode>;
   get_strings(lang: LangCode): Promise<Record<string, string>>;
@@ -130,7 +134,7 @@ function waitForDesktopBridge(timeoutMs: number): Promise<boolean> {
       window.removeEventListener('pywebviewready', onReady);
       resolve(ok);
     };
-    const onReady = () => finish(isDesktop());
+    const onReady = () => finish(true);
     const deadline = Date.now() + timeoutMs;
     const poll = () => {
       if (isDesktop()) {
@@ -205,8 +209,12 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
   others: [],
 };
 
+// Must track APP_VERSION in app/constants.py — this is only the browser
+// preview's stand-in for the version the Python core reports in get_state().
+const SAMPLE_VERSION = '6.1.2';
+
 const SAMPLE_STATE: AppState = {
-  version: '6.1.1',
+  version: SAMPLE_VERSION,
   categories: SAMPLE_DEFAULT_CATEGORIES,
   categoryMeta: {},
   smartRules: [],
@@ -394,6 +402,12 @@ function createMockBridge(): BridgeApi {
     async browse_folder(): Promise<string | null> {
       return SAMPLE_PATH;
     },
+    async record_recent_folder(path: string): Promise<string[]> {
+      const recents = SAMPLE_STATE.recentFolders.filter((p) => p !== path);
+      recents.unshift(path);
+      SAMPLE_STATE.recentFolders = recents.slice(0, 8);
+      return [...SAMPLE_STATE.recentFolders];
+    },
     async toggle_theme(): Promise<ThemeName> {
       SAMPLE_STATE.theme = SAMPLE_STATE.theme === 'dark' ? 'light' : 'dark';
       return SAMPLE_STATE.theme;
@@ -428,6 +442,7 @@ function createMockBridge(): BridgeApi {
           errors: 1,
           target_dir: 'D:/Sample Folder/sorted',
           sort_log,
+          sort_log_total: sort_log.length,
         };
         emit('done', payload);
       });

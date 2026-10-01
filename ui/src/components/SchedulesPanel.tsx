@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import type { UIState } from '../store';
 import {
   TASK_INTERVALS,
   addScheduledTask,
@@ -12,6 +11,7 @@ import {
   taskSummaryArgs,
   taskSummaryKey,
   updateScheduledTask,
+  useStoreFields,
 } from '../store';
 import type { TaskDef, TaskKind } from '../protocol';
 import { fmt, inline, t } from '../i18n';
@@ -36,11 +36,30 @@ function formatWhen(ts: number, lang: string): string {
   });
 }
 
-export default function SchedulesPanel({ store }: { store: UIState }) {
+export default function SchedulesPanel() {
+  const store = useStoreFields([
+    'tasksOpen',
+    'strings',
+    'lang',
+    'folder',
+    'recentFolders',
+    'drives',
+    'drivesLoaded',
+    'tasks',
+    'tasksHistory',
+    'runningTasks',
+  ]);
   const S = store.strings;
   const [kind, setKind] = useState<TaskKind>('cleanup');
   const [folder, setFolder] = useState<string | null>(null);
   const [intervalMinutes, setIntervalMinutes] = useState(1440);
+
+  // Drive candidates are a one-shot load, so it belongs in an effect: doing it
+  // during render fired an RPC on every render until the flag flipped.
+  const needsDrives = store.tasksOpen && !store.drivesLoaded && store.drives.length === 0;
+  useEffect(() => {
+    if (needsDrives) void loadDrives();
+  }, [needsDrives]);
 
   if (!store.tasksOpen) return null;
 
@@ -58,12 +77,6 @@ export default function SchedulesPanel({ store }: { store: UIState }) {
     if (!candidates.some((c) => c.value === d.path)) {
       candidates.push({ label: d.path, value: d.path });
     }
-  }
-  if (!store.drivesLoaded && store.drives.length === 0) {
-    // Rendering guard: loadDrives is normally kicked off by
-    // openTasksPanel(); this fallback only runs when the panel was
-    // opened by another path that missed it.
-    void loadDrives();
   }
 
   const kindLabel = (k: TaskKind) => inline(t(S, taskKindKey(k)));

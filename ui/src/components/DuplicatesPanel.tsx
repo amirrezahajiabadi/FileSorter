@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { UIState } from '../store';
+import { useStoreFields } from '../store';
 import {
   cancelScan,
   closeDupPanel,
@@ -34,7 +34,20 @@ function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
-export default function DuplicatesPanel({ store }: { store: UIState }) {
+export default function DuplicatesPanel() {
+  const store = useStoreFields([
+    'dupOpen',
+    'strings',
+    'folder',
+    'drives',
+    'dupScanning',
+    'dupPhase',
+    'dupProcessed',
+    'dupTotal',
+    'dupGroups',
+    'dupCancelled',
+    'dupScanFolder',
+  ]);
   const S = store.strings;
   const [armed, setArmed] = useState(false);
   // Per-group visible-row counts: giant groups render in pages of
@@ -43,18 +56,28 @@ export default function DuplicatesPanel({ store }: { store: UIState }) {
   const [rowCaps, setRowCaps] = useState<Record<string, number>>({});
   const [shownGroups, setShownGroups] = useState(GROUPS_PER_PAGE);
 
+  const { dupGroups, dupScanning, dupPhase, dupProcessed, dupTotal } = store;
+
+  // Memoized: these walk every file of every group. They used to run on every
+  // render — including the ~8 progress ticks a second a running scan emits.
+  // It must stay above the open/closed early return: React forbids a hook
+  // count that depends on whether the panel happens to be open.
+  const { extraCopies, reclaimable } = useMemo(() => {
+    let copies = 0;
+    let bytes = 0;
+    for (const group of dupGroups) {
+      for (const file of group.files) {
+        if (file.markDelete) {
+          copies += 1;
+          bytes += file.size;
+        }
+      }
+    }
+    return { extraCopies: copies, reclaimable: bytes };
+  }, [dupGroups]);
+
   if (!store.dupOpen) return null;
 
-  const { dupGroups, dupScanning, dupPhase, dupProcessed, dupTotal } = store;
-  const extraCopies = dupGroups.reduce(
-    (n, g) => n + g.files.filter((f) => f.markDelete).length,
-    0,
-  );
-  const reclaimable = dupGroups.reduce(
-    (n, g) =>
-      n + g.files.filter((f) => f.markDelete).reduce((s, f) => s + f.size, 0),
-    0,
-  );
   const phaseLabel =
     dupPhase === 'hashing'
       ? inline(t(S, 'dup_phase_hashing'))

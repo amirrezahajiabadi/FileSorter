@@ -12,6 +12,11 @@ Deletion safety: the controller only deletes paths that appeared in the
 *last* scan (a whitelist), so a compromised/mistaken UI can never ask
 the backend to remove arbitrary files.
 
+Memory: the listing phase walks the tree through sorter.iter_files (one
+stat per file) and each phase drops the map it just consumed, so peak usage
+is driven by the largest single bucket rather than by the whole file index,
+the candidate list and every hash bucket being alive at once.
+
 Progress is reported through the same on_event(kind, payload) contract
 used by sort/undo: ("dup_progress", {"phase", "processed", "total"}).
 This module is UI-free and safe to call from any thread.
@@ -20,11 +25,17 @@ This module is UI-free and safe to call from any thread.
 from __future__ import annotations
 
 import hashlib
-import os
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
+from app.sorter import iter_files
+
 CHUNK = 64 * 1024  # head-hash window (64 KB)
+
+# Progress frames during the full-hash pass. Every frame crosses the UI bridge,
+# so a drive-wide scan reports every HASH_EMIT_EVERY files instead of one per
+# file (the bridge coalescer would collapse them anyway).
+HASH_EMIT_EVERY = 32
 
 ProgressEvent = Callable[[str, dict], None]
 
@@ -41,12 +52,6 @@ def _sha256(path: Path) -> str:
                 break
             h.update(block)
     return h.hexdigest()
-
-
-def _skip_walk_error(_exc: OSError) -> None:
-    """os.walk onerror hook: ignore unreadable directories instead of
-    aborting the whole scan (common on drive roots: system folders,
-    permissions)."""
 
 
 def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
@@ -71,6 +76,7 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
          "cancelled": bool}
         groups only contain 2+ files.
     """
+
     def emit(phase: str, processed: int, total: int) -> None:
         if on_event:
             on_event("dup_progress", {"phase": phase, "processed": processed, "total": total})
@@ -84,26 +90,20 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
     by_size: Dict[int, List[Tuple[Path, int]]] = {}
     scanned = 0
     listing_cancelled = False
-    for dirpath, _dirnames, filenames in os.walk(root, onerror=_skip_walk_error):
-        for name in filenames:
-            if cancelled():
-                listing_cancelled = True
-                break
-            path = Path(dirpath) / name
-            try:
-                size = path.stat().st_size
-            except OSError:
-                continue  # unreadable entry — not our problem
-            scanned += 1
-            if size > 0:  # zero-byte files are noise, never "duplicates"
-                by_size.setdefault(size, []).append((path, size))
-        if listing_cancelled:
+    for path, st in iter_files(root):
+        if cancelled():
+            listing_cancelled = True
             break
+        scanned += 1
+        size = st.st_size
+        if size > 0:  # zero-byte files are noise, never "duplicates"
+            by_size.setdefault(size, []).append((path, size))
 
     candidates: List[Tuple[Path, int]] = []
     for entries in by_size.values():
         if len(entries) > 1:
             candidates.extend(entries)
+    del by_size  # every distinct size loses its bucket here; only 2+ survive
 
     emit("listing", 0, len(candidates))
     if listing_cancelled:
@@ -122,13 +122,16 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
         except OSError:
             continue
         head_buckets.setdefault((size, hashlib.sha256(head).hexdigest()), []).append((path, size))
+    del candidates  # the head buckets now own every surviving candidate
 
     to_hash: List[Tuple[Path, int]] = []
     for entries in head_buckets.values():
         if len(entries) > 1:
             to_hash.extend(entries)
+    del head_buckets  # only head-collision buckets reach the full hash
 
-    emit("hashing", 0, len(to_hash))
+    total_to_hash = len(to_hash)
+    emit("hashing", 0, total_to_hash)
     if not to_hash:
         return {"groups": [], "wasted_bytes": 0, "files_scanned": scanned, "cancelled": False}
 
@@ -146,7 +149,10 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
             continue
         full_buckets.setdefault(digest, []).append((path, size))
         processed += 1
-        emit("hashing", processed, len(to_hash))
+        if processed % HASH_EMIT_EVERY == 0:
+            emit("hashing", processed, total_to_hash)
+    del to_hash  # full digests are all we still need
+    emit("hashing", processed, total_to_hash)  # final tick — never hides the tail
 
     groups = []
     wasted = 0

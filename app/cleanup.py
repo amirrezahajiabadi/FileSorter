@@ -35,6 +35,8 @@ import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
+from app.sorter import iter_files
+
 _windows = sys.platform == "win32"
 
 ProgressEvent = Callable[[str, dict], None]
@@ -90,12 +92,17 @@ def known_locations() -> List[dict]:
 # ── Scanning ─────────────────────────────────────────────────────
 
 def _iter_junk_files(location: dict):
-    """Yield files under every dir of `location` that count as junk.
+    """Yield ``(path, stat_result)`` for the junk under one location.
 
     For the thumbnail-cache location only thumbcache_*.db files count
     (the Explorer folder also holds non-junk state); every other
     location is junk wholesale, recursively. Files inside a dir are
     yielded without any ordering guarantee.
+
+    The recursive case goes through sorter.iter_files, which stats each
+    entry exactly once and skips unreadable sub-directories silently
+    (common under Windows Temp for a non-elevated user) instead of aborting
+    the scan.
     """
     thumbnails = location["id"] == "thumbnails"
     for d in location["dirs"]:
@@ -103,14 +110,13 @@ def _iter_junk_files(location: dict):
         if thumbnails:
             # Only loose thumbcache_*.db files, not the folder's state.
             for p in base.glob("thumbcache_*.db"):
-                if p.is_file():
-                    yield p
+                try:
+                    if p.is_file():
+                        yield p, p.stat()
+                except OSError:
+                    continue
             continue
-        # Unreadable sub-directories (common under Windows Temp for a
-        # non-elevated user) are skipped silently, never fatal.
-        for dirpath, _dirnames, filenames in os.walk(base, onerror=lambda _e: None):
-            for name in filenames:
-                yield Path(dirpath) / name
+        yield from iter_files(base)
 
 
 def scan_junk(
@@ -138,11 +144,8 @@ def scan_junk(
         files = bytes_ = 0
         processed = 0
         loc_paths: List[str] = [] if want_paths else None
-        for path in _iter_junk_files(loc):
-            try:
-                bytes_ += path.stat().st_size
-            except OSError:
-                continue  # vanished mid-walk — not our problem
+        for path, st in _iter_junk_files(loc):
+            bytes_ += st.st_size
             files += 1
             processed += 1
             if want_paths:
@@ -179,29 +182,46 @@ def scan_junk(
 
 # ── Deletion (whitelisted) ───────────────────────────────────────
 
-def delete_junk(paths: List[str], allowed: Set[Path]) -> dict:
+def delete_junk(paths: List[str], allowed: Set) -> dict:
     """Delete the given files — only ones in `allowed` (the whitelist a
     recent scan recorded). Anything else is a no-op failure.
 
     Returns {"deleted": [str, ...], "failed": [{"path", "error"}],
     "freed_bytes": int}. Best-effort per file: locked files fail and
     are reported, the rest still get cleaned.
+
+    The caller builds `paths` from the very same whitelist entries, so the
+    verbatim-string fast path below matches virtually every path and never
+    touches the filesystem to prove it. On Windows Path.resolve() opens a
+    handle per call, and the previous implementation resolved both the
+    whitelist and every input path — two extra syscalls per file, which is
+    real time when deleting six figures of temp files. Resolution survives
+    only as the fallback for differently-spelled paths, so the safety
+    property is unchanged.
     """
-    allowed = {p.resolve() for p in allowed}
+    exact = {str(p) for p in allowed}
+    resolved: Optional[Set[str]] = None  # built lazily, only if a path differs
     deleted: List[str] = []
     failed: List[dict] = []
     freed = 0
 
     for raw in paths:
-        try:
-            path = Path(raw).resolve()
-        except OSError:
-            failed.append({"path": raw, "error": "bad path"})
-            continue
-        if path not in allowed:
+        raw = str(raw)
+        if raw in exact:
+            ok = True
+        else:
+            if resolved is None:
+                resolved = {str(p.resolve()) for p in allowed}
+            try:
+                ok = str(Path(raw).resolve()) in resolved
+            except OSError:
+                failed.append({"path": raw, "error": "bad path"})
+                continue
+        if not ok:
             failed.append({"path": raw, "error": "not flagged by last scan"})
             continue
         try:
+            path = Path(raw)
             size = path.stat().st_size
             path.unlink()
             deleted.append(raw)

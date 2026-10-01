@@ -8,6 +8,10 @@
  *
  * The store subscribes once at init via subscribeEvents(); transports
  * never talk to the store directly.
+ *
+ * Events are dispatched synchronously but the store batches them (see
+ * store.ts flushBatch) so a burst of N files costs one render instead of
+ * N.
  */
 
 import type { EventKind } from './protocol';
@@ -21,7 +25,7 @@ function syncDesktopHandler(): void {
   // pywebview can inject its API after this module subscribes. Assigning the
   // callback eagerly is safe in a normal browser and prevents the desktop
   // bridge from losing every progress/completion event during startup.
-  window.onSortEvent = listeners.values().next().value;
+  window.onSortEvent = listeners.values().next().value ?? window.onSortEvent;
 }
 
 export function isDesktop(): boolean {
@@ -41,5 +45,14 @@ export function subscribeEvents(cb: (msg: SortEvent) => void): () => void {
 
 export function emit(kind: EventKind, payload: unknown): void {
   const msg: SortEvent = { kind, payload };
-  listeners.forEach((cb) => cb(msg));
+  // Use a snapshot to avoid issues if a listener removes itself during iteration.
+  const snapshot = Array.from(listeners);
+  for (const cb of snapshot) {
+    try {
+      cb(msg);
+    } catch (e) {
+      // One failing listener must not block the rest.
+      console.error('event listener error:', e);
+    }
+  }
 }

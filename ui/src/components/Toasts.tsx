@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 
-import { useStore, clearNotice } from '../store';
+import { clearNotice, useStoreFields } from '../store';
 
 const AUTODISMISS_MS = 4000;
 
 export default function Toasts() {
-  const notice = useStore().notice;
+  const notice = useStoreFields(['notice']).notice;
 
   useEffect(() => {
     if (!notice) return;

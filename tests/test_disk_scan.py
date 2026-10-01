@@ -176,7 +176,13 @@ def test_cancel_stops_scan_and_returns_partial():
 
 
 def test_cancel_mid_scan_reports_partial_counts():
-    """A cancel set during the walk returns what was found so far."""
+    """A cancel set during the walk returns what was found so far.
+
+    The cancel fires from the scan's own progress callback rather than a
+    wall-clock timer: a sleep-based version raced the walk, and a fast walk
+    (one stat per file) finishes 500 tiny files before any fixed delay
+    elapses, which made the assertion depend on machine speed.
+    """
     import threading
 
     from app.disk_scan import scan_space
@@ -189,17 +195,17 @@ def test_cancel_mid_scan_reports_partial_counts():
 
         cancel = threading.Event()
 
-        def cancel_soon():
-            # fire after the walk has started processing files
-            import time
-            time.sleep(0.01)
-            cancel.set()
+        def cancel_on_first_tick(_kind, payload):
+            # progress ticks land every 128 files, so this stops the walk
+            # partway with real counts already accumulated
+            if payload["processed"] >= 128:
+                cancel.set()
 
-        t = threading.Thread(target=cancel_soon, daemon=True)
-        t.start()
-        res = scan_space(root, DEFAULT_CATEGORIES, cancel_event=cancel)
+        res = scan_space(
+            root, DEFAULT_CATEGORIES, on_event=cancel_on_first_tick, cancel_event=cancel
+        )
         assert res["cancelled"] is True
-        assert res["files_scanned"] < 500  # stopped partway, still counted some
+        assert 0 < res["files_scanned"] < 500  # stopped partway, still counted some
         assert res["total_bytes"] > 0
 
 

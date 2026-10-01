@@ -15,6 +15,7 @@ import urllib.request
 
 import pytest
 
+from app.constants import APP_VERSION
 from app.service import FileSorterService
 
 
@@ -148,7 +149,9 @@ def test_events_requires_token(service):
 def test_get_state(service):
     resp = rpc(service, "get_state")
     state = resp["result"]
-    assert state["version"] == "6.1.2"
+    # Read the expected version from the app instead of freezing a literal
+    # here — a hardcoded copy is just one more thing to forget on a bump.
+    assert state["version"] == APP_VERSION
     assert "categories" in state and "smartRules" in state
     assert state["language"] in ("fa", "en")
 
@@ -348,3 +351,81 @@ def test_rpc_recycle_bin_status_read_only(service):
     assert "available" in res
     assert res["available"] is True
     assert res["files"] >= 0 and res["bytes"] >= 0
+
+
+# ══════════════════════════════════════════════════════════════════
+#  SSE delivery guarantees
+#
+#  Regression: _push dropped *every* frame when a subscriber's queue was
+#  full, including "done"/"dup_done"/"clean_done". A busy sort filled the
+#  queue, the terminal frame was discarded, and the UI sat on a spinner
+#  forever with the operation long since finished.
+# ══════════════════════════════════════════════════════════════════
+
+def _drain(q):
+    frames = []
+    while True:
+        try:
+            frames.append(q.get_nowait())
+        except Exception:  # queue.Empty
+            return frames
+
+
+def _fill(api, count, kind="item"):
+    for i in range(count):
+        api._push(kind, {"status": "ok", "name": f"f{i}.txt"})
+
+
+def test_terminal_event_survives_a_full_subscriber_queue(service):
+    from app.service import SSE_QUEUE_MAXSIZE
+
+    api = service.api
+    q = api._subscribe()
+    try:
+        _fill(api, SSE_QUEUE_MAXSIZE + 50)
+        assert q.full()
+
+        api._push("done", {
+            "copied": 1, "skipped": 0, "errors": 0,
+            "target_dir": "C:/x/sorted", "sort_log": [], "sort_log_total": 0,
+        })
+
+        frames = _drain(q)
+        assert any('"kind": "done"' in f for f in frames), (
+            "the terminal frame must be delivered even when the queue was full"
+        )
+    finally:
+        api._unsubscribe(q)
+
+
+def test_terminal_event_evicts_the_oldest_frame(service):
+    """Delivery is guaranteed by making room, not by growing the queue."""
+    from app.service import SSE_QUEUE_MAXSIZE
+
+    api = service.api
+    q = api._subscribe()
+    try:
+        _fill(api, SSE_QUEUE_MAXSIZE)
+        newest_before = q.queue[-1]
+        api._push("clean_done", {"locations": [], "total_files": 0, "total_bytes": 0})
+        assert q.qsize() <= SSE_QUEUE_MAXSIZE
+        frames = _drain(q)
+        assert any('"kind": "clean_done"' in f for f in frames)
+        # The oldest frame went away, the rest kept their order.
+        assert newest_before in frames
+    finally:
+        api._unsubscribe(q)
+
+
+def test_chatty_events_still_never_block_a_scan(service):
+    """High-frequency kinds keep the drop-on-full policy: a stalled reader
+    must not stall the scanner producing rows for it."""
+    from app.service import SSE_QUEUE_MAXSIZE
+
+    api = service.api
+    q = api._subscribe()
+    try:
+        _fill(api, SSE_QUEUE_MAXSIZE * 3)
+        assert q.qsize() <= SSE_QUEUE_MAXSIZE  # bounded, no unbounded growth
+    finally:
+        api._unsubscribe(q)

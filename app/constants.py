@@ -29,3 +29,11 @@ LARGE_FILE_THRESHOLD = 100 * 1024 * 1024
 
 # Old file threshold (days)
 OLD_FILE_DAYS = 365
+
+# How many sort-log rows travel to the UI in the "done" event. A whole-drive
+# sort can produce six figures of entries; shipping them all built a
+# multi-megabyte JSON frame that had to be parsed and kept in JS memory twice
+# over (once in the event, once in the store). Undo never uses this preview —
+# it replays AppController.last_sort_log, which stays complete — so the cap
+# only trims what the Undo dialog displays (it already renders a tail window).
+MAX_SORT_LOG_WIRE = 2000

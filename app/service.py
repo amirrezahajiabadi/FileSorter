@@ -36,8 +36,20 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from app.api import BaseApi
+from app.constants import APP_VERSION
+from app.protocol import TERMINAL_EVENT_KINDS
 
 _TOKEN_META = '<meta name="api-token" content="{token}">'
+
+# Per-subscriber SSE queue depth. Deep enough to absorb a burst of per-file
+# rows, shallow enough that one stalled browser tab cannot pin a scan's worth
+# of JSON in memory per subscriber.
+SSE_QUEUE_MAXSIZE = 256
+
+# A terminal frame evicts the oldest queued frame to make room; if another
+# producer thread grabs the freed slot first, retry. Bounded so delivery can
+# never spin.
+_TERMINAL_PUT_RETRIES = 8
 
 
 def _base_dir() -> Path:
@@ -111,16 +123,41 @@ class ServiceApi(BaseApi):
 
     def _push(self, kind: str, payload) -> None:
         data = json.dumps({"kind": kind, "payload": payload}, default=str)
+        terminal = kind in TERMINAL_EVENT_KINDS
         with self._lock:
             subs = tuple(self._subscribers)
         for q in subs:
+            if terminal:
+                self._deliver_terminal(q, data)
+            else:
+                try:
+                    q.put_nowait(data)
+                except queue.Full:
+                    pass  # slowest reader drops high-frequency rows rather than stalling scans
+
+    @staticmethod
+    def _deliver_terminal(q: "queue.Queue", data: str) -> None:
+        """Deliver a terminal frame, evicting the oldest queued frame if the
+        subscriber is backed up.
+
+        A dropped "done"/"dup_done"/"clean_done" leaves the UI spinning
+        forever, so terminal kinds trade the oldest buffered progress row for
+        guaranteed delivery. High-frequency kinds keep the drop-oldest
+        policy above (their newest value is the only one that matters).
+        """
+        for _ in range(_TERMINAL_PUT_RETRIES):
             try:
                 q.put_nowait(data)
+                return
             except queue.Full:
-                pass  # slowest reader drops events rather than stalling scans
+                try:
+                    q.get_nowait()  # make room: discard the oldest frame
+                except queue.Empty:
+                    # Another producer drained it; the retry can just put.
+                    continue
 
     def _subscribe(self) -> queue.Queue:
-        q = queue.Queue(maxsize=256)
+        q = queue.Queue(maxsize=SSE_QUEUE_MAXSIZE)
         with self._lock:
             self._subscribers.add(q)
         return q
@@ -159,7 +196,7 @@ class FileSorterService:
         dist = _require_build()
 
         class Handler(_DistHandler):
-            server_version = "FileSorterService/6.1.2"
+            server_version = f"FileSorterService/{APP_VERSION}"
             protocol_version = "HTTP/1.1"
 
             def _authorized(self, parsed=None):

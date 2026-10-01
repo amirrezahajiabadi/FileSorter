@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
-import type { UIState } from '../store';
-import { analyzeFolder, browseFolder, pickRecent } from '../store';
+import { analyzeFolder, browseFolder, pickRecent, pickTypedFolder, useStoreFields } from '../store';
 import { inline, t } from '../i18n';
 
 function FolderIcon() {
@@ -12,8 +11,14 @@ function FolderIcon() {
   );
 }
 
-export default function FolderPicker({ store }: { store: UIState }) {
-  const { strings, folder, recentFolders, phase } = store;
+export default function FolderPicker() {
+  const { strings, folder, recentFolders, phase, ready } = useStoreFields([
+    'strings',
+    'folder',
+    'recentFolders',
+    'phase',
+    'ready',
+  ]);
   const browseLabel = t(strings, 'browse_btn');
   const recentLabel = t(strings, 'recent_folders_btn');
   const noFolder = t(strings, 'no_folder');
@@ -27,7 +32,7 @@ export default function FolderPicker({ store }: { store: UIState }) {
   const submitTyped = (raw: string) => {
     const path = raw.trim();
     if (!path) return;
-    pickRecent(path);
+    void pickTypedFolder(path);
     setTyping(false);
     setDraft('');
   };
@@ -133,7 +138,7 @@ export default function FolderPicker({ store }: { store: UIState }) {
           ))}
         </div>
       )}
-      {recentFolders.length === 0 && store.ready && (
+      {recentFolders.length === 0 && ready && (
         <div className="recent-empty">{recentEmpty}</div>
       )}
     </section>

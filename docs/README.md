@@ -105,15 +105,16 @@ FileSorter/
 │       ├── transport.ts         # pywebview bridge + browser mock
 │       ├── protocol.ts          # wire types (mirror of app/protocol.py)
 │       └── generated/strings.ts # generated mirror of app/i18n.py
-├── tests/                       # 14 pytest suites (230+ tests)
+├── tests/                       # 16 pytest suites (270+ tests)
 ├── .github/workflows/           # CI (tests.yml) + Build & Release (release.yml)
 ├── FileSorter.spec              # PyInstaller build config
 ├── installer.nsi                # NSIS installer script
-├── build_installer.md           # full build & installer guide
 ├── requirements.txt
-├── CHANGELOG.md                 # complete version history
-├── ROADMAP.md                   # long-term direction & ideas
-└── README.md
+└── docs/                        # documentation bundle (README, roadmap, changelog, build guide)
+    ├── README.md                # this file
+    ├── ROADMAP.md               # long-term direction & ideas
+    ├── CHANGELOG.md             # complete version history
+    └── build_installer.md       # full build & installer guide
 ```
 
 ---
@@ -125,9 +126,10 @@ pip install pytest
 pytest
 ```
 
-**230+ tests** cover the pure logic (`sorter.py`), the controller, the wire
-protocol, every utility (disk scan, duplicates, cleanup, watcher, tasks, tray,
-autostart) and the headless service RPC over real HTTP. The same suite runs
+**270+ tests** cover the pure logic (`sorter.py` and its shared
+one-stat-per-file walk), the controller, the wire protocol, every utility (disk
+scan, duplicates, cleanup, watcher, tasks, tray, autostart) and the headless
+service RPC over real HTTP. The same suite runs
 automatically on every push and pull request via
 [GitHub Actions](.github/workflows/tests.yml) — see the badge at the top.
 
@@ -143,9 +145,22 @@ pip install -r requirements.txt
 pip install pyinstaller
 cd ui && npm install && npm run build && cd ..   # -> ui/dist/
 
-pyinstaller FileSorter.spec                        # -> dist/FileSorter.exe
-makensis installer.nsi                             # -> dist/FileSorter_Setup.exe (optional)
+python -m PyInstaller --clean --noconfirm FileSorter.spec   # -> dist/FileSorter/ (exe + _internal/)
+python tools/smoke_test_build.py                            # proves the frozen app actually runs
+makensis installer.nsi                                      # -> dist/FileSorter_Setup.exe (optional)
 ```
+
+`FileSorter.spec` is the **single build recipe**: it owns the hidden imports,
+the bundled frontend, the app icon and the Windows version resource, so there
+is no second `pyinstaller` command line to keep in sync. The build is **onedir**
+(a small launcher exe beside an `_internal/` folder) rather than a
+self-extracting single file — it starts faster and trips far fewer antivirus
+heuristics, at the cost of shipping a folder. UPX stays off for the same reason:
+packing the DLLs slows every launch and is the main source of false positives.
+
+`tools/smoke_test_build.py` runs the real executable (layout, version resource,
+the `--autostart` CLI, and the headless JSON-RPC/SSE service); the release
+workflow refuses to publish a build that fails it.
 
 The full step-by-step guide (including the NSIS installer) lives in
 [`build_installer.md`](build_installer.md).
@@ -160,7 +175,12 @@ git tag v6.1.2
 git push origin v6.1.2
 ```
 
-The tag must match `v` + three dot-separated numbers exactly (e.g. `v5.0.0`).
+The tag must match `v` + three dot-separated numbers exactly (e.g. `v5.0.0`),
+and it must equal `APP_VERSION` in `app/constants.py` —
+`tools/check_version_consistency.py` compares the tag against every copy of the
+version and fails the build on drift. The Release carries
+`FileSorter-<tag>-win64.zip` (the whole onedir folder; unzip it anywhere and run
+`FileSorter.exe`).
 
 ---
 

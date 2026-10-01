@@ -2,14 +2,14 @@
 ; Creates a proper Windows installer with Start Menu + Desktop shortcuts
 
 !define APP_NAME "FileSorter"
-!define APP_VERSION "4.2.0"
+!define APP_VERSION "6.1.2"
 !define PUBLISHER "HajAmir"
 !define EXE_NAME "FileSorter.exe"
 !define INSTALL_DIR "$LOCALAPPDATA\${APP_NAME}"
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "dist\FileSorter_Setup.exe"
-InstallDir "${INSTALL_DIR}"
+InstallDir "$LOCALAPPDATA\${APP_NAME}"
 InstallDirRegKey HKCU "Software\${APP_NAME}" "InstallDir"
 RequestExecutionLevel user
 
@@ -46,8 +46,11 @@ RequestExecutionLevel user
 Section "Install"
     SetOutPath "$INSTDIR"
 
-    ; Main executable
-    File "dist\${EXE_NAME}"
+    ; The whole onedir build: exe + _internal\ (the bundled DLLs, pythonnet,
+    ; the WebView2 runtime and the built React UI). FileSorter.spec produces a
+    ; *folder*, not a single exe — installing only the exe would ship an app
+    ; that cannot start. Shortcuts pick their icon up from the exe itself.
+    File /r "dist\FileSorter\*.*"
 
     ; Store install path
     WriteRegStr HKCU "Software\${APP_NAME}" "InstallDir" "$INSTDIR"
@@ -84,9 +87,12 @@ SectionEnd
 
 ; ── Uninstaller Section ────────────────────────────────────
 Section "Uninstall"
+    ; onedir means _internal\ holds most of the files, so clear the tree.
+    ; RMDir /r also removes the sub-directories NSIS would otherwise leave
+    ; behind (the old flat RMDir failed on any non-empty folder).
     Delete "$INSTDIR\${EXE_NAME}"
     Delete "$INSTDIR\Uninstall.exe"
-    RMDir "$INSTDIR"
+    RMDir /r "$INSTDIR"
 
     Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
     Delete "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk"

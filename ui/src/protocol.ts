@@ -26,6 +26,18 @@ export type EventKind =
   | 'sched_run'
   | 'sched_done';
 
+/** Kinds that close an operation. A dropped terminal event leaves the UI on
+ *  an eternal spinner, so any buffering transport must deliver these
+ *  reliably — mirrors TERMINAL_EVENT_KINDS in app/protocol.py. */
+export const TERMINAL_EVENT_KINDS: ReadonlySet<EventKind> = new Set([
+  'done',
+  'error',
+  'dup_done',
+  'space_done',
+  'clean_done',
+  'sched_done',
+]);
+
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
 export type LangCode = 'en' | 'fa';
@@ -44,6 +56,8 @@ export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
   'space_done',
   'clean_progress',
   'clean_done',
+  'sched_run',
+  'sched_done',
 ]);
 
 // ── Wire shapes ─────────────────────────────────────────────────
@@ -114,7 +128,10 @@ export interface SortDone {
   skipped: number;
   errors: number;
   target_dir: string;
+  /** Bounded preview of the sort log (see MAX_SORT_LOG_WIRE in app/api.py). */
   sort_log: SortLogEntry[];
+  /** Real entry count; may exceed sort_log.length when the sort was large. */
+  sort_log_total: number;
 }
 
 export interface UndoDone {

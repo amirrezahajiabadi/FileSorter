@@ -55,7 +55,34 @@ class Api(BaseApi):
         if not self.window:
             return
         data = json.dumps({"kind": kind, "payload": payload}, default=str)
-        self.window.evaluate_js(f"window.onSortEvent({data})")
+        try:
+            self.window.evaluate_js(f"window.onSortEvent({data})")
+        except Exception:
+            # The webview can reject evaluate_js while the window is
+            # closing or when the page is mid-navigation; one failed
+            # frame must never kill the event flush and strand the
+            # operation mid-run.
+            pass
+
+    def _push_many(self, kind: str, payloads: list) -> None:
+        """Deliver a burst of event rows in ONE evaluate_js round trip.
+
+        Each row keeps its own window.onSortEvent(...) statement inside a
+        single script, so the per-event wire format is unchanged while a
+        flush of N rows costs one bridge round trip instead of N.
+        (Every row used to be a separate blocking evaluate_js call; on a
+        fast sort the flush could never keep up, the backlog grew
+        without bound and the UI froze.)"""
+        if not self.window or not payloads:
+            return
+        script = "\n".join(
+            f"window.onSortEvent({json.dumps({'kind': kind, 'payload': p}, default=str)})"
+            for p in payloads
+        )
+        try:
+            self.window.evaluate_js(script)
+        except Exception:
+            pass
 
 
 def parse_args(argv=None) -> argparse.Namespace:

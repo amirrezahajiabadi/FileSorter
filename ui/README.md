@@ -17,7 +17,7 @@ HTTP server.
 | --- | --- |
 | `src/protocol.ts` | Wire types mirroring `app/protocol.py` (keep in sync) |
 | `src/transport.ts` | Bridge to pywebview; deterministic mock for the browser |
-| `src/store.ts` | Typed external store + phase machine + actions |
+| `src/store.ts` | Typed external store + phase machine + actions, and `useStoreFields` for per-component subscriptions |
 | `src/i18n.ts` | String lookup / template helpers |
 | `src/generated/strings.ts` | **Generated** mirror of `app/i18n.py` for the mock |
 | `src/components/` | Screens: Header, FolderPicker, CategoryGrid, AnalysisModal, OperationPanel, Toasts |
@@ -46,3 +46,22 @@ browser the mock returns a deterministic sample folder/report and simulates
 sort/undo events so the full flow is explorable; the UI states clearly that
 this is preview data. Folder picking, analysis, sorting and undo all run
 against real files only in the desktop runtime (`python main_web.py`).
+
+## Renders and subscriptions
+
+A sort or scan emits several events per second, so subscribing to the whole
+store would re-render the entire tree on every tick. Every component instead
+subscribes to just the fields it renders:
+
+```ts
+const store = useStoreFields(['dupOpen', 'dupGroups', 'strings']);
+```
+
+`useStoreFields` compares the picked fields shallowly, so a tick that only
+changes `processed` leaves the other panels untouched. Two rules follow from
+this:
+
+- Call hooks **before** any `if (!store.xOpen) return null` early return —
+  React requires the same hook order on every render, open or closed.
+- Prefer `useStoreFields` over `useStore`; the latter re-renders on every
+  state change and is only a fallback for debugging.

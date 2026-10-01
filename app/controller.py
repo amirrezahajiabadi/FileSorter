@@ -19,7 +19,7 @@ never starts threads — the caller decides that too.
 import shutil
 from pathlib import Path
 
-from app.constants import DEFAULT_CATEGORIES
+from app.constants import DEFAULT_CATEGORIES, MAX_SORT_LOG_WIRE
 from app.settings_manager import load_settings, save_settings, add_recent_folder
 from app.duplicates import delete_files, scan_duplicates
 from app.disk_scan import list_drives, scan_space
@@ -239,8 +239,14 @@ class AppController:
         # Whitelist per location: delete_cleanup(location_ids) later
         # removes exactly these files and nothing else — a file that
         # appeared *after* the scan is never touched.
+        #
+        # Held as the scanner's own strings rather than Path objects: this is
+        # the largest long-lived structure in the process during a cleanup
+        # scan (a Path is an object plus a parts tuple plus a case-folded
+        # duplicate, per file), and the deletion path only ever needs to
+        # compare and unlink them.
         self.last_clean_by_loc = {
-            loc_id: [Path(p) for p in loc_paths]
+            loc_id: [str(p) for p in loc_paths]
             for loc_id, loc_paths in result.get("paths", {}).items()
         }
         return {k: v for k, v in result.items() if k != "paths"}
@@ -256,7 +262,7 @@ class AppController:
         for loc_id in location_ids:
             loc_paths = self.last_clean_by_loc.get(loc_id, [])
             whitelist.update(loc_paths)
-            paths.extend(str(p) for p in loc_paths)
+            paths.extend(loc_paths)
         return delete_junk(paths, whitelist)
 
     def recycle_bin_status(self) -> dict:
@@ -294,6 +300,10 @@ class AppController:
         """Delete the given duplicate copies — only paths the last scan
         flagged are touched (see duplicates.delete_files). Returns
         {"deleted": [...], "failed": [{"path", "error"}]}.
+
+        The whitelist stays a set of Path objects on purpose: Path equality
+        normalizes separators and case, so "C:/a/b" and "C:\\a\\b" compare
+        equal, which a plain string whitelist would reject.
         """
         return delete_files(list(paths), self.last_dup_paths)
 
@@ -302,7 +312,7 @@ class AppController:
 
         Event kinds emitted, in order:
         - ("total", file_count)               — once, as soon as it's known
-        - ("item", {...}) — once per file:
+        - ("item", {...}) — once per file (coalesced by the adapter):
             {"status": "skip", "name": str, "category": str}
             {"status": "ok", "name": str, "category": str, "action": "copied"|"moved"}
             {"status": "error", "name": str, "error": str}
@@ -321,7 +331,12 @@ class AppController:
 
         Returns:
             {"copied": int, "skipped": int, "errors": int,
-             "target_dir": Path, "sort_log": list}
+             "target_dir": Path, "sort_log": list, "sort_log_total": int}
+
+        `sort_log` in the *event payload* is capped at MAX_SORT_LOG_WIRE rows
+        so a huge sort cannot ship a multi-megabyte frame to the UI; the
+        complete log is kept on the controller for undo(). "sort_log_total"
+        always reports the real entry count.
         """
         def emit(kind, payload=None):
             if on_event:
@@ -369,10 +384,14 @@ class AppController:
                 processed += 1
                 emit("progress", processed)
 
+            # The controller keeps the complete log (undo replays it); the
+            # event payload carries a bounded preview plus the real count.
             self.last_sort_log = sort_log
             result = {
                 "copied": copied, "skipped": skipped, "errors": errors,
-                "target_dir": target_dir, "sort_log": sort_log,
+                "target_dir": target_dir,
+                "sort_log": sort_log[:MAX_SORT_LOG_WIRE],
+                "sort_log_total": len(sort_log),
             }
             emit("done", result)
             return result

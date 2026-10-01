@@ -8,7 +8,7 @@
  * through subscribeEvents (registered once at init).
  */
 
-import { useRef, useSyncExternalStore } from 'react';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
 
 import type {
   AnalysisReport,
@@ -21,6 +21,7 @@ import type {
   DriveInfo,
   DuplicateMode,
   DupDone,
+  EventKind,
   LangCode,
   PlanItem,
   SortDone,
@@ -34,7 +35,7 @@ import type {
   WatchError,
   WatchItem,
 } from './protocol';
-import { DEFAULT_CATEGORY_META } from './protocol';
+import { DEFAULT_CATEGORY_META, TERMINAL_EVENT_KINDS } from './protocol';
 import { bridge, initTransport, subscribeEvents, transportKind, isDesktop } from './transport';
 import type { TransportKind } from './transport';
 import type { SortEvent } from './transport';
@@ -245,6 +246,18 @@ let logId = 0;
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<UIState>): void {
+  // A patch whose values are all identical is a no-op: allocating a new state
+  // object would notify every subscriber, and a component whose selected slice
+  // is unchanged would still pay for a selector evaluation. Progress events
+  // reuse counters often enough for this to matter on a fast sort.
+  let changed = false;
+  for (const key of Object.keys(patch) as (keyof UIState)[]) {
+    if (!Object.is(state[key], patch[key])) {
+      changed = true;
+      break;
+    }
+  }
+  if (!changed) return;
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
 }
@@ -366,8 +379,13 @@ function flushBatch(): void {
 }
 
 /** Events that end a phase must land after the rows/counters that
- *  preceded them — drain any buffered items first. */
-const BATCH_FLUSH_KINDS = new Set(['total', 'done', 'error']);
+ *  preceded them — drain any buffered items first. That is every terminal
+ *  kind (mirrors TERMINAL_EVENT_KINDS, so a newly added one cannot be
+ *  forgotten here) plus "total", which resets the counters. */
+const BATCH_FLUSH_KINDS: ReadonlySet<EventKind> = new Set<EventKind>([
+  'total',
+  ...TERMINAL_EVENT_KINDS,
+]);
 
 function showNotice(kind: Notice['kind'], text: string): void {
   set({ notice: { kind, text } });
@@ -745,6 +763,27 @@ export function pickRecent(path: string): void {
   setFolder(path);
 }
 
+/**
+ * Select a folder from a path the user typed or drove to, and record it as
+ * recent.
+ *
+ * Only the native browse flow used to record folders (Python does it inside
+ * browse_folder), so in headless mode — where there is no dialog and the picker
+ * always falls back to a typed path — the recent list stayed permanently
+ * empty. Re-recording a path that is already in the list is harmless: the
+ * backend just moves it to the front.
+ */
+export async function pickTypedFolder(path: string): Promise<void> {
+  setFolder(path);
+  try {
+    const recents = await bridge.record_recent_folder(path);
+    if (Array.isArray(recents)) set({ recentFolders: recents });
+  } catch (err) {
+    // Recording is a convenience — a failure must never block selection.
+    console.warn('could not record recent folder:', err);
+  }
+}
+
 export async function analyzeFolder(): Promise<void> {
   if (!state.folder || state.phase !== 'idle') return;
   set({ phase: 'analyzing' });
@@ -777,9 +816,27 @@ export async function loadPlan(mode: DuplicateMode): Promise<void> {
   if (!state.folder) return;
   try {
     const plan = await bridge.plan_sort(state.folder, mode);
+    // The backend reports a failed plan as a single {"error": ...} row
+    // (it can't raise across the bridge). Surface it instead of opening
+    // the dry-run modal with one broken row.
+    if (plan.length === 1 && 'error' in plan[0] && !('name' in plan[0])) {
+      showNotice('error', String((plan[0] as { error?: string }).error ?? 'plan failed'));
+      return;
+    }
     set({ plan, dryRunOpen: true });
   } catch (err) {
     showNotice('error', String(err));
+  }
+}
+
+export function planSortSync(mode: DuplicateMode): Promise<PlanItem[]> {
+  // Returns a promise that resolves to the plan items.
+  // Returns empty array promise if no folder is selected.
+  if (!state.folder) return Promise.resolve([]);
+  try {
+    return bridge.plan_sort(state.folder, mode);
+  } catch {
+    return Promise.resolve([]);
   }
 }
 
@@ -809,7 +866,14 @@ export async function runSort(): Promise<void> {
   });
   resetCounts();
   try {
-    await bridge.start_sort(state.folder, state.move, state.dupMode);
+    const started = await bridge.start_sort(state.folder, state.move, state.dupMode);
+    // The backend refuses to run a second sort/undo while one is in
+    // flight (it returns false instead of raising). Don't leave the UI
+    // on an eternal spinner — fall back and tell the user.
+    if (!started) {
+      showNotice('error', inline(t(state.strings, 'operation_busy')));
+      set({ phase: 'idle' });
+    }
   } catch (err) {
     showNotice('error', String(err));
     set({ phase: 'idle' });
@@ -828,7 +892,11 @@ export async function runUndo(): Promise<void> {
     logs: [],
   });
   try {
-    await bridge.undo_sort();
+    const started = await bridge.undo_sort();
+    if (!started) {
+      showNotice('error', inline(t(state.strings, 'operation_busy')));
+      set({ phase: 'idle' });
+    }
   } catch (err) {
     showNotice('error', String(err));
     set({ phase: 'idle' });
@@ -1491,6 +1559,42 @@ export async function runCleanDelete(): Promise<void> {
   }
 }
 
+/**
+ * Shallow equality for selector results that are freshly-built objects.
+ *
+ * Compared field by field with Object.is, so a component only re-renders when
+ * one of the fields it actually reads changed — a progress tick for another
+ * panel leaves its selected object referentially identical.
+ */
+export function shallowEqual<T extends object>(a: T, b: T): boolean {
+  if (Object.is(a, b)) return true;
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  return aKeys.every((key) =>
+    Object.is(
+      (a as Record<string, unknown>)[key],
+      (b as Record<string, unknown>)[key],
+    ),
+  );
+}
+
+/**
+ * Subscribe to a hand-picked slice of the store.
+ *
+ * `useStoreFields(['dupOpen', 'dupGroups'])` re-renders only when one of
+ * those fields changes, which is what keeps per-file sort events from
+ * re-rendering every panel in the app (the panels are always mounted).
+ */
+export function useStoreFields<K extends keyof UIState>(
+  keys: readonly K[],
+): Pick<UIState, K> {
+  return useStoreSelector<Pick<UIState, K>>((snapshot) => {
+    const picked = {} as Pick<UIState, K>;
+    for (const key of keys) picked[key] = snapshot[key];
+    return picked;
+  }, shallowEqual);
+}
+
 // React bindings. Selectors prevent unrelated high-frequency progress events
 // from re-rendering the entire application tree.
 export function useStoreSelector<T>(
@@ -1498,34 +1602,50 @@ export function useStoreSelector<T>(
   isEqual: (a: T, b: T) => boolean = Object.is,
 ): T {
   const selected = useRef<{ source: UIState; value: T } | null>(null);
+  // Latest selector/comparator, so components may build them inline without
+  // forcing a re-subscribe on every render.
+  const selectorRef = useRef(selector);
+  const isEqualRef = useRef(isEqual);
+  selectorRef.current = selector;
+  isEqualRef.current = isEqual;
 
-  const getSelected = (): T => {
+  const getSelected = useCallback((): T => {
     const current = selected.current;
     if (current && current.source === state) return current.value;
-    const next = selector(state);
-    if (current && isEqual(current.value, next)) {
+    const next = selectorRef.current(state);
+    if (current && isEqualRef.current(current.value, next)) {
       current.source = state;
       return current.value;
     }
     selected.current = { source: state, value: next };
     return next;
-  };
+  }, []);
 
-  const subscribeSelected = (onChange: () => void): (() => void) =>
-    subscribe(() => {
-      const next = selector(state);
-      const current = selected.current;
-      if (current && isEqual(current.value, next)) {
-        current.source = state;
-        return;
-      }
-      selected.current = { source: state, value: next };
-      onChange();
-    });
+  // Stable identity: useSyncExternalStore re-subscribes whenever the
+  // subscribe callback changes, which a fresh closure every render would
+  // cause on every single render.
+  const subscribeSelected = useCallback(
+    (onChange: () => void): (() => void) =>
+      subscribe(() => {
+        const next = selectorRef.current(state);
+        const current = selected.current;
+        if (current && isEqualRef.current(current.value, next)) {
+          current.source = state;
+          return;
+        }
+        selected.current = { source: state, value: next };
+        onChange();
+      }),
+    [],
+  );
 
-  return useSyncExternalStore(subscribeSelected, getSelected, () => selector(initial));
+  return useSyncExternalStore(subscribeSelected, getSelected, getSelected);
 }
 
+/**
+ * Subscribe to the whole store. Prefer useStoreFields: this re-renders on
+ * every state change, including per-file progress during a sort.
+ */
 export function useStore(): UIState {
   return useSyncExternalStore(subscribe, getSnapshot);
 }

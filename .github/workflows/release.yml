@@ -1,8 +1,8 @@
 name: Build & Release
 
-# Runs whenever a tag like v3.6.0 is pushed. Tag MUST follow this exact
-# lowercase "v" + three dot-separated numbers pattern (semantic
-# versioning) or the workflow will not trigger.
+# Runs whenever a tag like v6.1.2 is pushed. The tag must name the version the
+# app actually reports (checked below), because a release whose exe disagrees
+# with its own tag is worse than no release at all.
 on:
   push:
     tags:
@@ -50,11 +50,35 @@ jobs:
       - name: Install PyInstaller
         run: pip install pyinstaller
 
-      - name: Build Windows executable
-        run: pyinstaller --onefile --windowed --clean --name "FileSorter" --add-data "ui/dist;ui/dist" main_web.py
+      - name: Check the version agrees everywhere
+        # Fails on drift (package.json / installer.nsi / generated strings) and
+        # on a tag that doesn't match APP_VERSION — before ten minutes of
+        # packaging produce an artefact nobody can name correctly.
+        run: python tools/check_version_consistency.py --tag "${{ github.ref_name }}"
 
-      - name: Create GitHub Release with the .exe attached
+      - name: Build the frozen app
+        # FileSorter.spec is the only build recipe: it owns the hidden imports,
+        # the bundled frontend, the icon and the version resource. Do not add a
+        # second pyinstaller command line here — that is how the two drifted
+        # apart in the first place.
+        run: python -m PyInstaller --clean --noconfirm FileSorter.spec
+
+      - name: Smoke-test the frozen build
+        # Exercises the real executable: onedir layout, version resource, the
+        # --autostart CLI and the headless JSON-RPC + SSE service. A missing
+        # hidden import or an over-eager `excludes` dies here, not on a user's
+        # machine.
+        run: python tools/smoke_test_build.py
+
+      - name: Package the onedir build
+        shell: pwsh
+        # onedir ships as a folder (exe + _internal/); zipping preserves the
+        # relative layout the exe resolves its bundled files through.
+        run: |
+          Compress-Archive -Path dist/FileSorter/* -DestinationPath "dist/FileSorter-${{ github.ref_name }}-win64.zip" -Force
+
+      - name: Create GitHub Release with the zip attached
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/FileSorter.exe
+          files: dist/FileSorter-${{ github.ref_name }}-win64.zip
           generate_release_notes: true

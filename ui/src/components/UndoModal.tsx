@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import type { SortLogEntry } from '../protocol';
-import { closeUndoModal, runUndo, useStore } from '../store';
+import { closeUndoModal, runUndo, useStoreFields } from '../store';
 import { fmt, inline, t } from '../i18n';
 
 interface Group {
@@ -12,7 +12,7 @@ interface Group {
 }
 
 export default function UndoModal() {
-  const store = useStore();
+  const store = useStoreFields(['strings', 'result', 'undoOpen', 'categories', 'folder']);
   const result = store.result;
   const S = store.strings;
 
@@ -40,7 +40,11 @@ export default function UndoModal() {
 
   if (!store.undoOpen || !result || result.kind !== 'sort') return null;
 
-  const totalFiles = result.sort_log.length;
+  // The event carries a bounded preview of the log (a whole-drive sort would
+  // otherwise ship a multi-megabyte frame); sort_log_total is the real count,
+  // and the undo itself always replays the backend's complete log.
+  const totalFiles = result.sort_log_total ?? result.sort_log.length;
+  const previewedFiles = result.sort_log.length;
 
   const confirmUndo = () => {
     void runUndo(); // modal closes itself when phase leaves 'done'
@@ -77,6 +81,14 @@ export default function UndoModal() {
             {store.folder}
           </span>
         </div>
+
+        {previewedFiles < totalFiles && (
+          <p className="undo-more-note">
+            {inline(
+              fmt(t(S, 'undo_more_files'), { n: totalFiles - previewedFiles }),
+            )}
+          </p>
+        )}
 
         <div className="undo-groups">
           {groups.map((g) => {

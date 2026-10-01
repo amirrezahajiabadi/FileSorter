@@ -10,6 +10,141 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **`tools/smoke_test_build.py` — the packaged artefact is now tested at all.**
+  Nothing used to exercise the frozen build: a missing hidden import or an
+  over-eager `excludes` entry could only ever be discovered by a user, because
+  pytest runs from source where those problems cannot exist. The script runs the
+  real executable — onedir layout, the version resource Windows shows in the
+  file's Details tab, `--autostart status` (console I/O from a windowed binary),
+  and the headless JSON-RPC service end to end including token auth and the SSE
+  stream — and exits non-zero on the first problem. The release workflow runs it
+  and refuses to publish a build that fails.
+- **`tools/check_version_consistency.py` — version drift is now a build error.**
+  `APP_VERSION` is the single source of truth (the frozen exe takes its version
+  resource straight from it), but `ui/package.json`, `ui/src/transport.ts`,
+  `installer.nsi` and the generated string table each kept their own copy. The
+  checker compares all of them, optionally against a release tag, and runs both
+  in `pytest` and in CI before the build starts.
+
+### Changed
+- **The desktop build is a PyInstaller *onedir* build, and `FileSorter.spec` is
+  the only recipe that produces it.** Onefile had to unpack every bundled DLL
+  into `%TEMP%` on each launch — a visible pause before the window appeared, and
+  a hard failure on machines that restrict `%TEMP%`. The spec had also stopped
+  being the source of truth: the release workflow ran its own hand-rolled
+  `pyinstaller --onefile --windowed --clean …` line, which had already drifted
+  (no hidden imports, no version resource), so CI and local builds disagreed
+  about what a release was.
+- **UPX is off, bytecode ships at `optimize=2`, and `excludes` is a short,
+  documented list.** Compressing the DLLs traded a smaller download for slower
+  start-up and for the largest single source of antivirus false positives in the
+  PyInstaller ecosystem; each excluded package now names its reason in the spec,
+  and the smoke test is what proves the list is still safe. The biggest single
+  entry is `cryptography`: pywebview imports it lazily and only for `ssl=True`
+  (it raises its own “SSL support requires cryptography” error otherwise), while
+  FileSorter serves plain loopback HTTP — dropping it took the build from
+  **37 MB to 27 MB**. The stdlib OpenSSL pieces deliberately stay (`_hashlib` →
+  `libcrypto-3.dll`, 5 MB): `app/duplicates.py` hashes files with
+  `hashlib.sha256`, so that weight is load-bearing.
+- **The executable carries an icon and a Windows version resource.**
+  `assets/icon.ico` is generated from the app's own folder mark by
+  `tools/make_icon.py` (seven sizes, minimum 2px stroke so the glyph survives at
+  16px), and the Details-tab fields are built at build time from `APP_VERSION`,
+  so a release never edits a version literal in the spec. Previously the exe had
+  no version information and no icon at all.
+- **`installer.nsi` installs the folder and uninstalls the tree.** `File /r` for
+  the onedir payload — installing only the exe would ship an app that cannot
+  start — and `RMDir /r` on uninstall, where the flat `RMDir` failed on any
+  non-empty directory.
+- **Releases now ship `FileSorter-<tag>-win64.zip`** (the whole onedir folder;
+  unzip and run `FileSorter.exe`) instead of a bare `.exe` that cannot run on
+  its own.
+
+### Fixed
+- **Completion events could be dropped on a busy stream.** `ServiceApi._push`
+  discarded *every* frame once a subscriber's queue was full — including
+  `done`/`dup_done`/`clean_done`. A long sort filled the 256-frame queue and the
+  terminal frame was silently lost, leaving the page on an eternal spinner with
+  the operation long finished. Terminal kinds now evict the oldest queued frame
+  to guarantee delivery; high-frequency kinds keep the drop-oldest policy (their
+  newest value is the only one that matters).
+- **A file vanishing mid-analysis killed the whole report.** `analyze_folder`
+  stat'd every file twice (size, then mtime); a file deleted or locked between
+  the two calls raised and replaced the report with an error. Each entry is now
+  read once, inside the walk, and skipped if it is gone.
+- **A missing folder was reported as "0 files".** `analyze_folder`/`plan_sort`
+  now raise `FileNotFoundError` (surfaced to the UI as an error) like
+  `scan_space` does, instead of quietly returning an empty report for a typo'd
+  or deleted path.
+- **The declared event set had drifted behind reality.** `EVENT_KINDS` was
+  missing `clean_progress`/`clean_done`/`sched_run`/`sched_done`, so
+  `event_message()` raised for them; the TypeScript mirror also lacked
+  `sched_*`. Both sides now declare the same kinds, and a test compares the two
+  files directly so they cannot drift again.
+- **Version strings disagreed.** `ui/package.json` and the browser mock said
+  `6.1.1` while Python said `6.1.2`, and the service banner was hardcoded. All
+  of them now follow `APP_VERSION`.
+- **Typed paths never became "recent".** Only the native folder dialog recorded
+  a folder (Python does it inside `browse_folder`), so in headless mode — where
+  the picker always falls back to a typed path — the recent list stayed empty
+  forever.
+- **Duplicate scans re-rendered their whole reduction set per frame.** The
+  extra-copy and reclaimable-bytes totals now memoize on the group list, as does
+  the disk panel's category chart.
+
+### Performance
+- **Every scanner now stats each file exactly once.** `sorter.iter_files` is a
+  single `os.scandir` walk — shared by the analysis, the sort planner, disk
+  analysis, duplicate scanning and junk cleanup — that returns the stat it
+  already had, prunes the sorter's own `sorted/` output directory instead of
+  filtering a path per file, and skips unreadable or vanishing entries. Watcher
+  snapshots use `os.scandir` too (it re-fingerprints every watched folder every
+  couple of seconds, forever). Measured on a 10,000-file tree:
+  `analyze_folder` 1096 ms → 81 ms (**13.6×**), `scan_space` 322 ms → 64 ms
+  (**5.0×**), `plan_sort` 772 ms → 243 ms (**3.2×**).
+- **Coalescing no longer spawns a thread per burst.** The event coalescer used a
+  fresh `threading.Timer` every 120 ms — roughly 2,500 threads for a five-minute
+  sort. It is now one flusher thread that retires after a few idle ticks.
+- **The UI subscribes per panel instead of to the whole store.** `App` and the
+  always-mounted panels each read only the fields they render
+  (`useStoreFields` + shallow comparison), so a per-file progress tick no longer
+  re-renders the tree; log rows are memoized so appending a line touches one
+  node, not ~250, and the live log scrolls by assigning `scrollTop` instead of
+  re-running layout via `scrollIntoView` several times a second.
+- **Large payloads are bounded.** The `done` event carries at most
+  `MAX_SORT_LOG_WIRE` (2000) sort-log rows plus `sort_log_total`; undo still
+  replays the controller's complete log, so truncation never changes what an
+  undo does. The duplicate-scan intermediate maps are released as each phase
+  consumes them, and the cleanup whitelist holds strings rather than `Path`
+  objects. The duplicate whitelist stays `Path`-based on purpose: `Path`
+  equality normalizes separators and case, which a string list would not.
+- **Deletion no longer resolves every path twice.** `cleanup.delete_junk`
+  `Path.resolve()`-d both the whitelist and every input path — on Windows that
+  opens a handle per call. The verbatim-string fast path now matches without
+  touching the filesystem, with resolution kept as the fallback, so the safety
+  property is unchanged.
+
+### Changed
+- `api.analyze_folder`/`api.plan_sort` no longer spawn a thread and immediately
+  `join()` it — they blocked on the result either way, and paid for a thread, a
+  closure and a duplicate result object per call.
+
+### Tests
+- 16 suites / 270+ tests (from 15 / 255). New `tests/test_file_walk.py` covers
+  one-stat-per-file, vanishing and unreadable entries, the pruned output folder
+  and missing scan roots; `test_protocol.py` gains event-kind coverage including
+  a direct comparison against the TypeScript mirror; `test_service.py` gains SSE
+  terminal-delivery guarantees under a full queue.
+- Two tests pinned implementation details and were adjusted: a duplicate scan now
+  throttles per-file `dup_progress` ticks (the closing tick is still exact), and
+  the disk-scan cancel test drives the cancel from the scan's own progress
+  callback instead of a wall-clock sleep that the faster walk beat.
+
+---
+
 ## [6.1.2] — 2026
 
 ### Fixed

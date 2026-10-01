@@ -79,6 +79,7 @@ export function createHttpBridge(): BridgeApi {
   return {
     get_state: () => call<AppState>('get_state'),
     browse_folder: async () => null, // headless: no native dialog; UI falls back to typed path
+    record_recent_folder: (path) => call<string[]>('record_recent_folder', path),
     toggle_theme: () => call<ThemeName>('toggle_theme'),
     toggle_language: () => call<LangCode>('toggle_language'),
     get_strings: (lang) => call<Record<string, string>>('get_strings', lang),

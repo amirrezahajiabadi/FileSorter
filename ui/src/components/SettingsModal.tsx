@@ -7,7 +7,7 @@ import {
   rulesSnapshot,
   saveSettings,
   settingsSnapshot,
-  useStore,
+  useStoreFields,
 } from '../store';
 import { fmt, inline, t } from '../i18n';
 
@@ -16,7 +16,7 @@ function displayName(d: CategoryDraft, lang: string): string {
 }
 
 export default function SettingsModal() {
-  const store = useStore();
+  const store = useStoreFields(['strings', 'lang']);
   const S = store.strings;
   const lang = store.lang;
 
