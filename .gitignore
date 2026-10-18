@@ -1,37 +1,134 @@
-# Python
+# ==============================================================================
+#  FileSorter — Repository .gitignore
+# ==============================================================================
+
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*$py.class
 *.pyo
 *.pyd
 .Python
 *.egg-info/
+*.egg
+build/
+dist/
+eggs/
+.eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+*.manifest
+*.spec.bak
+
+# PyInstaller / Build outputs
 dist/
 build/
+Output/
+Release/
+*.exe
+*.dll
+*.so
+*.dylib
+# Keep icon assets
+!assets/*.ico
+!assets/*.png
+!v2/src-tauri/icons/*
 
-# Testing
+# ── Testing & Quality ─────────────────────────────────────────────────────────
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
 
-# Virtual environment
+# ── Virtual Environments ──────────────────────────────────────────────────────
 venv/
 env/
 .venv/
+ENV/
+env.bak/
+venv.bak/
 
-# App settings (user-specific, not project data)
+# ── Node / Vite / TypeScript ──────────────────────────────────────────────────
+node_modules/
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.tsbuildinfo
+
+# Node logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment & Local overrides
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Rust / Cargo / Tauri ──────────────────────────────────────────────────────
+**/target/
+target/
+src-tauri/target/
+**/src-tauri/target/
+src-tauri/gen/schemas/
+**/src-tauri/gen/schemas/
+**/*.rs.bk
+
+# ── Application Runtime & User Data ───────────────────────────────────────────
 .filesorter_settings.json
-
-# Application data
 *.log
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE
-.vscode/
-.idea/
-
-# Agent scratch dir (dev server logs)
+logs/
+*.tmp
+*.bak
+*.swp
+*.swo
+crash_dumps/
 .freebuff/
+
+# ── Operating System Artifacts ────────────────────────────────────────────────
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.stackdump
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+
+# Linux
+*~
+.directory
+
+# ── IDEs & Editors ────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

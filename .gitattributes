@@ -1,0 +1,45 @@
+# ==============================================================================
+#  FileSorter — Repository .gitattributes
+# ==============================================================================
+
+# Set default behavior to automatically normalize line endings to LF
+* text=auto eol=lf
+
+# Explicit text files
+*.py            text diff=python
+*.rs            text diff=rust
+*.ts            text
+*.tsx           text
+*.js            text
+*.jsx           text
+*.json          text
+*.css           text
+*.html          text
+*.md            text
+*.yml           text
+*.yaml          text
+*.toml          text
+*.ini           text
+*.spec          text
+*.nsi           text eol=crlf
+*.bat           text eol=crlf
+*.ps1           text
+
+# Binary media & font files (do not convert line endings)
+*.ico           binary
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.icns          binary
+*.ttf           binary
+*.woff          binary
+*.woff2         binary
+*.exe           binary
+*.dll           binary
+
+# GitHub Linguist customizations
+ui/src/generated/*      linguist-generated=true
+ui/package-lock.json    linguist-generated=true
+v2/package-lock.json    linguist-generated=true
+v2/src-tauri/Cargo.lock linguist-generated=true
