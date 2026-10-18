@@ -400,59 +400,312 @@ body::after {
   box-shadow: var(--card-shadow-hover);
 }
 
-/* ── Top Bar & Branding ──────────────────────────────────── */
+/* ── Floating Capsule Navbar (Supaste Inspiration) ───────── */
 
-.topbar {
+.capsule-nav {
+  position: sticky;
+  top: 14px;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 0;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.brand-mark {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--btn-border);
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--text);
+  gap: 12px;
+  height: 56px;
+  padding: 6px 10px 6px 14px;
+  border-radius: 9999px;
   background: var(--surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--btn-specular);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  box-shadow: var(--card-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 4px;
 }
 
-.brand:hover .brand-mark {
-  transform: rotate(-6deg) scale(1.05);
+[data-theme="dark"] .capsule-nav {
+  background: rgba(13, 16, 23, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.65),
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.22),
+              inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4);
 }
 
-.brand h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
+[data-theme="light"] .capsule-nav {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.08),
+              inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1),
+              inset 0 -1px 1px 0 rgba(0, 0, 0, 0.03);
 }
 
-.brand p {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
+.capsule-nav:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--card-shadow-hover);
 }
 
-.topbar-actions {
+/* Left Brand Zone */
+.capsule-brand {
   display: flex;
   align-items: center;
   gap: 10px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.capsule-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.04) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="light"] .capsule-logo {
+  background: linear-gradient(135deg, #ffffff 0%, rgba(235, 242, 250, 0.85) 100%);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow: inset 0 1.5px 1.5px #ffffff, 0 4px 10px rgba(15, 23, 42, 0.06);
+}
+
+.capsule-brand:hover .capsule-logo {
+  transform: rotate(-6deg) scale(1.08);
+}
+
+.capsule-logo-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.capsule-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.capsule-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  line-height: 1;
+}
+
+[data-theme="light"] .capsule-badge {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text-muted);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Center Segmented Floating Tabs */
+.capsule-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+[data-theme="light"] .capsule-tabs {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+.capsule-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 15px;
+  border-radius: 9999px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.capsule-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme="light"] .capsule-tab:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.capsule-tab:active {
+  transform: scale(0.97);
+}
+
+/* Active tab: Pure Supaste contrast capsule */
+[data-theme="dark"] .capsule-tab.active {
+  background: #ffffff;
+  color: #07090e;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] .capsule-tab.active {
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+.tab-icon {
+  font-size: 13.5px;
+  line-height: 1;
+}
+
+.tab-label {
+  line-height: 1;
+}
+
+.capsule-tab-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+[data-theme="dark"] .capsule-tab.active .capsule-tab-badge {
+  background: rgba(7, 9, 14, 0.14);
+  color: #07090e;
+}
+
+[data-theme="light"] .capsule-tab.active .capsule-tab-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.capsule-tab:not(.active) .capsule-tab-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .capsule-tab:not(.active) .capsule-tab-badge {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--text);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Right Actions Zone */
+.capsule-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.capsule-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 9999px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--btn-specular);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.capsule-btn-pill:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.capsule-btn-pill:active {
+  transform: scale(0.97);
+}
+
+.capsule-btn-icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--btn-specular);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.capsule-btn-icon:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+  transform: scale(1.06);
+}
+
+.capsule-btn-icon:active {
+  transform: scale(0.95);
+}
+
+.capsule-lang-text {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+/* Responsiveness */
+@media (max-width: 768px) {
+  .capsule-badge {
+    display: none;
+  }
+  .capsule-btn-text {
+    display: none;
+  }
+  .tab-label {
+    font-size: 12px;
+  }
+  .capsule-tab {
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 620px) {
+  .capsule-title {
+    display: none;
+  }
+  .tab-label {
+    display: none;
+  }
+  .capsule-tab {
+    padding: 7px 11px;
+  }
 }
 
 /* ── Liquid Glass Buttons (Zero Colored Halos) ───────────── */
@@ -543,64 +796,6 @@ body::after {
   font-size: 16px;
 }
 
-/* ── Navigation Tabs (Liquid Glass) ──────────────────────── */
-
-.tabs {
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: var(--card-shadow);
-  overflow-x: auto;
-}
-
-.tab-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  border-radius: 10px;
-  padding: 8px 18px;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tab-btn:hover {
-  color: var(--text);
-  background: var(--surface-hover);
-  border-color: var(--line);
-}
-
-.tab-btn:active {
-  transform: scale(0.97);
-}
-
-.tab-btn.active {
-  color: var(--text);
-  background: var(--surface-strong);
-  border-color: var(--line-strong);
-  font-weight: 700;
-  box-shadow: var(--btn-specular);
-}
-
-.tab-badge {
-  background: var(--badge-bg);
-  color: var(--badge-text);
-  border: 1px solid var(--line);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 1px 7px;
-  border-radius: 12px;
-}
 
 /* ── Hero / Dropzone (Liquid Glass) ──────────────────────── */
 

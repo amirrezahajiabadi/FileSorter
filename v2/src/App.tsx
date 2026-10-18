@@ -294,22 +294,71 @@ export default function App() {
 
   return (
     <main className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">FS</span>
-          <div>
-            <h1>{t.app_title}</h1>
-            <p>{t.app_subtitle}</p>
+      {/* Floating Capsule Navbar (Supaste Style) */}
+      <header className="capsule-nav">
+        {/* Left: Brand */}
+        <div className="capsule-brand">
+          <div className="capsule-logo">
+            <span className="capsule-logo-icon">⚡</span>
           </div>
+          <span className="capsule-title">{t.app_title}</span>
+          <span className="capsule-badge">v2.0</span>
         </div>
-        <div className="topbar-actions">
+
+        {/* Center: Segmented Floating Tabs */}
+        <nav className="capsule-tabs">
+          <button
+            className={`capsule-tab ${activeTab === "sort" ? "active" : ""}`}
+            onClick={() => setActiveTab("sort")}
+            title={t.tab_sort}
+          >
+            <span className="tab-icon">📁</span>
+            <span className="tab-label">{t.tab_sort}</span>
+          </button>
+          <button
+            className={`capsule-tab ${activeTab === "dupes" ? "active" : ""}`}
+            onClick={() => setActiveTab("dupes")}
+            title={t.tab_dupes}
+          >
+            <span className="tab-icon">🔍</span>
+            <span className="tab-label">{t.tab_dupes}</span>
+            {dupes.length > 0 && <span className="capsule-tab-badge">{dupes.length}</span>}
+          </button>
+          <button
+            className={`capsule-tab ${activeTab === "disk" ? "active" : ""}`}
+            onClick={() => setActiveTab("disk")}
+            title={t.tab_disk}
+          >
+            <span className="tab-icon">📊</span>
+            <span className="tab-label">{t.tab_disk}</span>
+          </button>
+          <button
+            className={`capsule-tab ${activeTab === "settings" ? "active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+            title={t.tab_settings}
+          >
+            <span className="tab-icon">⚙️</span>
+            <span className="tab-label">{t.tab_settings}</span>
+          </button>
+        </nav>
+
+        {/* Right: Quick Action Controls */}
+        <div className="capsule-actions">
           {folder && (
-            <button className="btn btn-ghost" onClick={reset} title={t.reset_folder}>
-              {t.reset_folder}
+            <button className="capsule-btn-pill" onClick={reset} title={t.reset_folder}>
+              <span>↺</span>
+              <span className="capsule-btn-text">{t.reset_folder}</span>
             </button>
           )}
           <button
-            className="btn btn-icon btn-ghost"
+            className="capsule-btn-icon"
+            onClick={() => setLang(lang === "fa" ? "en" : "fa")}
+            title={lang === "fa" ? "Switch to English" : "تغییر به زبان فارسی"}
+          >
+            <span className="capsule-lang-text">{lang === "fa" ? "EN" : "فا"}</span>
+          </button>
+          <button
+            className="capsule-btn-icon"
             onClick={toggleTheme}
             title={theme === "dark" ? t.theme_light : t.theme_dark}
           >
@@ -317,39 +366,6 @@ export default function App() {
           </button>
         </div>
       </header>
-
-      {/* Tabs */}
-      <nav className="tabs">
-        <button
-          className={`tab-btn ${activeTab === "sort" ? "active" : ""}`}
-          onClick={() => setActiveTab("sort")}
-        >
-          <span>📁</span>
-          <span>{t.tab_sort}</span>
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "dupes" ? "active" : ""}`}
-          onClick={() => setActiveTab("dupes")}
-        >
-          <span>🔍</span>
-          <span>{t.tab_dupes}</span>
-          {dupes.length > 0 && <span className="tab-badge">{dupes.length}</span>}
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "disk" ? "active" : ""}`}
-          onClick={() => setActiveTab("disk")}
-        >
-          <span>📊</span>
-          <span>{t.tab_disk}</span>
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "settings" ? "active" : ""}`}
-          onClick={() => setActiveTab("settings")}
-        >
-          <span>⚙️</span>
-          <span>{t.tab_settings}</span>
-        </button>
-      </nav>
 
       {error && (
         <div className="error-bar" role="alert" onClick={() => setError("")}>
