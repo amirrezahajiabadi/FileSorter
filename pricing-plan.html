@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pick your Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* everything scales off the 550px-wide reference panel */
+      --u: clamp(0.66px, calc((100vw - 24px) / 550), 1px);
+      --page: #f3f3f3;
+      --panel: #fdfdfd;
+      --card: #f3f3f3;
+      --ink: #111111;
+      --muted: #7a7a7a;
+      --faint: #bcbcbc;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--page);
+    }
+
+    body {
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    /* === PANEL === */
+    .plans {
+      width: 100%;
+      max-width: 550px;
+      background: var(--panel);
+      border: 1px solid #e7e7e7;
+      border-radius: calc(var(--u) * 44);
+      padding: calc(var(--u) * 42) calc(var(--u) * 19) calc(var(--u) * 17);
+    }
+
+    .plans__title {
+      font-family: "Instrument Serif", "Times New Roman", serif;
+      font-weight: 400;
+      font-size: calc(var(--u) * 58);
+      line-height: 1;
+      letter-spacing: -0.045em;
+      text-align: center;
+    }
+
+    /* === TABS === */
+    .tabs {
+      position: relative;
+      display: flex;
+      width: fit-content;
+      margin: calc(var(--u) * 20) auto calc(var(--u) * 36);
+      padding: calc(var(--u) * 4);
+      background: var(--card);
+      border-radius: 999px;
+    }
+
+    .tabs__pill {
+      position: absolute;
+      top: calc(var(--u) * 4);
+      bottom: calc(var(--u) * 4);
+      left: 0;
+      width: 0;
+      background: #fff;
+      border-radius: 999px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .tabs__btn {
+      position: relative;
+      z-index: 1;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      font: inherit;
+      font-size: max(11px, calc(var(--u) * 15));
+      line-height: calc(var(--u) * 37);
+      padding: 0 calc(var(--u) * 18.5);
+      color: var(--muted);
+      border-radius: 999px;
+      transition: color 0.3s ease;
+    }
+
+    .tabs__btn[aria-selected="true"] {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    .tabs__btn:focus-visible {
+      outline: 2px solid #9db4ff;
+      outline-offset: 2px;
+    }
+
+    /* === CARDS (shared) === */
+    .card {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background: var(--card);
+      border-radius: calc(var(--u) * 30);
+    }
+
+    .card video {
+      position: absolute;
+      z-index: -1;
+      display: block;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    /* === HERO CARD === */
+    .hero {
+      aspect-ratio: 510 / 269;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: calc(var(--u) * 29) calc(var(--u) * 26) calc(var(--u) * 30);
+    }
+
+    .hero video {
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-position: 100% 50%;
+      filter: brightness(1.04);
+      -webkit-mask-image: linear-gradient(to right, transparent 40%, #000 49%);
+      mask-image: linear-gradient(to right, transparent 40%, #000 49%);
+    }
+
+    .hero__title {
+      font-weight: 500;
+      font-size: max(17px, calc(var(--u) * 26.5));
+      line-height: 1.22;
+      letter-spacing: -0.012em;
+    }
+
+    .hero__title span {
+      color: var(--faint);
+      font-weight: 400;
+    }
+
+    .hero__list {
+      list-style: none;
+      display: grid;
+      gap: calc(var(--u) * 6);
+      font-size: max(11px, calc(var(--u) * 15));
+      line-height: calc(var(--u) * 19);
+      color: var(--muted);
+    }
+
+    .hero__list li {
+      display: flex;
+      align-items: center;
+      gap: calc(var(--u) * 10);
+    }
+
+    .hero__list svg {
+      width: calc(var(--u) * 14);
+      height: calc(var(--u) * 14);
+      flex: none;
+    }
+
+    /* === FEATURE GRID === */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: calc(var(--u) * 15) calc(var(--u) * 13);
+      margin-top: calc(var(--u) * 13);
+    }
+
+    .feature {
+      aspect-ratio: 249 / 215;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 calc(var(--u) * 12) calc(var(--u) * 15);
+      border-radius: calc(var(--u) * 28);
+    }
+
+    .feature video {
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 72%;
+      -webkit-mask-image: linear-gradient(to bottom, #000 38%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 38%, transparent 100%);
+    }
+
+    .feature p {
+      font-size: max(11px, calc(var(--u) * 15));
+      line-height: 1.4;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    /* === ANIMATIONS / TRANSITIONS === */
+    .swap {
+      transition: opacity 0.25s ease;
+    }
+
+    .swap.is-out {
+      opacity: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tabs__pill,
+      .swap {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="plans" aria-labelledby="plans-title">
+    <h1 class="plans__title" id="plans-title">Pick your Plan</h1>
+    <div class="tabs" role="tablist" aria-label="Plans">
+      <span class="tabs__pill" aria-hidden="true"></span>
+      <button class="tabs__btn" role="tab" aria-selected="false" data-plan="free">Free Plan</button>
+      <button class="tabs__btn" role="tab" aria-selected="true" data-plan="pro">Pro Plan</button>
+      <button class="tabs__btn" role="tab" aria-selected="false" data-plan="enterprise">Enterprise</button>
+    </div>
+    <article class="card hero">
+      <video autoplay muted loop playsinline preload="auto" poster="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_132921_13724c3c-287c-41d5-a0b3-d1dc7b054a9e.png" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_133336_881aba37-43a4-411b-bc54-478d4c5d64cd.mp4"></video>
+      <h2 class="hero__title swap" id="plan-title">Upgrade to Pro<br>$79<span>/month</span></h2>
+      <ul class="hero__list swap" id="plan-list">
+        <li>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#9a9aa2" d="M8 .6l1.7 1.3 2.1-.2.8 2 1.9 1-.5 2.1.9 1.9-1.6 1.4-.2 2.1-2.1.5-1.2 1.8L8 13.6l-1.8.9L5 12.7l-2.1-.5-.2-2.1L1.1 8.700 2 6.800 1.500 4.700l1.900-1 .8-2 2.100.2z"/><path fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M5.400 7.800l1.800 1.800 3.400-3.700"/></svg>
+          Satellite coverage
+        </li>
+        <li>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#9a9aa2" d="M8 .6l1.7 1.3 2.1-.2.8 2 1.9 1-.5 2.1.9 1.9-1.6 1.4-.2 2.1-2.1.5-1.2 1.8L8 13.6l-1.8.9L5 12.7l-2.1-.5-.2-2.1L1.1 8.700 2 6.800 1.500 4.700l1.900-1 .8-2 2.100.2z"/><path fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M5.400 7.800l1.800 1.800 3.400-3.700"/></svg>
+          Additional lines included
+        </li>
+      </ul>
+    </article>
+    <div class="grid">
+      <article class="card feature">
+        <video autoplay muted loop playsinline preload="auto" poster="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_132921_f16b029b-5a56-43e5-a972-ca3621fc65c4.png" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_133333_a193c8c3-31c3-4410-bac3-aa1e277f27d6.mp4"></video>
+        <p>Unlimited Data, Calls<br>and Voice notes.</p>
+      </article>
+      <article class="card feature">
+        <video autoplay muted loop playsinline preload="auto" poster="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_132920_572d6568-c311-4c22-b723-0fc997307cd5.png" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_133332_42677a5f-2a62-4b2d-b6df-362bcd38c517.mp4"></video>
+        <p>Fast international<br>data roaming.</p>
+      </article>
+      <article class="card feature">
+        <video autoplay muted loop playsinline preload="auto" poster="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_132920_ee53be73-b1cb-4382-9c0c-8980413d9cba.png" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_133333_8b5a3d3f-8f53-410b-a382-8bec57190837.mp4"></video>
+        <p>Full access additional<br>available lines.</p>
+      </article>
+      <article class="card feature">
+        <video autoplay muted loop playsinline preload="auto" poster="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_132919_6e3878d7-d7e9-427c-8c09-f773d4fd150d.png" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_133338_88390589-9e79-4e3a-a9e9-a9be86ffc56f.mp4"></video>
+        <p>eSim protection and<br>VPN support</p>
+      </article>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      const plans = {
+        free: {
+          title: "Start for Free",
+          price: "$0",
+          items: ["Local coverage", "One line included"]
+        },
+        pro: {
+          title: "Upgrade to Pro",
+          price: "$79",
+          items: ["Satellite coverage", "Additional lines included"]
+        },
+        enterprise: {
+          title: "Go Enterprise",
+          price: "$249",
+          items: ["Global priority network", "Unlimited lines included"]
+        }
+      };
+
+      const tabsContainer = document.querySelector(".tabs");
+      const pill = document.querySelector(".tabs__pill");
+      const tabs = document.querySelectorAll(".tabs__btn");
+      const planTitle = document.getElementById("plan-title");
+      const planList = document.getElementById("plan-list");
+
+      // Capture icon SVG once from the first list item's outerHTML
+      const firstSvg = planList.querySelector("li svg");
+      const iconSvg = firstSvg ? firstSvg.outerHTML : '';
+
+      function movePill() {
+        const activeTab = document.querySelector('.tabs__btn[aria-selected="true"]');
+        if (!activeTab || !pill) return;
+        pill.style.width = activeTab.offsetWidth + "px";
+        pill.style.transform = "translateX(" + activeTab.offsetLeft + "px)";
+      }
+
+      function render(key) {
+        const plan = plans[key];
+        if (!plan) return;
+        planTitle.innerHTML = plan.title + "<br>" + plan.price + "<span>/month</span>";
+        planList.innerHTML = plan.items
+          .map(item => `<li>${iconSvg}${item}</li>`)
+          .join("");
+      }
+
+      tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          if (tab.getAttribute("aria-selected") === "true") return;
+
+          tabs.forEach(t => t.setAttribute("aria-selected", t === tab ? "true" : "false"));
+          movePill();
+
+          planTitle.classList.add("is-out");
+          planList.classList.add("is-out");
+
+          setTimeout(() => {
+            render(tab.dataset.plan);
+            planTitle.classList.remove("is-out");
+            planList.classList.remove("is-out");
+          }, 220);
+        });
+      });
+
+      // 4. Call movePill() on load, on window resize, inside a ResizeObserver observing .tabs (if supported), and after document.fonts.ready (if supported)
+      window.addEventListener("load", movePill);
+      window.addEventListener("resize", movePill);
+
+      if (window.ResizeObserver && tabsContainer) {
+        const ro = new ResizeObserver(() => movePill());
+        ro.observe(tabsContainer);
+      }
+
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(movePill);
+      }
+
+      movePill();
+
+      // 5. If matchMedia("(prefers-reduced-motion: reduce)") matches, remove the autoplay attribute from every video and pause it.
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.querySelectorAll("video").forEach(v => {
+          v.removeAttribute("autoplay");
+          v.pause();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
