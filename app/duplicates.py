@@ -178,21 +178,45 @@ def scan_duplicates(root: Path, on_event: Optional[ProgressEvent] = None,
 
 # ── Deletion (whitelisted) ───────────────────────────────────────
 
-def delete_files(paths: List[str], allowed: Set[Path]) -> dict:
+def delete_files(paths: List[str], allowed: Set[Path],
+                 groups: Optional[List[List[Path]]] = None) -> dict:
     """Delete the given files — but only ones in `allowed` (the paths a
     recent scan flagged as duplicates). Anything else is a no-op failure.
+    If `groups` is provided, at least one file from each duplicate group is
+    always preserved to prevent total data loss.
 
     Returns {"deleted": [str, ...], "failed": [{"path", "error"}, ...]}.
     """
     deleted: List[str] = []
     failed: List[dict] = []
+
+    # If duplicate groups are known, ensure at least one copy in each group is preserved
+    protected_last_copies = set()
+    if groups:
+        requested_set = {Path(p) for p in paths}
+        for group in groups:
+            group_paths = [Path(p) for p in group]
+            # If all files of this group are requested to be deleted, protect the first one
+            if len(group_paths) > 0 and all(p in requested_set for p in group_paths):
+                protected_last_copies.add(group_paths[0])
+
     for raw in paths:
         path = Path(raw)
+        if path in protected_last_copies:
+            failed.append({"path": raw, "error": "cannot delete the last remaining copy of a duplicate group"})
+            continue
         if path not in allowed:
             failed.append({"path": raw, "error": "not flagged as a duplicate by the last scan"})
             continue
         try:
             if path.is_file():
+                try:
+                    import stat
+                    mode = path.stat().st_mode
+                    if not (mode & stat.S_IWRITE):
+                        path.chmod(stat.S_IWRITE)
+                except OSError:
+                    pass
                 path.unlink()
                 deleted.append(raw)
             else:

@@ -20,7 +20,12 @@ import shutil
 from pathlib import Path
 
 from app.constants import DEFAULT_CATEGORIES, MAX_SORT_LOG_WIRE
-from app.settings_manager import load_settings, save_settings, add_recent_folder
+from app.settings_manager import (
+    load_settings,
+    save_settings,
+    add_recent_folder,
+    sanitize_category_name,
+)
 from app.duplicates import delete_files, scan_duplicates
 from app.disk_scan import list_drives, scan_space
 from app.cleanup import (
@@ -47,6 +52,7 @@ class AppController:
         self.tasks = self.settings.get("tasks", [])
         self.last_sort_log = []  # for undo: list of {"action", "source", "final_dest"}
         self.last_dup_paths = set()  # whitelist of paths the last duplicate scan flagged
+        self.last_dup_groups = []  # list of [Path, ...] duplicate groups from the last scan
         self.last_clean_by_loc = {}  # {location_id: [paths]} flagged by the last cleanup scan
 
     # ══════════════════════════════════════════════════════════════
@@ -64,16 +70,25 @@ class AppController:
         save_settings(self.settings)
 
     def update_categories(self, categories: dict, meta: dict = None) -> None:
-        self.categories = categories
-        self.settings["categories"] = categories
+        sanitized_cats = {}
+        sanitized_meta = {}
+        for cat, exts in (categories or {}).items():
+            safe_cat = sanitize_category_name(cat)
+            sanitized_cats.setdefault(safe_cat, []).extend(exts)
+            if meta and cat in meta:
+                sanitized_meta[safe_cat] = meta[cat]
+        if "others" not in sanitized_cats:
+            sanitized_cats["others"] = []
+        self.categories = sanitized_cats
+        self.settings["categories"] = sanitized_cats
         if meta is not None:
-            self.category_meta = meta
-            self.settings["category_meta"] = meta
+            self.category_meta = sanitized_meta
+            self.settings["category_meta"] = sanitized_meta
         # Drop smart rules whose target category was removed — they can no
         # longer match anything (match_rule_category skips them anyway).
         if self.smart_rules:
             self.smart_rules = [
-                r for r in self.smart_rules if r.get("category") in categories
+                r for r in self.smart_rules if r.get("category") in self.categories
             ]
             self.settings["smart_rules"] = self.smart_rules
         save_settings(self.settings)
@@ -294,6 +309,10 @@ class AppController:
             for group in result["groups"]
             for f in group["files"]
         }
+        self.last_dup_groups = [
+            [Path(f["path"]) for f in group["files"]]
+            for group in result.get("groups", [])
+        ]
         return result
 
     def delete_duplicates(self, paths: list) -> dict:
@@ -305,7 +324,7 @@ class AppController:
         normalizes separators and case, so "C:/a/b" and "C:\\a\\b" compare
         equal, which a plain string whitelist would reject.
         """
-        return delete_files(list(paths), self.last_dup_paths)
+        return delete_files(list(paths), self.last_dup_paths, groups=self.last_dup_groups)
 
     def sort(self, path: str, move: bool = False, duplicate_mode: str = "skip", on_event=None) -> dict:
         """Run a real sort, reporting progress through on_event(kind, payload).
@@ -364,6 +383,7 @@ class AppController:
                     skipped += 1
                 else:
                     try:
+                        final_dest.parent.mkdir(parents=True, exist_ok=True)
                         if move:
                             shutil.move(str(source), str(final_dest))
                             sort_log.append({"action": "moved", "source": source, "final_dest": final_dest,
@@ -434,6 +454,7 @@ class AppController:
 
         emit("total", len(entries))
         restored = removed = failed = processed = 0
+        failed_entries = []
 
         for entry in reversed(entries):
             source, final_dest = entry["source"], entry["final_dest"]
@@ -445,17 +466,26 @@ class AppController:
                     restored += 1
                 else:  # "copied"
                     if final_dest.exists():
+                        try:
+                            import stat
+                            mode = final_dest.stat().st_mode
+                            if not (mode & stat.S_IWRITE):
+                                final_dest.chmod(stat.S_IWRITE)
+                        except OSError:
+                            pass
                         final_dest.unlink()
                     emit("item", {"status": "removed", "name": final_dest.name})
                     removed += 1
             except Exception as e:
                 emit("item", {"status": "failed", "name": final_dest.name, "error": str(e)})
                 failed += 1
+                failed_entries.append(entry)
 
             processed += 1
             emit("progress", processed)
 
-        self.last_sort_log = []
+        # Keep failed entries so the user can retry after releasing locked files
+        self.last_sort_log = list(reversed(failed_entries))
         result = {"restored": restored, "removed": removed, "failed": failed, "nothing": False}
         emit("done", result)
         return result

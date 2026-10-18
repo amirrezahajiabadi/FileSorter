@@ -139,7 +139,30 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
             on_progress(report.restored, total);
             continue;
         }
-        match fs::rename(&f.moved_to, &f.original) {
+        if let Some(parent) = f.original.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let move_res = match fs::rename(&f.moved_to, &f.original) {
+            Ok(()) => Ok(()),
+            Err(_) => {
+                // Fallback for cross-volume moves
+                match fs::copy(&f.moved_to, &f.original) {
+                    Ok(_) => {
+                        let src_len = fs::metadata(&f.moved_to).map(|m| m.len()).ok();
+                        let dst_len = fs::metadata(&f.original).map(|m| m.len()).ok();
+                        if src_len.is_some() && src_len == dst_len {
+                            let _ = fs::remove_file(&f.moved_to);
+                            Ok(())
+                        } else {
+                            let _ = fs::remove_file(&f.original);
+                            Err("کپی ناقص در واگرد".to_string())
+                        }
+                    }
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+        };
+        match move_res {
             Ok(()) => report.restored += 1,
             Err(err) => {
                 report.skipped += 1;
@@ -150,7 +173,8 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
         }
         on_progress(report.restored, total);
     }
-    // Consumed journal is removed whether fully or partially restored.
+    // The journal is considered replayed once undo finishes; rm it so a second
+    // call undoes the previous run, not this one.
     let _ = fs::remove_file(&newest);
     Ok(report)
 }

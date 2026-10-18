@@ -10,9 +10,12 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
-## [Unreleased]
+## [6.2.0] — 2026-10-18
 
 ### Added
+- **Native Tauri 2 & Rust Engine (`src/v2/`):** Ultra-fast, lightweight native desktop architecture with zero UI blocking. Built-in multi-threaded directory walking, incremental duplicate finder with SHA-256 chunked hashing, journaled undo engine, and disk space analyzer.
+- **Craft UI & Dual-Theme (Dark / Light):** Completely revamped frontend with custom craft design tokens, subtle glassmorphic panels, unified button consistency, tactile spring micro-animations on interactive controls, and instant theme switching.
+- **Disk Space Analyzer Tab:** Real-time visual disk and folder space analyzer with category breakdowns and quick actions.
 - **`tools/smoke_test_build.py` — the packaged artefact is now tested at all.**
   Nothing used to exercise the frozen build: a missing hidden import or an
   over-eager `excludes` entry could only ever be discovered by a user, because

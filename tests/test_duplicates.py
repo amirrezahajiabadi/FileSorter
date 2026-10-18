@@ -132,6 +132,21 @@ def test_delete_refuses_paths_outside_whitelist(tmp_path):
     assert untracked.exists()
 
 
+def test_delete_refuses_to_delete_all_copies_of_duplicate_group(tmp_path):
+    orig = write(tmp_path, "orig/notes.txt", b"content")
+    copy = write(tmp_path, "copy/notes.txt", b"content")
+    allowed = {orig, copy}
+    groups = [[orig, copy]]
+
+    # Attempting to delete both copies must protect the first copy to prevent data loss
+    res = delete_files([str(orig), str(copy)], allowed, groups=groups)
+    assert res["deleted"] == [str(copy)]
+    assert len(res["failed"]) == 1
+    assert "last remaining copy" in res["failed"][0]["error"]
+    assert orig.exists()
+    assert not copy.exists()
+
+
 # ══════════════════════════════════════════════════════════════════
 #  controller glue
 # ══════════════════════════════════════════════════════════════════

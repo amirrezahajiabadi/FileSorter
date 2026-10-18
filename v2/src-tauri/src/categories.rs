@@ -95,6 +95,12 @@ pub fn save_categories(map: &CategoryMap) -> Result<(), String> {
     Ok(())
 }
 
+pub fn reset_categories() -> Result<CategoryMap, String> {
+    let defaults = default_categories();
+    save_categories(&defaults)?;
+    Ok(defaults)
+}
+
 /// Immutable snapshot: extension (lowercased, with dot) → dense category index.
 pub struct Categories {
     names: Vec<String>,

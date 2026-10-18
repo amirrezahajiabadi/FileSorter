@@ -146,9 +146,12 @@ pub fn find_duplicates<F>(
 where
     F: FnMut(usize),
 {
-    // Stage 1: group by size.
+    // Stage 1: group by size (zero-byte files are noise, never duplicates).
     let mut by_size: BTreeMap<u64, Vec<PathBuf>> = BTreeMap::new();
     for (path, size) in files {
+        if *size == 0 {
+            continue;
+        }
         by_size.entry(*size).or_default().push(path.clone());
     }
     let candidates: Vec<(PathBuf, u64)> = by_size
@@ -208,18 +211,22 @@ where
         progress(done);
     }
 
-    // Assemble groups keyed by full hash, straight from the cache.
+    // Assemble groups keyed by full hash, ONLY for files in the current scan.
     let mut groups: HashMap<String, Vec<DupFile>> = HashMap::new();
     let mut sizes: HashMap<String, u64> = HashMap::new();
-    for (path, entry) in &cache.0 {
-        if let Some(full) = &entry.full {
-            groups.entry(full.clone()).or_default().push(DupFile {
-                path: path.clone(),
-                size: entry.size,
-                modified: entry.mtime,
-                is_keeper: false,
-            });
-            sizes.insert(full.clone(), entry.size);
+    for (size, head) in &full_needed {
+        if let Some(paths) = by_head.get(&(*size, head.clone())) {
+            for (path, size, mtime) in paths {
+                if let Some(full) = cache.valid_cached(path, *mtime, *size, true) {
+                    groups.entry(full.clone()).or_default().push(DupFile {
+                        path: path.clone(),
+                        size: *size,
+                        modified: *mtime,
+                        is_keeper: false,
+                    });
+                    sizes.insert(full, *size);
+                }
+            }
         }
     }
     let mut result: Vec<DuplicateGroup> = groups

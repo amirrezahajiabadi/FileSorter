@@ -91,7 +91,7 @@ def _stem_tokens(name: str) -> set:
 
 def match_rule_category(name: str, categories: dict, rules: list) -> str | None:
     """Return the category of the first smart rule whose keyword appears as a
-    whole word in the file's stem, or None if no rule matches.
+    whole word or phrase in the file's stem, or None if no rule matches.
 
     Rules are checked in order (first match wins). A rule whose target
     category no longer exists in `categories` is skipped, so deleting a
@@ -99,9 +99,13 @@ def match_rule_category(name: str, categories: dict, rules: list) -> str | None:
     """
     if not rules:
         return None
-    tokens = _stem_tokens(name)
-    if not tokens:
+    stem = Path(name).stem
+    tokens_list = [t for t in re.split(r"[^\w]+|_+", stem.casefold()) if t]
+    if not tokens_list:
         return None
+    tokens = set(tokens_list)
+    stem_norm = " " + " ".join(tokens_list) + " "
+
     for rule in rules:
         if not isinstance(rule, dict):
             continue
@@ -109,8 +113,18 @@ def match_rule_category(name: str, categories: dict, rules: list) -> str | None:
         if cat not in categories:
             continue  # inactive rule — category was deleted
         for kw in rule.get("keywords") or []:
-            if kw and str(kw).casefold() in tokens:
+            if not kw:
+                continue
+            kw_cf = str(kw).strip().casefold()
+            if not kw_cf:
+                continue
+            if kw_cf in tokens:
                 return cat
+            kw_tokens = [t for t in re.split(r"[^\w]+|_+", kw_cf) if t]
+            if len(kw_tokens) > 1:
+                kw_norm = " " + " ".join(kw_tokens) + " "
+                if kw_norm in stem_norm:
+                    return cat
     return None
 
 
@@ -219,14 +233,17 @@ def resolve_duplicate(dest: Path, mode: str, reserved: set) -> tuple:
         reserved.add(dest)
         return "ok", dest
 
-    if mode == "skip":
-        return "skip", dest
-
-    if mode == "overwrite":
+    if dest not in reserved and mode == "overwrite":
         reserved.add(dest)
         return "overwrite", dest
 
-    # mode == "rename": find the first free "name (1).ext", "name (2).ext", ...
+    if mode == "skip":
+        return "skip", dest
+
+    # mode == "rename" or (mode == "overwrite" and dest in reserved):
+    # If dest is already in reserved, another source file in this run already
+    # claimed it. Never allow two source files in the same run to overwrite
+    # each other (which would permanently destroy one of the user's files).
     stem, suffix = dest.stem, dest.suffix
     i = 1
     candidate = dest

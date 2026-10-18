@@ -205,6 +205,16 @@ def test_category_for_file_rule_beats_extension():
     assert category_for_file("invoice.jpg", ".jpg", RULES_CATS, rules) == "invoices"
 
 
+def test_match_rule_category_multi_word_phrases():
+    rules = [
+        {"keywords": ["bank statement", "صورت حساب"], "category": "invoices"}
+    ]
+    assert match_rule_category("bank statement-2024.pdf", RULES_CATS, rules) == "invoices"
+    assert match_rule_category("bank_statement.pdf", RULES_CATS, rules) == "invoices"
+    assert match_rule_category("صورت حساب دی ماه.pdf", RULES_CATS, rules) == "invoices"
+    assert match_rule_category("nonbank statement.pdf", RULES_CATS, rules) is None
+
+
 def _write(base: Path, rel: str, content: bytes = b"x") -> Path:
     f = base / rel
     f.parent.mkdir(parents=True, exist_ok=True)

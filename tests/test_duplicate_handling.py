@@ -34,6 +34,23 @@ def test_resolve_duplicate_overwrite_mode(tmp_path):
     assert final == dest
 
 
+def test_resolve_duplicate_overwrite_protects_two_sources_from_destroying_each_other(tmp_path):
+    dest = tmp_path / "photo.jpg"
+    dest.write_bytes(b"existing")
+    reserved = set()
+
+    # First source file gets overwrite action to replace the pre-existing file on disk
+    action1, final1 = resolve_duplicate(dest, "overwrite", reserved)
+    assert action1 == "overwrite"
+    assert final1 == dest
+
+    # Second source file colliding must NOT overwrite the first source file
+    action2, final2 = resolve_duplicate(dest, "overwrite", reserved)
+    assert action2 == "rename"
+    assert final2 != final1
+    assert final2 == tmp_path / "photo (1).jpg"
+
+
 def test_resolve_duplicate_rename_mode(tmp_path):
     dest = tmp_path / "photo.jpg"
     dest.write_bytes(b"x")

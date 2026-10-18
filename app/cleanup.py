@@ -211,7 +211,7 @@ def delete_junk(paths: List[str], allowed: Set) -> dict:
             ok = True
         else:
             if resolved is None:
-                resolved = {str(p.resolve()) for p in allowed}
+                resolved = {str(Path(p).resolve()) for p in allowed}
             try:
                 ok = str(Path(raw).resolve()) in resolved
             except OSError:
@@ -223,6 +223,13 @@ def delete_junk(paths: List[str], allowed: Set) -> dict:
         try:
             path = Path(raw)
             size = path.stat().st_size
+            try:
+                import stat
+                mode = path.stat().st_mode
+                if not (mode & stat.S_IWRITE):
+                    path.chmod(stat.S_IWRITE)
+            except OSError:
+                pass
             path.unlink()
             deleted.append(raw)
             freed += size

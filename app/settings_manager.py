@@ -1,10 +1,25 @@
-"""Load/save the user's persisted settings (categories, language, theme)."""
-
 import json
+import os
+import re
 
 from app.constants import SETTINGS_FILE, DEFAULT_CATEGORIES
 
 MAX_RECENT_FOLDERS = 8
+
+
+def sanitize_category_name(name: str) -> str:
+    """Ensure category name is a safe, single-level directory name without path traversal."""
+    if not isinstance(name, str):
+        return "others"
+    clean = re.sub(r'[\/\\:\*\?"<>\|\x00-\x1f]', '_', name.strip())
+    clean = clean.strip(". ")
+    if not clean or clean.upper() in {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    }:
+        return "others"
+    return clean
 
 
 def load_settings() -> dict:
@@ -29,10 +44,14 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict) -> None:
-    """Persist settings to disk as UTF-8 JSON (safe for Persian text)."""
+    """Persist settings to disk as UTF-8 JSON atomically via temp file."""
     try:
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        tmp_file = SETTINGS_FILE.with_suffix(".json.tmp")
+        with open(tmp_file, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_file, SETTINGS_FILE)
     except Exception as exc:
         import logging
         logging.warning("Failed to save settings to %s: %s", SETTINGS_FILE, exc)

@@ -32,14 +32,13 @@ struct ScanState {
 
 type SharedScan = Mutex<ScanState>;
 
-fn lock<'a>(app: &AppHandle) -> Result<std::sync::MutexGuard<'a, ScanState>, String> {
+fn with_state<T, F>(app: &AppHandle, f: F) -> Result<T, String>
+where
+    F: FnOnce(&mut ScanState) -> Result<T, String>,
+{
     let state = app.state::<SharedScan>();
-    // `state.inner()` borrows from `state`; tie the guard to that borrow.
-    let guard = state
-        .try_lock()
-        .map_err(|_| "وضعیت برنامه قفل است؛ کمی بعد دوباره تلاش کنید")?;
-    // Extend lifetime: `state` lives as long as `app`, which outlives the guard's use.
-    Ok(unsafe { std::mem::transmute::<std::sync::MutexGuard<'_, ScanState>, std::sync::MutexGuard<'a, ScanState>>(guard) })
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    f(&mut guard)
 }
 
 #[derive(Clone, Serialize)]
@@ -69,8 +68,7 @@ fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
 #[tauri::command]
 fn scan_start(root: String, app: AppHandle) -> Result<(), String> {
     let root = walk::normalize_root(std::path::Path::new(&root))?;
-    {
-        let mut st = lock(&app)?;
+    with_state(&app, |st| {
         if st.scanning {
             return Err("یک اسکن در حال اجراست".into());
         }
@@ -78,22 +76,22 @@ fn scan_start(root: String, app: AppHandle) -> Result<(), String> {
         st.stop = StopFlag::new();
         st.files.clear();
         st.root = Some(root.clone());
-    }
+        Ok(())
+    })?;
     let handle = app.clone();
     std::thread::spawn(move || {
-        let (opts, stop, exclude) = {
-            let st = match lock(&handle) {
-                Ok(s) => s,
-                Err(e) => {
-                    let _ = handle.emit("scan-done", SimpleError { error: e });
-                    return;
-                }
-            };
-            (
+        let (opts, stop, exclude) = match with_state(&handle, |st| {
+            Ok((
                 walk::WalkOptions::default(),
                 st.stop.clone(),
                 st.root.as_ref().map(|r| r.join(categories::OUTPUT_DIR)),
-            )
+            ))
+        }) {
+            Ok(v) => v,
+            Err(e) => {
+                let _ = handle.emit("scan-done", SimpleError { error: e });
+                return;
+            }
         };
         let batches = walk::collect_files(&root, exclude.as_deref(), &opts, &stop, 500);
         let mut files: Vec<(PathBuf, u64)> = Vec::new();
@@ -115,12 +113,13 @@ fn scan_start(root: String, app: AppHandle) -> Result<(), String> {
             );
         }
         let stopped = stop.is_stopped();
-        if let Ok(mut st) = lock(&handle) {
+        let _ = with_state(&handle, |st| {
             if !stopped {
                 st.files = files;
             }
             st.scanning = false;
-        }
+            Ok(())
+        });
         let _ = handle.emit("scan-done", serde_json::json!({ "stopped": stopped }));
     });
     Ok(())
@@ -128,23 +127,23 @@ fn scan_start(root: String, app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn scan_stop(app: AppHandle) {
-    if let Ok(st) = lock(&app) {
+    let _ = with_state(&app, |st| {
         st.stop.stop();
-    }
+        Ok(())
+    });
 }
 
 #[tauri::command]
 fn analyze(app: AppHandle) -> Result<(), String> {
-    let (files, cache_path) = {
-        let st = lock(&app)?;
+    let (files, cache_path) = with_state(&app, |st| {
         if st.scanning {
             return Err("اسکن هنوز در حال اجراست".into());
         }
         if st.files.is_empty() {
             return Err("اول یک پوشه را اسکن کنید".into());
         }
-        (st.files.clone(), categories::data_dir().join("hash-cache.json"))
-    };
+        Ok((st.files.clone(), categories::data_dir().join("hash-cache.json")))
+    })?;
     let handle = app.clone();
     std::thread::spawn(move || {
         match dupes::find_duplicates(
@@ -168,26 +167,27 @@ fn analyze(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn plan_sort(app: AppHandle) -> Result<plan::SortPlan, String> {
-    let st = lock(&app)?;
-    if st.files.is_empty() {
-        return Err("اول یک پوشه را اسکن کنید".into());
-    }
-    let root = st.root.clone().ok_or("ریشهٔ اسکن؟")?;
+    let (root, files) = with_state(&app, |st| {
+        if st.files.is_empty() {
+            return Err("اول یک پوشه را اسکن کنید".into());
+        }
+        let root = st.root.clone().ok_or("ریشهٔ اسکن؟")?;
+        Ok((root, st.files.clone()))
+    })?;
     let cats = Categories::from_map(&categories::load_categories());
-    Ok(plan::build_plan(&root, &st.files, &cats))
+    Ok(plan::build_plan(&root, &files, &cats))
 }
 
 #[tauri::command]
 fn sort_execute(app: AppHandle) -> Result<(), String> {
-    let (plan, stop) = {
-        let st = lock(&app)?;
+    let (plan, stop) = with_state(&app, |st| {
         if st.files.is_empty() {
             return Err("اول یک پوشه را اسکن کنید".into());
         }
         let root = st.root.clone().ok_or("ریشهٔ اسکن؟")?;
         let cats = Categories::from_map(&categories::load_categories());
-        (plan::build_plan(&root, &st.files, &cats), st.stop.clone())
-    };
+        Ok((plan::build_plan(&root, &st.files, &cats), st.stop.clone()))
+    })?;
     let handle = app.clone();
     std::thread::spawn(move || {
         let result = execute::execute(&plan, &stop, &|moved, total| {
@@ -196,9 +196,10 @@ fn sort_execute(app: AppHandle) -> Result<(), String> {
         match result {
             Ok(report) => {
                 // The scanned snapshot is stale after a successful sort.
-                if let Ok(mut st) = lock(&handle) {
+                let _ = with_state(&handle, |st| {
                     st.files.clear();
-                }
+                    Ok(())
+                });
                 let _ = handle.emit("sort-done", serde_json::json!({ "report": report }));
             }
             Err(e) => {
@@ -212,17 +213,16 @@ fn sort_execute(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn quarantine_duplicates(app: AppHandle, keep: String) -> Result<(), String> {
     // `keep`: "oldest" (default) or "newest" — which copy stays in place.
-    let (files, root, cache_path) = {
-        let st = lock(&app)?;
+    let (files, root, cache_path) = with_state(&app, |st| {
         if st.files.is_empty() {
             return Err("اول یک پوشه را اسکن کنید".into());
         }
-        (
+        Ok((
             st.files.clone(),
             st.root.clone().ok_or("ریشهٔ اسکن؟")?,
             categories::data_dir().join("hash-cache.json"),
-        )
-    };
+        ))
+    })?;
     let handle = app.clone();
     std::thread::spawn(move || {
         let (groups, _) = match dupes::find_duplicates(
@@ -253,9 +253,10 @@ fn quarantine_duplicates(app: AppHandle, keep: String) -> Result<(), String> {
         });
         match result {
             Ok(report) => {
-                if let Ok(mut st) = lock(&handle) {
+                let _ = with_state(&handle, |st| {
                     st.files.clear();
-                }
+                    Ok(())
+                });
                 let _ = handle.emit("quarantine-done", serde_json::json!({ "report": report }));
             }
             Err(e) => {
@@ -294,6 +295,66 @@ fn set_categories(map: categories::CategoryMap) -> Result<(), String> {
     categories::save_categories(&map)
 }
 
+#[tauri::command]
+fn reset_categories() -> Result<categories::CategoryMap, String> {
+    categories::reset_categories()
+}
+
+#[derive(serde::Serialize)]
+struct DiskStats {
+    total_files: usize,
+    total_bytes: u64,
+    largest_files: Vec<(String, u64)>,
+    category_breakdown: Vec<(String, u64, u64)>,
+}
+
+#[tauri::command]
+fn get_disk_stats(app: AppHandle) -> Result<DiskStats, String> {
+    with_state(&app, |st| {
+        if st.files.is_empty() {
+            return Err("اول یک پوشه را اسکن کنید".into());
+        }
+        let cats = Categories::from_map(&categories::load_categories());
+        let total_files = st.files.len();
+        let total_bytes: u64 = st.files.iter().map(|(_, s)| *s).sum();
+
+        let mut sorted_by_size = st.files.clone();
+        sorted_by_size.sort_by(|a, b| b.1.cmp(&a.1));
+        let largest_files: Vec<(String, u64)> = sorted_by_size
+            .into_iter()
+            .take(20)
+            .map(|(p, s)| (p.to_string_lossy().into_owned(), s))
+            .collect();
+
+        let mut cat_counts = std::collections::HashMap::new();
+        let mut cat_bytes = std::collections::HashMap::new();
+        for (p, s) in &st.files {
+            let idx = cats.index_for_path(p);
+            *cat_counts.entry(idx).or_insert(0u64) += 1;
+            *cat_bytes.entry(idx).or_insert(0u64) += *s;
+        }
+
+        let category_breakdown: Vec<(String, u64, u64)> = cats
+            .names()
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let count = *cat_counts.get(&(i as u8)).unwrap_or(&0);
+                let bytes = *cat_bytes.get(&(i as u8)).unwrap_or(&0);
+                (name.clone(), count, bytes)
+            })
+            .filter(|(_, count, _)| *count > 0)
+            .collect();
+
+        Ok(DiskStats {
+            total_files,
+            total_bytes,
+            largest_files,
+            category_breakdown,
+        })
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -310,7 +371,9 @@ pub fn run() {
             quarantine_duplicates,
             undo_last,
             get_categories,
-            set_categories
+            set_categories,
+            reset_categories,
+            get_disk_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

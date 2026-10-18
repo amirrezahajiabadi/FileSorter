@@ -327,7 +327,11 @@ class FileSorterService:
         dist = _require_build()
         handler_cls = self._build_handler()
         factory = partial(handler_cls, directory=str(dist))
-        httpd = ThreadingHTTPServer(("127.0.0.1", self.port), factory)
+        try:
+            httpd = ThreadingHTTPServer(("127.0.0.1", self.port), factory)
+        except OSError:
+            # Preferred port is taken or blocked — fall back to an ephemeral port
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), factory)
         self.port = httpd.server_address[1]
         return httpd
 

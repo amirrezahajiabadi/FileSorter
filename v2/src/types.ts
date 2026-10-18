@@ -52,6 +52,15 @@ export interface ScanProgress {
   done: boolean;
 }
 
+export interface DiskStats {
+  total_files: number;
+  total_bytes: number;
+  largest_files: [string, number][];
+  category_breakdown: [string, number, number][];
+}
+
+export type CategoryMap = Record<string, string[]>;
+
 export const CATEGORY_LABELS: Record<string, string> = {
   images: "تصاویر",
   documents: "اسناد",

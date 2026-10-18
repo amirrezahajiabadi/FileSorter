@@ -54,6 +54,7 @@ class TaskScheduler:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._running: set = set()
+        self._failed_at: dict = {}
         self._lock = threading.Lock()
 
     # ── lifecycle ───────────────────────────────────────────────
@@ -105,6 +106,8 @@ class TaskScheduler:
             with self._lock:
                 if task_id in self._running:
                     continue  # still running its previous pass — skip this tick
+                if task_id in self._failed_at and (now - self._failed_at[task_id]) < min(interval, 300):
+                    continue  # cooling down after a failure — don't spin every tick
                 self._running.add(task_id)
             threading.Thread(
                 target=self._run_one, args=(task,), daemon=True
@@ -119,6 +122,7 @@ class TaskScheduler:
         with self._lock:
             if task_id in self._running:
                 return False
+            self._failed_at.pop(task_id, None)
             self._running.add(task_id)
         threading.Thread(target=self._run_one, args=(task,), daemon=True).start()
         return True
@@ -133,6 +137,10 @@ class TaskScheduler:
         finally:
             with self._lock:
                 self._running.discard(task.get("id"))
+                if ok:
+                    self._failed_at.pop(task.get("id"), None)
+                else:
+                    self._failed_at[task.get("id")] = self._now()
         if ok:
             task["last_run"] = self._now()  # caller persists the shared list
         self._on_done(task, summary, ok)

@@ -52,6 +52,9 @@ fn take_unique_on_disk(candidate: PathBuf) -> PathBuf {
 }
 
 fn move_one(source: &Path, dest: &Path) -> Result<(), String> {
+    if source == dest {
+        return Ok(());
+    }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("ساخت پوشه: {}", e))?;
     }
