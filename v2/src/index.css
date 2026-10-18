@@ -1,24 +1,23 @@
 /* FileSorter v2 — Pure Liquid Glass Design System.
-   Bilingual RTL Persian typography, ultra-refined liquid glassmorphism,
-   ambient liquid background refraction, and tactile spring micro-animations.
-   Zero colored halos, zero neon glows — pure crystal clarity. */
+   Bilingual Typography (Estedad for Persian, Manrope for English & numbers),
+   ultra-refined liquid glassmorphism, ambient liquid background refraction,
+   and tactile spring micro-animations. Zero colored halos. */
+
+/* ── Fonts: Estedad (Persian) & Manrope (English) ────────── */
 
 @font-face {
-  font-family: "Vazirmatn";
-  src: url("./assets/fonts/Vazirmatn-Regular.woff2") format("woff2");
-  font-weight: 400;
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
   font-display: swap;
 }
+
 @font-face {
-  font-family: "Vazirmatn";
-  src: url("./assets/fonts/Vazirmatn-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Vazirmatn";
-  src: url("./assets/fonts/Vazirmatn-Bold.woff2") format("woff2");
-  font-weight: 700;
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
   font-display: swap;
 }
 
@@ -167,14 +166,23 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
-  font-family: "Vazirmatn", system-ui, -apple-system, sans-serif;
+  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif;
   font-size: 14.5px;
   line-height: 1.7;
   user-select: none;
-  direction: rtl;
   overflow-x: hidden;
   position: relative;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html[lang="fa"], [data-lang="fa"] body {
+  direction: rtl;
+  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif;
+}
+
+html[lang="en"], [data-lang="en"] body {
+  direction: ltr;
+  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif;
 }
 
 /* Ambient Liquid Glass Backdrop */
@@ -716,7 +724,14 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+html[lang="fa"] table {
   text-align: right;
+}
+
+html[lang="en"] table {
+  text-align: left;
 }
 
 th, td {
@@ -761,13 +776,72 @@ tr:hover td {
   font-size: 13px;
 }
 
-/* ── Settings Grid ───────────────────────────────────────── */
+/* ── Settings Sections ───────────────────────────────────── */
+
+.settings-section {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-section h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.lang-selector {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--btn-specular);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lang-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--text);
+  transform: translateY(-1.5px);
+  box-shadow: var(--btn-specular-hover);
+}
+
+.lang-btn.active {
+  background: var(--surface-strong);
+  border-color: var(--line-strong);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: var(--btn-primary-specular);
+}
 
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 18px;
-  padding: 20px 24px;
 }
 
 .cat-box {

@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   CATEGORY_ICONS,
-  CATEGORY_LABELS,
   type CategoryMap,
   type DiskStats,
   type DuplicateGroup,
@@ -12,6 +11,7 @@ import {
   type SortPlan,
   type UndoReport,
 } from "./types";
+import { STRINGS, CATEGORY_LABELS_BILINGUAL, type Lang } from "./i18n";
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
 type ActiveTab = "sort" | "dupes" | "disk" | "settings";
@@ -31,6 +31,10 @@ function formatBytes(n: number): string {
 export default function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     return (localStorage.getItem("fs_theme") as "dark" | "light") || "dark";
+  });
+
+  const [lang, setLang] = useState<Lang>(() => {
+    return (localStorage.getItem("fs_lang") as Lang) || "fa";
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("sort");
@@ -61,10 +65,22 @@ export default function App() {
   const [error, setError] = useState<string>("");
   const unlisteners = useRef<UnlistenFn[]>([]);
 
+  const t = STRINGS[lang];
+  const catLabels = CATEGORY_LABELS_BILINGUAL[lang];
+  const fmtNum = (n: number) => (lang === "fa" ? n.toLocaleString("fa-IR") : n.toLocaleString("en-US"));
+  const getCatLabel = (cat: string) => catLabels[cat] ?? cat;
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("fs_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("lang", lang);
+    document.documentElement.setAttribute("dir", lang === "fa" ? "rtl" : "ltr");
+    document.documentElement.setAttribute("data-lang", lang);
+    localStorage.setItem("fs_lang", lang);
+  }, [lang]);
 
   const toggleTheme = () => {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
@@ -237,7 +253,7 @@ export default function App() {
   const saveSettings = async () => {
     try {
       await invoke("set_categories", { map: categories });
-      setSettingsNotice("تنظیمات با موفقیت ذخیره شد");
+      setSettingsNotice(t.settings_saved_notice);
       setTimeout(() => setSettingsNotice(""), 3000);
     } catch (e) {
       setError(String(e));
@@ -248,7 +264,7 @@ export default function App() {
     try {
       const defs = await invoke<CategoryMap>("reset_categories");
       setCategories(defs);
-      setSettingsNotice("تنظیمات به حالت پیش‌فرض بازگشت");
+      setSettingsNotice(t.settings_reset_notice);
       setTimeout(() => setSettingsNotice(""), 3000);
     } catch (e) {
       setError(String(e));
@@ -282,20 +298,20 @@ export default function App() {
         <div className="brand">
           <span className="brand-mark">FS</span>
           <div>
-            <h1>فایل‌ساز v2</h1>
-            <p>مرتب‌ساز فوق‌سریع فایل‌ها — قدرت گرفته از Rust & Tauri</p>
+            <h1>{t.app_title}</h1>
+            <p>{t.app_subtitle}</p>
           </div>
         </div>
         <div className="topbar-actions">
           {folder && (
-            <button className="btn btn-ghost" onClick={reset} title="شروع دوباره با پوشه جدید">
-              ↺ پوشه جدید
+            <button className="btn btn-ghost" onClick={reset} title={t.reset_folder}>
+              {t.reset_folder}
             </button>
           )}
           <button
             className="btn btn-icon btn-ghost"
             onClick={toggleTheme}
-            title={theme === "dark" ? "تغییر به تم روشن" : "تغییر به تم تاریک"}
+            title={theme === "dark" ? t.theme_light : t.theme_dark}
           >
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
@@ -309,14 +325,14 @@ export default function App() {
           onClick={() => setActiveTab("sort")}
         >
           <span>📁</span>
-          <span>مرتب‌سازی فایل‌ها</span>
+          <span>{t.tab_sort}</span>
         </button>
         <button
           className={`tab-btn ${activeTab === "dupes" ? "active" : ""}`}
           onClick={() => setActiveTab("dupes")}
         >
           <span>🔍</span>
-          <span>فایل‌های تکراری</span>
+          <span>{t.tab_dupes}</span>
           {dupes.length > 0 && <span className="tab-badge">{dupes.length}</span>}
         </button>
         <button
@@ -324,21 +340,21 @@ export default function App() {
           onClick={() => setActiveTab("disk")}
         >
           <span>📊</span>
-          <span>تحلیل فضای دیسک</span>
+          <span>{t.tab_disk}</span>
         </button>
         <button
           className={`tab-btn ${activeTab === "settings" ? "active" : ""}`}
           onClick={() => setActiveTab("settings")}
         >
           <span>⚙️</span>
-          <span>دسته‌بندی و تنظیمات</span>
+          <span>{t.tab_settings}</span>
         </button>
       </nav>
 
       {error && (
         <div className="error-bar" role="alert" onClick={() => setError("")}>
           <span>⚠️ {error}</span>
-          <span style={{ fontSize: "12px", opacity: 0.8 }}>بستن ✕</span>
+          <span style={{ fontSize: "12px", opacity: 0.8 }}>✕</span>
         </div>
       )}
 
@@ -353,20 +369,17 @@ export default function App() {
         <>
           {phase === "idle" && (
             <section className="hero glass">
-              <h2>پوشه مورد نظر را برای مرتب‌سازی انتخاب کنید</h2>
-              <p className="muted">
-                فایل‌ها بدون رونویسی به پوشه‌های <code>sorted/تصاویر</code>، <code>sorted/اسناد</code> و… منتقل می‌شوند.
-                هر عملیات دارای ژورنال بازگردانی اتمیک و دکمه Undo آنی است.
-              </p>
+              <h2>{t.hero_title}</h2>
+              <p className="muted">{t.hero_subtitle}</p>
               <button className="btn btn-primary" onClick={pickFolder}>
-                📁 انتخاب پوشه و اسکن سریع
+                {t.hero_drop_btn}
               </button>
             </section>
           )}
 
           {phase === "scanning" && (
             <section className="hero glass">
-              <h2>در حال اسکن موازی پوشه…</h2>
+              <h2>{t.hero_scanning}</h2>
               <p className="muted mono">{folder}</p>
               <div className="meter">
                 <div
@@ -377,11 +390,11 @@ export default function App() {
                 />
               </div>
               <p style={{ fontWeight: 600 }}>
-                {scan ? scan.total_so_far.toLocaleString("fa-IR") : 0} فایل شمارش شد
+                {scan ? fmtNum(scan.total_so_far) : 0} {t.hero_files_found}
                 {scan && scan.bytes_so_far > 0 ? ` — ${formatBytes(scan.bytes_so_far)}` : ""}
               </p>
               <button className="btn btn-ghost" onClick={stopScan}>
-                ✕ توقف اسکن
+                ✕ {t.hero_stop}
               </button>
             </section>
           )}
@@ -390,20 +403,20 @@ export default function App() {
             <>
               <section className="summary glass">
                 <div className="stat">
-                  <b>{plan.moves.length.toLocaleString("fa-IR")}</b>
-                  <span>فایل برای انتقال</span>
+                  <b>{fmtNum(plan.moves.length)}</b>
+                  <span>{t.summary_files}</span>
                 </div>
                 <div className="stat">
                   <b>{formatBytes(plan.total_size)}</b>
-                  <span>حجم کل فایل‌ها</span>
+                  <span>{t.summary_size}</span>
                 </div>
                 <div className="stat">
-                  <b>{plan.counts.length}</b>
-                  <span>دسته فعال</span>
+                  <b>{fmtNum(plan.counts.length)}</b>
+                  <span>{t.summary_categories}</span>
                 </div>
                 <div className="summary-actions">
                   <button className="btn btn-ghost" onClick={() => setShowMoves(!showMoves)}>
-                    {showMoves ? "مخفی کردن پیش‌نمایش" : "👁️ مشاهده پیش‌نمایش فایل‌ها"}
+                    {showMoves ? t.btn_hide_moves : `👁️ ${t.btn_show_moves}`}
                   </button>
                 </div>
               </section>
@@ -413,17 +426,17 @@ export default function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th>نام فایل</th>
-                        <th>دسته</th>
-                        <th>حجم</th>
-                        <th>مسیر مقصد جدید</th>
+                        <th>{t.disk_col_name}</th>
+                        <th>{t.summary_categories}</th>
+                        <th>{t.disk_col_size}</th>
+                        <th>{t.disk_col_path}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {plan.moves.slice(0, 100).map((m, idx) => (
                         <tr key={idx}>
                           <td className="mono ellipsis">{m.source.split(/[\\/]/).pop()}</td>
-                          <td>{CATEGORY_LABELS[m.category] ?? m.category}</td>
+                          <td>{getCatLabel(m.category)}</td>
                           <td className="mono">{formatBytes(m.size)}</td>
                           <td className="muted mono ellipsis">{m.destination}</td>
                         </tr>
@@ -432,7 +445,7 @@ export default function App() {
                   </table>
                   {plan.moves.length > 100 && (
                     <p className="muted" style={{ padding: "10px 16px", margin: 0 }}>
-                      و {plan.moves.length - 100} فایل دیگر…
+                      + {fmtNum(plan.moves.length - 100)} ...
                     </p>
                   )}
                 </section>
@@ -443,8 +456,8 @@ export default function App() {
                   <div key={cat} className="card glass">
                     <span className="card-icon">{CATEGORY_ICONS[cat] ?? "•"}</span>
                     <div>
-                      <b>{CATEGORY_LABELS[cat] ?? cat}</b>
-                      <span className="muted">{count.toLocaleString("fa-IR")} فایل</span>
+                      <b>{getCatLabel(cat)}</b>
+                      <span className="muted">{fmtNum(count)} {t.settings_formats_count}</span>
                     </div>
                   </div>
                 ))}
@@ -452,10 +465,10 @@ export default function App() {
 
               <section className="actions">
                 <button className="btn btn-primary" onClick={executeSort} disabled={plan.moves.length === 0}>
-                  ✓ مرتب‌سازی {plan.moves.length.toLocaleString("fa-IR")} فایل
+                  {t.btn_sort_now} ({fmtNum(plan.moves.length)})
                 </button>
                 <button className="btn btn-ghost" onClick={pickFolder}>
-                  انتخاب پوشه دیگر
+                  {t.reset_folder}
                 </button>
               </section>
             </>
@@ -463,38 +476,38 @@ export default function App() {
 
           {phase === "sorting" && (
             <section className="hero glass">
-              <h2>در حال انتقال فایل‌ها…</h2>
+              <h2>{t.btn_sorting}</h2>
               <div className="meter">
                 <div className="meter-fill indeterminate" />
               </div>
-              <p className="muted">انتقال‌ها درون‌درایو به شکل آنی (rename) و بین درایوها با کپی و تأیید انجام می‌شوند.</p>
+              <p className="muted">{t.app_subtitle}</p>
             </section>
           )}
 
           {phase === "done" && report && (
             <section className="hero glass">
-              <h2>مرتب‌سازی با موفقیت انجام شد ✓</h2>
+              <h2>{t.sort_done_title}</h2>
               <p>
-                <b>{report.moved.toLocaleString("fa-IR")}</b> فایل با موفقیت سازمان‌دهی شد
-                {report.skipped > 0 ? ` — ${report.skipped.toLocaleString("fa-IR")} فایل در دسترس نبود` : ""}
+                <b>{fmtNum(report.moved)}</b> {t.sort_done_desc}
+                {report.skipped > 0 ? ` — ${fmtNum(report.skipped)} ${t.undo_skipped}` : ""}
               </p>
               {report.skipped_examples.length > 0 && (
                 <details className="mono muted">
-                  <summary>جزئیات فایل‌های ردشده</summary>
+                  <summary>Details</summary>
                   <pre>{report.skipped_examples.join("\n")}</pre>
                 </details>
               )}
               <div className="actions">
                 <button className="btn btn-primary" onClick={undoLast}>
-                  ↩ واگرد این عملیات (Undo)
+                  {t.btn_undo}
                 </button>
                 <button className="btn btn-ghost" onClick={pickFolder}>
-                  مرتب‌سازی پوشه جدید
+                  {t.reset_folder}
                 </button>
               </div>
               {undoReport && (
                 <p className={undoReport.skipped > 0 ? "warn" : "ok"} style={{ fontWeight: 600 }}>
-                  واگرد شد: {undoReport.restored.toLocaleString("fa-IR")} فایل به جای قبلی بازگردانده شد
+                  {fmtNum(undoReport.restored)} {t.undo_success}
                 </p>
               )}
             </section>
@@ -507,19 +520,19 @@ export default function App() {
         <section className="glass dupes">
           <div className="dupes-header">
             <div>
-              <h3>تحلیل و مدیریت فایل‌های تکراری</h3>
+              <h3>{t.dupes_title}</h3>
               <p className="muted" style={{ margin: "4px 0 0" }}>
-                الگوریتم ۳ مرحله‌ای هش هوشمند با کش ماندگار (حجم → هش اولیه ۶۴KB → هش کامل SHA-256)
+                {t.dupes_desc}
               </p>
             </div>
             <div className="summary-actions">
               {folder ? (
                 <button className="btn btn-primary" onClick={runDupes} disabled={dupeBusy}>
-                  {dupeBusy ? "در حال پردازش هش‌ها…" : "⚡ اسکن تکراری‌ها"}
+                  {dupeBusy ? t.dupes_btn_scanning : t.dupes_btn_scan}
                 </button>
               ) : (
                 <button className="btn btn-primary" onClick={pickFolder}>
-                  📁 انتخاب پوشه
+                  {t.hero_drop_btn}
                 </button>
               )}
             </div>
@@ -527,7 +540,7 @@ export default function App() {
 
           {quarantineReport && (
             <div className="notice-bar glass" style={{ margin: "14px 0" }}>
-              ✓ {quarantineReport.moved.toLocaleString("fa-IR")} فایل تکراری با موفقیت به پوشه قرنطینه منتقل شد.
+              ✓ {fmtNum(quarantineReport.moved)} {t.dupes_quarantine_done}
             </div>
           )}
 
@@ -535,29 +548,28 @@ export default function App() {
             <>
               <div className="summary" style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
                 <div className="stat">
-                  <b>{dupes.length.toLocaleString("fa-IR")}</b>
-                  <span>گروه تکراری</span>
+                  <b>{fmtNum(dupes.length)}</b>
+                  <span>{t.tab_dupes}</span>
                 </div>
                 <div className="stat">
-                  <b style={{ color: "var(--accent)" }}>{formatBytes(dupes.reduce((s, g) => s + g.wasted, 0))}</b>
-                  <span>فضای قابل آزادسازی</span>
+                  <b style={{ color: "var(--text)" }}>{formatBytes(dupes.reduce((s, g) => s + g.wasted, 0))}</b>
+                  <span>{t.dupes_reclaimable}</span>
                 </div>
                 <div className="summary-actions" style={{ alignItems: "center" }}>
-                  <span className="muted" style={{ fontSize: "12px" }}>نسخه اصلی:</span>
                   <button
                     className={`btn ${dupeKeep === "oldest" ? "btn-primary" : "btn-ghost"}`}
                     onClick={() => setDupeKeep("oldest")}
                   >
-                    قدیمی‌ترین
+                    {t.dupes_keep_oldest}
                   </button>
                   <button
                     className={`btn ${dupeKeep === "newest" ? "btn-primary" : "btn-ghost"}`}
                     onClick={() => setDupeKeep("newest")}
                   >
-                    جدیدترین
+                    {t.dupes_keep_newest}
                   </button>
                   <button className="btn btn-primary" onClick={quarantineDuplicates} disabled={dupeBusy}>
-                    📦 قرنطینه تکراری‌ها
+                    {t.dupes_btn_quarantine}
                   </button>
                 </div>
               </div>
@@ -565,8 +577,8 @@ export default function App() {
               <ul>
                 {dupes.map((g) => (
                   <li key={g.hash}>
-                    <span className="mono">{g.files.length} نسخه</span>
-                    <span className="mono" style={{ color: "var(--accent)" }}>{formatBytes(g.wasted)}</span>
+                    <span className="mono">{fmtNum(g.files.length)} copies</span>
+                    <span className="mono">{formatBytes(g.wasted)}</span>
                     <div>
                       <b className="ellipsis" style={{ display: "block" }}>
                         {g.files[0].path.split(/[\\/]/).pop()}
@@ -582,7 +594,7 @@ export default function App() {
           ) : (
             !dupeBusy && (
               <p className="muted" style={{ padding: "32px 0", textAlign: "center" }}>
-                {folder ? "برای یافتن فایل‌های تکراری روی «اسکن تکراری‌ها» کلیک کنید." : "ابتدا یک پوشه را انتخاب کنید."}
+                {folder ? t.dupes_empty : t.disk_pick_first}
               </p>
             )
           )}
@@ -594,14 +606,14 @@ export default function App() {
         <section className="glass disk-bars">
           <div className="dupes-header">
             <div>
-              <h3>تحلیل فضای ذخیره‌سازی پوشه</h3>
+              <h3>{t.disk_title}</h3>
               <p className="muted" style={{ margin: "4px 0 0" }}>
-                تفکیک حجم فایل‌ها بر اساس دسته‌بندی و فهرست ۲۰ فایل حجیم‌تر
+                {t.disk_desc}
               </p>
             </div>
             {folder && (
               <button className="btn btn-ghost" onClick={loadDiskStats} disabled={loadingDisk}>
-                {loadingDisk ? "در حال محاسبه…" : "🔄 بروزرسانی آمار"}
+                {loadingDisk ? t.disk_loading : `🔄 ${t.btn_rescan}`}
               </button>
             )}
           </div>
@@ -610,27 +622,27 @@ export default function App() {
             <>
               <div className="summary" style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
                 <div className="stat">
-                  <b>{diskStats.total_files.toLocaleString("fa-IR")}</b>
-                  <span>تعداد کل فایل‌ها</span>
+                  <b>{fmtNum(diskStats.total_files)}</b>
+                  <span>{t.disk_total_files}</span>
                 </div>
                 <div className="stat">
                   <b>{formatBytes(diskStats.total_bytes)}</b>
-                  <span>حجم کل</span>
+                  <span>{t.disk_total_size}</span>
                 </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", margin: "16px 0" }}>
-                <b>تفکیک دسته‌ها:</b>
+                <b>{t.disk_category_breakdown}</b>
                 {diskStats.category_breakdown.map(([cat, count, bytes]) => {
                   const share = pct(bytes, diskStats.total_bytes);
                   return (
                     <div key={cat} className="disk-bar-row">
                       <div className="disk-bar-header">
                         <span>
-                          {CATEGORY_ICONS[cat] ?? "•"} {CATEGORY_LABELS[cat] ?? cat} ({count.toLocaleString("fa-IR")} فایل)
+                          {CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)} ({fmtNum(count)} {t.settings_formats_count})
                         </span>
                         <span className="mono">
-                          {formatBytes(bytes)} ({share}٪)
+                          {formatBytes(bytes)} ({share}%)
                         </span>
                       </div>
                       <div className="meter" style={{ width: "100%" }}>
@@ -642,21 +654,21 @@ export default function App() {
               </div>
 
               <div style={{ marginTop: "20px" }}>
-                <b>۲۰ فایل حجیم‌تر:</b>
+                <b>{t.disk_largest_files}</b>
                 <div className="table-container" style={{ marginTop: "10px" }}>
                   <table>
                     <thead>
                       <tr>
-                        <th>نام فایل</th>
-                        <th>حجم</th>
-                        <th>مسیر کامل</th>
+                        <th>{t.disk_col_name}</th>
+                        <th>{t.disk_col_size}</th>
+                        <th>{t.disk_col_path}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {diskStats.largest_files.map(([filePath, size], i) => (
                         <tr key={i}>
                           <td className="mono ellipsis">{filePath.split(/[\\/]/).pop()}</td>
-                          <td className="mono" style={{ color: "var(--accent)" }}>
+                          <td className="mono" style={{ color: "var(--text)" }}>
                             {formatBytes(size)}
                           </td>
                           <td className="muted mono ellipsis">{filePath}</td>
@@ -669,80 +681,108 @@ export default function App() {
             </>
           ) : (
             <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-              {folder ? "در حال بارگذاری اطلاعات دیسک…" : "ابتدا از برگه مرتب‌سازی پوشه‌ای را انتخاب کنید."}
+              {folder ? t.disk_loading : t.disk_pick_first}
             </p>
           )}
         </section>
       )}
 
-      {/* TAB 4: Settings */}
+      {/* TAB 4: Settings & Language */}
       {activeTab === "settings" && (
-        <section className="glass">
-          <div className="dupes-header" style={{ padding: "20px 24px 0" }}>
-            <div>
-              <h3>دسته‌بندی‌ها و فرمت‌های فایل</h3>
-              <p className="muted" style={{ margin: "4px 0 0" }}>
-                تعیین فرمت‌های تحت پوشش هر دسته یا افزودن پسوندهای سفارشی
-              </p>
-            </div>
-            <div className="summary-actions">
-              <button className="btn btn-primary" onClick={saveSettings}>
-                💾 ذخیره تنظیمات
-              </button>
-              <button className="btn btn-ghost" onClick={resetSettings}>
-                ↺ بازگردانی پیش‌فرض
-              </button>
-            </div>
-          </div>
-
-          <div className="settings-grid">
-            {Object.entries(categories).map(([cat, exts]) => (
-              <div key={cat} className="glass cat-box">
-                <div className="cat-box-header">
-                  <span>
-                    {CATEGORY_ICONS[cat] ?? "•"} {CATEGORY_LABELS[cat] ?? cat}
-                  </span>
-                  <span className="muted mono" style={{ fontSize: "11px" }}>
-                    {exts.length} فرمت
-                  </span>
-                </div>
-                <div className="tags">
-                  {exts.map((e) => (
-                    <span key={e} className="tag mono">
-                      {e}
-                      <button onClick={() => removeExtension(cat, e)} title="حذف این پسوند">
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="add-tag-form">
-                  <input
-                    type="text"
-                    placeholder="پسوند جدید (مثال: .webp)"
-                    value={newExts[cat] || ""}
-                    onChange={(e) => setNewExts({ ...newExts, [cat]: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addExtension(cat);
-                      }
-                    }}
-                    style={{ flex: 1 }}
-                  />
-                  <button className="btn btn-icon btn-ghost" onClick={() => addExtension(cat)} title="افزودن">
-                    +
-                  </button>
-                </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Section 1: Language Switcher */}
+          <section className="glass settings-section">
+            <div className="settings-section-header">
+              <div>
+                <h3>{t.settings_lang_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>
+                  {t.settings_lang_desc}
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
+            </div>
+            <div className="lang-selector">
+              <button
+                className={`lang-btn ${lang === "fa" ? "active" : ""}`}
+                onClick={() => setLang("fa")}
+              >
+                {t.settings_lang_fa}
+              </button>
+              <button
+                className={`lang-btn ${lang === "en" ? "active" : ""}`}
+                onClick={() => setLang("en")}
+              >
+                {t.settings_lang_en}
+              </button>
+            </div>
+          </section>
+
+          {/* Section 2: Categories and File Formats */}
+          <section className="glass">
+            <div className="dupes-header" style={{ padding: "20px 24px 0" }}>
+              <div>
+                <h3>{t.settings_cat_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>
+                  {t.settings_cat_desc}
+                </p>
+              </div>
+              <div className="summary-actions">
+                <button className="btn btn-primary" onClick={saveSettings}>
+                  {t.settings_btn_save}
+                </button>
+                <button className="btn btn-ghost" onClick={resetSettings}>
+                  {t.settings_btn_reset}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-grid" style={{ padding: "20px 24px" }}>
+              {Object.entries(categories).map(([cat, exts]) => (
+                <div key={cat} className="glass cat-box">
+                  <div className="cat-box-header">
+                    <span>
+                      {CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)}
+                    </span>
+                    <span className="muted mono" style={{ fontSize: "11px" }}>
+                      {fmtNum(exts.length)} {t.settings_formats_count}
+                    </span>
+                  </div>
+                  <div className="tags">
+                    {exts.map((e) => (
+                      <span key={e} className="tag mono">
+                        {e}
+                        <button onClick={() => removeExtension(cat, e)} title="Remove">
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="add-tag-form">
+                    <input
+                      type="text"
+                      placeholder={t.settings_add_placeholder}
+                      value={newExts[cat] || ""}
+                      onChange={(e) => setNewExts({ ...newExts, [cat]: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addExtension(cat);
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button className="btn btn-icon btn-ghost" onClick={() => addExtension(cat)} title={t.settings_add_btn}>
+                      {t.settings_add_btn}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       )}
 
       <footer className="muted">
-        فایل‌ساز نسخه ۲ · معماری مدرن، موازی و ۱۰۰٪ ایمن با Rust & Tauri · مسیر ژورنال:{" "}
-        <span className="mono">%APPDATA%\FileSorterV2\undo</span>
+        {t.footer_text} <span className="mono">{t.footer_journal}</span>
       </footer>
     </main>
   );
