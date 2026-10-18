@@ -5,18 +5,113 @@
 
 /* ── Fonts: Estedad (Persian) & Manrope (English) ────────── */
 
+/* Estedad — Variable & Explicit Weight Bindings for 100% Browser Compatibility */
 @font-face {
   font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  src: url("./assets/fonts/Estedad.woff2") format("woff2-variations"),
+       url("./assets/fonts/Estedad.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estedad";
+  src: url("./assets/fonts/Estedad.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
 
+/* Manrope — Variable & Explicit Weight Bindings */
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2-variations"),
+       url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
 @font-face {
   font-family: "Manrope";
   src: url("./assets/fonts/Manrope.woff2") format("woff2");
-  font-weight: 200 800;
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/Manrope.woff2") format("woff2");
+  font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
@@ -161,12 +256,36 @@ body,
   height: 100%;
 }
 
+/* Global font cascade: Estedad first for Persian, Manrope for Latin */
+html,
+body,
+button,
+input,
+optgroup,
+select,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+a,
+b,
+strong,
+th,
+td,
+label {
+  font-family: "Estedad", "Manrope", system-ui, -apple-system, sans-serif;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
-  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif;
   font-size: 14.5px;
   line-height: 1.7;
   user-select: none;
@@ -175,14 +294,34 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-html[lang="fa"], [data-lang="fa"] body {
+/* Persian Mode Typography & Direction */
+html[lang="fa"],
+html[lang="fa"] *,
+[data-lang="fa"],
+[data-lang="fa"] * {
   direction: rtl;
-  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif;
+  font-family: "Estedad", "Manrope", system-ui, -apple-system, sans-serif !important;
 }
 
-html[lang="en"], [data-lang="en"] body {
+/* English Mode Typography & Direction */
+html[lang="en"],
+html[lang="en"] *,
+[data-lang="en"],
+[data-lang="en"] * {
   direction: ltr;
-  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif;
+  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif !important;
+}
+
+/* Monospace Code Typography */
+.mono,
+.mono *,
+code,
+code *,
+pre,
+pre * {
+  font-family: "Consolas", "Cascadia Code", "Courier New", monospace !important;
+  direction: ltr !important;
+  unicode-bidi: embed;
 }
 
 /* Ambient Liquid Glass Backdrop */
@@ -232,13 +371,6 @@ body::after {
   gap: 20px;
   min-height: 100%;
   position: relative;
-}
-
-.mono {
-  font-family: "Consolas", "Cascadia Code", monospace;
-  font-size: 12.5px;
-  direction: ltr;
-  unicode-bidi: embed;
 }
 
 .muted {
@@ -330,7 +462,6 @@ body::after {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: inherit;
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1;
@@ -506,7 +637,6 @@ code {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 2px 8px;
-  font-family: "Consolas", monospace;
   font-size: 12.5px;
   color: var(--text);
 }
@@ -711,7 +841,7 @@ code {
   padding-inline: 8px;
 }
 
-/* ── Data Tables (Liquid Glass) ──────────────────────────── */
+/* ── Data Tables (Liquid Glass) ──────────────────── */
 
 .table-container {
   overflow-x: auto;
@@ -815,7 +945,6 @@ tr:hover td {
   background: var(--btn-bg);
   color: var(--text-muted);
   cursor: pointer;
-  font-family: inherit;
   font-size: 14px;
   font-weight: 600;
   box-shadow: var(--btn-specular);
@@ -909,7 +1038,6 @@ input[type="text"] {
   border-radius: 10px;
   color: var(--text);
   padding: 8px 14px;
-  font: inherit;
   font-size: 13px;
   outline: none;
   backdrop-filter: blur(16px);
