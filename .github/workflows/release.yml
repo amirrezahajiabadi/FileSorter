@@ -30,6 +30,9 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install frontend dependencies
         working-directory: ui
         run: npm ci
@@ -77,8 +80,26 @@ jobs:
         run: |
           Compress-Archive -Path dist/FileSorter/* -DestinationPath "dist/FileSorter-${{ github.ref_name }}-win64.zip" -Force
 
-      - name: Create GitHub Release with the zip attached
+      - name: Install Tauri v2 dependencies
+        working-directory: v2
+        run: npm ci
+
+      - name: Build Tauri v2 App (Native Windows Installer & Portable)
+        working-directory: v2
+        run: npm run tauri build
+
+      - name: Prepare Tauri Release Binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist-binaries
+          Copy-Item v2/src-tauri/target/release/filesorter2.exe -Destination "dist-binaries/FileSorter_Portable.exe"
+          Copy-Item v2/src-tauri/target/release/bundle/nsis/*.exe -Destination "dist-binaries/FileSorter_Setup.exe"
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/FileSorter-${{ github.ref_name }}-win64.zip
+          files: |
+            dist-binaries/FileSorter_Setup.exe
+            dist-binaries/FileSorter_Portable.exe
+            dist/FileSorter-${{ github.ref_name }}-win64.zip
           generate_release_notes: true
