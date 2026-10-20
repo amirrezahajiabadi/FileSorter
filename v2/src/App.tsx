@@ -13,9 +13,11 @@ import {
 } from "./types";
 import { STRINGS, CATEGORY_LABELS } from "./i18n";
 import PdfStudio from "./PdfStudio";
+import BatchRenamer from "./BatchRenamer";
+import ImageStudio from "./ImageStudio";
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
-type ActiveTab = "sort" | "dupes" | "disk" | "pdf" | "settings";
+type ActiveTab = "sort" | "dupes" | "disk" | "renamer" | "images" | "pdf" | "settings";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -320,12 +322,20 @@ export default function App() {
             {dupes.length > 0 && <span className="capsule-tab-badge">{dupes.length}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "disk" ? "active" : ""}`}
-            onClick={() => setActiveTab("disk")}
-            title={t.tab_disk}
+            className={`capsule-tab ${activeTab === "renamer" ? "active" : ""}`}
+            onClick={() => setActiveTab("renamer")}
+            title={t.tab_renamer}
           >
-            <span className="tab-icon">📊</span>
-            <span className="tab-label">{t.tab_disk}</span>
+            <span className="tab-icon">✏️</span>
+            <span className="tab-label">{t.tab_renamer}</span>
+          </button>
+          <button
+            className={`capsule-tab ${activeTab === "images" ? "active" : ""}`}
+            onClick={() => setActiveTab("images")}
+            title={t.tab_images}
+          >
+            <span className="tab-icon">🖼️</span>
+            <span className="tab-label">{t.tab_images}</span>
           </button>
           <button
             className={`capsule-tab ${activeTab === "pdf" ? "active" : ""}`}
@@ -334,6 +344,14 @@ export default function App() {
           >
             <span className="tab-icon">📑</span>
             <span className="tab-label">{t.tab_pdf}</span>
+          </button>
+          <button
+            className={`capsule-tab ${activeTab === "disk" ? "active" : ""}`}
+            onClick={() => setActiveTab("disk")}
+            title={t.tab_disk}
+          >
+            <span className="tab-icon">📊</span>
+            <span className="tab-label">{t.tab_disk}</span>
           </button>
           <button
             className={`capsule-tab ${activeTab === "settings" ? "active" : ""}`}
@@ -698,6 +716,12 @@ export default function App() {
           )}
         </section>
       )}
+
+      {/* TAB: Smart Batch Renamer */}
+      {activeTab === "renamer" && <BatchRenamer />}
+
+      {/* TAB: Image Studio */}
+      {activeTab === "images" && <ImageStudio />}
 
       {/* TAB: PDF Studio */}
       {activeTab === "pdf" && <PdfStudio />}

@@ -101,3 +101,36 @@ export interface SaveImagesReport {
   file_paths: string[];
 }
 
+export interface RenamePair {
+  original_path: string;
+  new_name: string;
+}
+
+export interface BatchRenameReport {
+  successful: number;
+  failed: number;
+  renamed_pairs: [string, string][];
+  errors: string[];
+}
+
+export interface UndoRenameReport {
+  restored: number;
+  failed: number;
+  errors: string[];
+}
+
+export interface ProcessedImagePayload {
+  original_path: string;
+  output_filename: string;
+  data: number[];
+}
+
+export interface ImageOptimizationReport {
+  target_dir: string;
+  saved_count: number;
+  original_total_bytes: number;
+  new_total_bytes: number;
+  saved_bytes: number;
+}
+
+

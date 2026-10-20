@@ -8,6 +8,8 @@ export interface I18nStrings {
   tab_dupes: string;
   tab_disk: string;
   tab_pdf: string;
+  tab_renamer: string;
+  tab_images: string;
   tab_settings: string;
   pdf_title: string;
   pdf_desc: string;
@@ -79,6 +81,8 @@ export const STRINGS: I18nStrings = {
   tab_dupes: "Duplicate Finder",
   tab_disk: "Disk Space Analyzer",
   tab_pdf: "PDF Studio",
+  tab_renamer: "Batch Renamer",
+  tab_images: "Image Studio",
   tab_settings: "Settings",
   pdf_title: "PDF Studio",
   pdf_desc: "Convert image collections into clean PDF documents or extract all pages & pictures from existing PDFs.",

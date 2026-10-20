@@ -10,6 +10,26 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.5.0] — 2026-10-21
+
+### Added
+- **Smart Batch Renamer (`BatchRenamer.tsx` + `rename_ops.rs`):**
+  - Powerful bulk renaming engine supporting multi-file selection or entire directory import.
+  - Multiple renaming modes:
+    - **Find & Replace:** Simple text matching or RegEx substitution with case sensitivity toggles.
+    - **Prefix & Suffix Affixing:** Seamlessly insert custom text at beginning or end of filenames.
+    - **Sequential Numbering:** Configurable zero-padded sequence numbers (`01`, `001`, `0001`) with optional start index, prefix, and suffix.
+    - **Case Converter:** Instant conversion to `lowercase`, `UPPERCASE`, `Title Case`, `kebab-case`, or `snake_case`.
+    - **Extension Modifier:** Batch alter or normalize extensions (e.g., lowercasing `.JPG` to `.jpg`).
+  - Real-time side-by-side diff table with conflict and collision warnings before execution.
+  - One-click safe Journaled Undo with automatic reverse restoration.
+- **Image Studio (`ImageStudio.tsx` + `image_ops.rs`):**
+  - Complete bulk image optimization and format conversion suite.
+  - Multi-format exporter: Next-gen WebP, high-compatibility JPEG, and lossless PNG.
+  - Interactive compression slider (50% to 100%) with real-time quality advice and visual feedback.
+  - Dimension clamp options: Original, 4K (3840px), Full HD (1920px), HD (1280px), and Web (800px) maintaining precise aspect ratios.
+  - Real-time metrics reporting: file count, total raw size vs. optimized size, and exact saved space percentage.
+
 ## [6.4.0] — 2026-10-20
 
 ### Added

@@ -2,7 +2,7 @@
 ; Creates a proper Windows installer with Start Menu + Desktop shortcuts
 
 !define APP_NAME "FileSorter"
-!define APP_VERSION "6.4.0"
+!define APP_VERSION "6.5.0"
 !define PUBLISHER "HajAmir"
 !define EXE_NAME "FileSorter.exe"
 !define INSTALL_DIR "$LOCALAPPDATA\${APP_NAME}"

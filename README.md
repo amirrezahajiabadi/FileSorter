@@ -12,9 +12,11 @@
 
 - **Smart Organization:** Automatically sort files by extension or custom rules with dry-run preview and one-click undo.
 - **Duplicate Cleaner:** Fast SHA-256 detection to find and remove identical duplicate files.
+- **Smart Renamer:** Bulk rename files with find & replace, regex, sequential numbering, case conversion, and safe undo.
+- **Image Studio:** Compress and convert images to WebP, JPEG, and PNG with aspect-ratio dimension clamping and live size comparison.
+- **PDF Studio:** Convert collections of images to PDF documents or extract all pages as high-resolution images.
 - **Disk Analyzer:** Visual breakdown of folder space and largest files.
 - **Junk Cleaner:** Safely clean temporary caches, crash dumps, and empty Recycle Bin.
-- **PDF Studio:** Convert collections of images to PDF documents or extract all pages as high-resolution images.
 - **Modern UI:** Sleek, responsive interface with Dark/Light themes.
 
 ---

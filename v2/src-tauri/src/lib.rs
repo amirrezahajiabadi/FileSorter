@@ -9,8 +9,10 @@
 pub mod categories;
 pub mod dupes;
 pub mod execute;
+pub mod image_ops;
 pub mod pdf_ops;
 pub mod plan;
+pub mod rename_ops;
 pub mod undo;
 pub mod walk;
 
@@ -382,7 +384,13 @@ pub fn run() {
             pdf_ops::read_file_binary,
             pdf_ops::write_file_binary,
             pdf_ops::save_extracted_images,
-            pdf_ops::open_in_file_manager
+            pdf_ops::open_in_file_manager,
+            rename_ops::pick_files_for_rename,
+            rename_ops::pick_folder_for_rename,
+            rename_ops::execute_batch_rename,
+            rename_ops::undo_last_rename,
+            image_ops::pick_images_for_studio,
+            image_ops::save_optimized_images
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
