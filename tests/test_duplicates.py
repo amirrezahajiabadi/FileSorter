@@ -205,14 +205,11 @@ def test_dup_cancel_mid_hash_returns_partial():
         root = _dup_tree(tmp, pairs=30, copies=2)  # 60 files to hash
         cancel = threading.Event()
 
-        def cancel_soon():
-            import time
-            time.sleep(0.01)
-            cancel.set()
+        def on_event(name, data):
+            if name == "dup_progress" and data.get("phase") == "hashing":
+                cancel.set()
 
-        t = threading.Thread(target=cancel_soon, daemon=True)
-        t.start()
-        res = scan_duplicates(root, cancel_event=cancel)
+        res = scan_duplicates(root, on_event=on_event, cancel_event=cancel)
         assert res["cancelled"] is True
         # some groups may already be complete; the result stays valid
         assert isinstance(res["groups"], list)
