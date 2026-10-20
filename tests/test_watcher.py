@@ -193,7 +193,7 @@ def test_tick_applies_smart_rules(tmp_path):
     events = []
 
     cats = {"documents": [".pdf"], "invoices": [], "others": []}
-    rules = [{"keywords": ["invoice", "فاکتور"], "category": "invoices"}]
+    rules = [{"keywords": ["invoice", "фактура"], "category": "invoices"}]
 
     mgr = WatchManager(
         get_categories=lambda: cats,

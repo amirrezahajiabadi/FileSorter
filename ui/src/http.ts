@@ -20,7 +20,6 @@ import type {
   CleanDeleteResult,
   DriveInfo,
   DupDeleteResult,
-  LangCode,
   PlanItem,
   TaskDef,
   TaskHistoryEntry,
@@ -81,8 +80,7 @@ export function createHttpBridge(): BridgeApi {
     browse_folder: async () => null, // headless: no native dialog; UI falls back to typed path
     record_recent_folder: (path) => call<string[]>('record_recent_folder', path),
     toggle_theme: () => call<ThemeName>('toggle_theme'),
-    toggle_language: () => call<LangCode>('toggle_language'),
-    get_strings: (lang) => call<Record<string, string>>('get_strings', lang),
+    get_strings: () => call<Record<string, string>>('get_strings'),
     analyze_folder: (path) => call<AnalysisReport>('analyze_folder', path),
     plan_sort: (path, mode) => call<PlanItem[]>('plan_sort', path, mode),
     start_sort: (path, move, mode) => call<boolean>('start_sort', path, move, mode),

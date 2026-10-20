@@ -28,9 +28,9 @@ function needsFolder(kind: TaskKind): boolean {
   return kind !== 'cleanup';
 }
 
-function formatWhen(ts: number, lang: string): string {
+function formatWhen(ts: number): string {
   if (!ts) return '';
-  return new Date(ts * 1000).toLocaleString(lang === 'fa' ? 'fa-IR' : 'en-GB', {
+  return new Date(ts * 1000).toLocaleString('en-GB', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
@@ -40,7 +40,6 @@ export default function SchedulesPanel() {
   const store = useStoreFields([
     'tasksOpen',
     'strings',
-    'lang',
     'folder',
     'recentFolders',
     'drives',
@@ -214,7 +213,7 @@ export default function SchedulesPanel() {
                         )}
                         <span className="task-when">
                           {task.last_run
-                            ? inline(fmt(t(S, 'task_last_run'), { when: formatWhen(task.last_run, store.lang) }))
+                            ? inline(fmt(t(S, 'task_last_run'), { when: formatWhen(task.last_run) }))
                             : inline(t(S, 'task_never_run'))}
                           {' · '}
                           {inline(t(S, intervalLabel))}
@@ -288,7 +287,7 @@ export default function SchedulesPanel() {
                         <span className="task-history-summary">{summary}</span>
                       </span>
                       <span className="task-history-time" dir="ltr">
-                        {formatWhen(h.at, store.lang)}
+                        {formatWhen(h.at)}
                       </span>
                     </li>
                   );

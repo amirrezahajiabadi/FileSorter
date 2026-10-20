@@ -85,7 +85,6 @@ class CategoryMeta(TypedDict):
 
     icon: str
     nameEn: str
-    nameFa: str
 
 
 class SmartRule(TypedDict):
@@ -109,7 +108,6 @@ class AppState(TypedDict):
     recentFolders: List[str]
     watchedFolders: List[str]
     theme: str  # "light" | "dark"
-    language: str  # "fa" | "en"
 
 
 class PlanItem(TypedDict):

@@ -153,11 +153,10 @@ def test_get_state(service):
     # here — a hardcoded copy is just one more thing to forget on a bump.
     assert state["version"] == APP_VERSION
     assert "categories" in state and "smartRules" in state
-    assert state["language"] in ("fa", "en")
 
 
 def test_get_strings(service):
-    resp = rpc(service, "get_strings", ["en"])
+    resp = rpc(service, "get_strings", [])
     assert "app_title" in resp["result"]
 
 
@@ -182,7 +181,7 @@ def test_private_method_blocked(service):
 
 
 def test_keyword_params(service):
-    resp = rpc(service, "get_strings", {"lang": "fa"})
+    resp = rpc(service, "get_strings", {})
     assert resp["result"]["app_title"]
 
 

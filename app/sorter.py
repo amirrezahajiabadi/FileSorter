@@ -82,8 +82,8 @@ def _stem_tokens(name: str) -> set:
     """Lowercased whole-word tokens of a file's stem (no extension).
 
     Splits on anything that is not a letter/digit, so dashes, dots,
-    spaces and underscores are all separators and Persian words work
-    the same as English ones ("faktor-1403.pdf" -> {"faktor", "1403"}).
+    spaces and underscores are all separators and non-ASCII words work
+    the same as English ones ("invoice-1403.pdf" -> {"invoice", "1403"}).
     """
     stem = Path(name).stem
     return {t for t in re.split(r"[^\w]+|_+", stem.casefold()) if t}

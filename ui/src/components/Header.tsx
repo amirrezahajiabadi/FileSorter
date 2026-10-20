@@ -6,7 +6,6 @@ import {
   openSettings,
   openTasksPanel,
   openWatch,
-  toggleLanguage,
   toggleTheme,
 } from '../store';
 import { inline, t } from '../i18n';
@@ -31,13 +30,11 @@ function MoonIcon() {
 export default function Header() {
   const store = useStoreFields([
     'strings',
-    'lang',
     'theme',
     'version',
     'transport',
   ]);
   const title = t(store.strings, 'app_title');
-  const langLabel = store.lang === 'fa' ? 'EN' : 'فا';
 
   return (
     <header className="app-header">
@@ -103,14 +100,6 @@ export default function Header() {
           onClick={openSettings}
         >
           <span className="header-btn-label">{inline(t(store.strings, 'settings_btn'))}</span>
-        </button>
-        <button
-          type="button"
-          className="header-btn"
-          title={store.lang === 'fa' ? 'Switch to English' : 'تغییر زبان به فارسی'}
-          onClick={() => void toggleLanguage()}
-        >
-          <span className="header-btn-label">{langLabel}</span>
         </button>
         <button
           type="button"

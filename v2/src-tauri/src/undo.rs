@@ -122,7 +122,7 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
     let newest = list_journals()
         .into_iter()
         .next()
-        .ok_or_else(|| "عملیاتی برای واگرد وجود ندارد".to_string())?;
+        .ok_or_else(|| "nothing to undo".to_string())?;
     let journal: UndoJournal =
         serde_json::from_str(&fs::read_to_string(&newest).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -134,7 +134,7 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
             // Original spot taken (user replaced it): keep the moved copy.
             report.skipped += 1;
             if report.skipped_examples.len() < 20 {
-                report.skipped_examples.push(format!("{} — مقصد اشغال است", f.original.display()));
+                report.skipped_examples.push(format!("{} — destination occupied", f.original.display()));
             }
             on_progress(report.restored, total);
             continue;
@@ -155,7 +155,7 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
                             Ok(())
                         } else {
                             let _ = fs::remove_file(&f.original);
-                            Err("کپی ناقص در واگرد".to_string())
+                            Err("incomplete copy during undo".to_string())
                         }
                     }
                     Err(e) => Err(e.to_string()),

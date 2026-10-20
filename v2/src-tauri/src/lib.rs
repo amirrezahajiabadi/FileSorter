@@ -70,7 +70,7 @@ fn scan_start(root: String, app: AppHandle) -> Result<(), String> {
     let root = walk::normalize_root(std::path::Path::new(&root))?;
     with_state(&app, |st| {
         if st.scanning {
-            return Err("یک اسکن در حال اجراست".into());
+            return Err("a scan is already running".into());
         }
         st.scanning = true;
         st.stop = StopFlag::new();
@@ -137,10 +137,10 @@ fn scan_stop(app: AppHandle) {
 fn analyze(app: AppHandle) -> Result<(), String> {
     let (files, cache_path) = with_state(&app, |st| {
         if st.scanning {
-            return Err("اسکن هنوز در حال اجراست".into());
+            return Err("a scan is still running".into());
         }
         if st.files.is_empty() {
-            return Err("اول یک پوشه را اسکن کنید".into());
+            return Err("scan a folder first".into());
         }
         Ok((st.files.clone(), categories::data_dir().join("hash-cache.json")))
     })?;
@@ -169,9 +169,9 @@ fn analyze(app: AppHandle) -> Result<(), String> {
 fn plan_sort(app: AppHandle) -> Result<plan::SortPlan, String> {
     let (root, files) = with_state(&app, |st| {
         if st.files.is_empty() {
-            return Err("اول یک پوشه را اسکن کنید".into());
+            return Err("scan a folder first".into());
         }
-        let root = st.root.clone().ok_or("ریشهٔ اسکن؟")?;
+        let root = st.root.clone().ok_or("scan root missing")?;
         Ok((root, st.files.clone()))
     })?;
     let cats = Categories::from_map(&categories::load_categories());
@@ -182,9 +182,9 @@ fn plan_sort(app: AppHandle) -> Result<plan::SortPlan, String> {
 fn sort_execute(app: AppHandle) -> Result<(), String> {
     let (plan, stop) = with_state(&app, |st| {
         if st.files.is_empty() {
-            return Err("اول یک پوشه را اسکن کنید".into());
+            return Err("scan a folder first".into());
         }
-        let root = st.root.clone().ok_or("ریشهٔ اسکن؟")?;
+        let root = st.root.clone().ok_or("scan root missing")?;
         let cats = Categories::from_map(&categories::load_categories());
         Ok((plan::build_plan(&root, &st.files, &cats), st.stop.clone()))
     })?;
@@ -215,11 +215,11 @@ fn quarantine_duplicates(app: AppHandle, keep: String) -> Result<(), String> {
     // `keep`: "oldest" (default) or "newest" — which copy stays in place.
     let (files, root, cache_path) = with_state(&app, |st| {
         if st.files.is_empty() {
-            return Err("اول یک پوشه را اسکن کنید".into());
+            return Err("scan a folder first".into());
         }
         Ok((
             st.files.clone(),
-            st.root.clone().ok_or("ریشهٔ اسکن؟")?,
+            st.root.clone().ok_or("scan root missing")?,
             categories::data_dir().join("hash-cache.json"),
         ))
     })?;
@@ -312,7 +312,7 @@ struct DiskStats {
 fn get_disk_stats(app: AppHandle) -> Result<DiskStats, String> {
     with_state(&app, |st| {
         if st.files.is_empty() {
-            return Err("اول یک پوشه را اسکن کنید".into());
+            return Err("scan a folder first".into());
         }
         let cats = Categories::from_map(&categories::load_categories());
         let total_files = st.files.len();

@@ -33,7 +33,7 @@ npm run build        # tsc typecheck + production build -> dist/
 
 ## Regenerating the string mirror
 
-Translations live only in `app/i18n.py`. After editing them:
+The English UI strings live only in `app/i18n.py`. After editing them:
 
 ```bash
 python ui/scripts/export_i18n.py

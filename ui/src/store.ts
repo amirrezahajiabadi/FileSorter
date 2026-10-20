@@ -22,7 +22,6 @@ import type {
   DuplicateMode,
   DupDone,
   EventKind,
-  LangCode,
   PlanItem,
   SortDone,
   SortItemEvent,
@@ -119,7 +118,6 @@ export interface UIState {
   desktop: boolean;
   transport: TransportKind;
   theme: ThemeName;
-  lang: LangCode;
   version: string;
   strings: StringTable;
   folder: string | null;
@@ -182,7 +180,6 @@ const initial: UIState = {
   desktop: false,
   transport: transportKind,
   theme: 'dark',
-  lang: 'en',
   version: '',
   strings: {},
   folder: null,
@@ -411,7 +408,7 @@ function pushWatchLog(kind: LogKind, text: string): void {
 
 // ── Row building ────────────────────────────────────────────────
 
-function buildRows(app: AppState, lang: LangCode): CategoryRow[] {
+function buildRows(app: AppState): CategoryRow[] {
   const ids = Object.keys(app.categories);
   const sorted = [...ids].sort((a, b) => {
     if (a === 'others') return 1;
@@ -422,10 +419,7 @@ function buildRows(app: AppState, lang: LangCode): CategoryRow[] {
     const meta: Partial<CategoryMeta> = app.categoryMeta?.[id] ?? {};
     const fallback = DEFAULT_CATEGORY_META[id];
     const icon = meta.icon || fallback?.icon || '📁';
-    const name =
-      (lang === 'fa'
-        ? meta.nameFa ?? fallback?.nameFa
-        : meta.nameEn ?? fallback?.nameEn) ?? id;
+    const name = (meta.nameEn ?? fallback?.nameEn) ?? id;
     return { id, icon, name, extensions: app.categories[id] ?? [], count: 0 };
   });
 }
@@ -443,7 +437,7 @@ function resetCounts(): void {
   applyCategoryCounts({});
 }
 
-// ── Theme / language helpers ────────────────────────────────────
+// ── Theme helpers ───────────────────────────────────────────────
 
 function applyTheme(theme: ThemeName): void {
   document.documentElement.dataset.theme = theme;
@@ -715,21 +709,20 @@ export async function init(): Promise<void> {
     await initTransport();
     const app = await bridge.get_state();
     appState = app;
-    const strings = await bridge.get_strings(app.language);
+    const strings = await bridge.get_strings();
     applyTheme(app.theme);
-    document.documentElement.lang = app.language;
-    document.documentElement.dir = app.language === 'fa' ? 'rtl' : 'ltr';
+    document.documentElement.lang = 'en';
+    document.documentElement.dir = 'ltr';
     set({
       ready: true,
       desktop: isDesktop(),
       theme: app.theme,
-      lang: app.language,
       version: app.version,
       strings,
       recentFolders: app.recentFolders ?? [],
       watchFolders: mergeWatchRows(app.watchedFolders ?? [], []),
       tasks: app.tasks ?? [],
-      categories: buildRows(app, app.language),
+      categories: buildRows(app),
     });
   } catch (err) {
     console.error('init failed:', err);
@@ -931,7 +924,6 @@ export interface CategoryDraft {
   id: string;
   icon: string;
   nameEn: string;
-  nameFa: string;
   extensions: string[];
 }
 
@@ -962,7 +954,6 @@ export function settingsSnapshot(): CategoryDraft[] {
       id,
       icon: m.icon || fb?.icon || '📁',
       nameEn: m.nameEn || fb?.nameEn || id,
-      nameFa: m.nameFa || fb?.nameFa || id,
       extensions: [...exts],
     };
   });
@@ -975,15 +966,14 @@ export function settingsSnapshot(): CategoryDraft[] {
 
 function syncFromApp(app: AppState): void {
   applyTheme(app.theme);
-  document.documentElement.lang = app.language;
-  document.documentElement.dir = app.language === 'fa' ? 'rtl' : 'ltr';
+  document.documentElement.lang = 'en';
+  document.documentElement.dir = 'ltr';
   set({
     theme: app.theme,
-    lang: app.language,
     version: app.version,
     strings: state.strings,
     recentFolders: app.recentFolders ?? [],
-    categories: buildRows(app, app.language),
+    categories: buildRows(app),
   });
 }
 
@@ -995,7 +985,7 @@ export async function saveSettings(
   const meta: Record<string, Partial<CategoryMeta>> = {};
   for (const d of drafts) {
     categories[d.id] = d.extensions;
-    meta[d.id] = { icon: d.icon, nameEn: d.nameEn, nameFa: d.nameFa };
+    meta[d.id] = { icon: d.icon, nameEn: d.nameEn };
   }
   const cleanRules = rules
     .map((r) => ({
@@ -1040,18 +1030,6 @@ export async function toggleTheme(): Promise<void> {
   const theme = await bridge.toggle_theme();
   applyTheme(theme);
   set({ theme });
-}
-
-export async function toggleLanguage(): Promise<void> {
-  const lang = await bridge.toggle_language();
-  const strings = await bridge.get_strings(lang);
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
-  set({
-    lang,
-    strings,
-    categories: appState ? buildRows(appState, lang) : state.categories,
-  });
 }
 
 export function clearNotice(): void {

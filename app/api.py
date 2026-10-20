@@ -390,7 +390,6 @@ class BaseApi:
             "recentFolders": self.controller.recent_folders,
             "watchedFolders": self.controller.watch_folders,
             "theme": self.controller.theme_name,
-            "language": self.controller.language,
         }
 
     def toggle_theme(self) -> str:
@@ -399,15 +398,9 @@ class BaseApi:
         self.controller.set_theme(new_theme)
         return new_theme
 
-    def toggle_language(self) -> str:
-        """Flip fa/en, persist it, and return the new language code."""
-        new_lang = "en" if self.controller.language == "fa" else "fa"
-        self.controller.set_language(new_lang)
-        return new_lang
-
-    def get_strings(self, lang: str) -> dict:
-        """Return the full string table for the given language."""
-        return STRINGS.get(lang, STRINGS["en"])
+    def get_strings(self) -> dict:
+        """Return the full (English) string table."""
+        return STRINGS
 
     # ── Analysis ───────────────────────────────────────────────
 

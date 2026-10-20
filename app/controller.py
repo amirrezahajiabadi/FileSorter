@@ -44,7 +44,6 @@ class AppController:
         self.settings = load_settings()
         self.categories = self.settings.get("categories", DEFAULT_CATEGORIES.copy())
         self.category_meta = self.settings.get("category_meta", {})
-        self.language = self.settings.get("language", "fa")
         self.theme_name = self.settings.get("theme", "light")
         self.recent_folders = self.settings.get("recent_folders", [])
         self.watch_folders = self.settings.get("watched_folders", [])
@@ -58,11 +57,6 @@ class AppController:
     # ══════════════════════════════════════════════════════════════
     #  Settings
     # ══════════════════════════════════════════════════════════════
-
-    def set_language(self, lang: str) -> None:
-        self.language = lang
-        self.settings["language"] = lang
-        save_settings(self.settings)
 
     def set_theme(self, theme_name: str) -> None:
         self.theme_name = theme_name

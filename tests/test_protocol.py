@@ -46,8 +46,8 @@ class TestJsonSafe:
 
         assert json_safe(Opaque()) == 'opaque'
 
-    def test_persian_text_is_preserved(self):
-        assert json_safe({'msg': 'تصاویر'}) == {'msg': 'تصاویر'}
+    def test_non_ascii_text_is_preserved(self):
+        assert json_safe({'msg': 'файлы'}) == {'msg': 'файлы'}
 
 
 class TestEventMessage:
@@ -95,11 +95,10 @@ class TestStateContract:
             'version': '4.3.0',
             'categories': {'images': ['.jpg'], 'others': []},
             'categoryMeta': {
-                'images': {'icon': '📸', 'nameEn': 'Images', 'nameFa': 'تصاویر'}
+                'images': {'icon': '📸', 'nameEn': 'Images'}
             },
             'recentFolders': ['C:/Photos'],
             'theme': 'dark',
-            'language': 'fa',
         }
         assert _roundtrip(state) == state
 

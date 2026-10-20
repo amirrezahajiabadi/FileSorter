@@ -23,13 +23,12 @@ def sanitize_category_name(name: str) -> str:
 
 
 def load_settings() -> dict:
-    """Load user settings (categories, language, theme) from disk, or defaults."""
+    """Load user settings (categories, theme) from disk, or defaults."""
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             data.setdefault("categories", DEFAULT_CATEGORIES.copy())
-            data.setdefault("language", "fa")
             data.setdefault("theme", "light")
             data.setdefault("recent_folders", [])
             return data
@@ -37,7 +36,6 @@ def load_settings() -> dict:
             pass
     return {
         "categories": DEFAULT_CATEGORIES.copy(),
-        "language": "fa",
         "theme": "light",
         "recent_folders": [],
     }

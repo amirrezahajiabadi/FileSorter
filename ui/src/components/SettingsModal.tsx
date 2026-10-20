@@ -11,14 +11,9 @@ import {
 } from '../store';
 import { fmt, inline, t } from '../i18n';
 
-function displayName(d: CategoryDraft, lang: string): string {
-  return lang === 'fa' ? d.nameFa : d.nameEn;
-}
-
 export default function SettingsModal() {
-  const store = useStoreFields(['strings', 'lang']);
+  const store = useStoreFields(['strings']);
   const S = store.strings;
-  const lang = store.lang;
 
   const [tab, setTab] = useState<'categories' | 'rules'>('categories');
   const [drafts, setDrafts] = useState<CategoryDraft[]>(() => settingsSnapshot());
@@ -42,7 +37,7 @@ export default function SettingsModal() {
     const id = `cat_${Date.now().toString(36)}`;
     setDrafts((ds) => [
       ...ds,
-      { id, icon: '📁', nameEn: label, nameFa: label, extensions: [] },
+      { id, icon: '📁', nameEn: label, extensions: [] },
     ]);
     setSelectedId(id);
     setNewName('');
@@ -54,7 +49,7 @@ export default function SettingsModal() {
       window.alert(inline(t(S, 'cannot_remove_others_msg')));
       return;
     }
-    const msg = fmt(t(S, 'remove_category_confirm_msg'), { cat: displayName(selected, lang) });
+    const msg = fmt(t(S, 'remove_category_confirm_msg'), { cat: selected.nameEn });
     if (!window.confirm(inline(msg))) return;
     setDrafts((ds) => {
       const next = ds.filter((d) => d.id !== selected.id);
@@ -159,7 +154,7 @@ export default function SettingsModal() {
                     <span className="settings-item-icon" aria-hidden="true">
                       {d.icon}
                     </span>
-                    <span className="settings-item-name">{displayName(d, lang)}</span>
+                    <span className="settings-item-name">{d.nameEn}</span>
                     <span className="settings-item-count">{d.extensions.length}</span>
                   </button>
                 ))}
@@ -188,7 +183,7 @@ export default function SettingsModal() {
                     {selected.icon}
                   </span>
                   <span className="settings-editor-name">
-                    {displayName(selected, lang)}
+                    {selected.nameEn}
                   </span>
                   <span className="settings-editor-id mono" dir="ltr">
                     {selected.id}
@@ -216,22 +211,12 @@ export default function SettingsModal() {
                 </label>
 
                 <label className="field">
-                  <span className="field-label">{inline(t(S, 'name_en_label'))}</span>
+                  <span className="field-label">{inline(t(S, 'name_label'))}</span>
                   <input
                     type="text"
                     className="input"
                     value={selected.nameEn}
                     onChange={(e) => updateDraft(selected.id, { nameEn: e.target.value })}
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="field-label">{inline(t(S, 'name_fa_label'))}</span>
-                  <input
-                    type="text"
-                    className="input"
-                    value={selected.nameFa}
-                    onChange={(e) => updateDraft(selected.id, { nameFa: e.target.value })}
                   />
                 </label>
 
@@ -285,7 +270,7 @@ export default function SettingsModal() {
                     >
                       {drafts.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {displayName(d, lang)}
+                          {d.nameEn}
                         </option>
                       ))}
                     </select>

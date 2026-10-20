@@ -81,7 +81,7 @@ pub fn load_categories() -> CategoryMap {
 
 pub fn save_categories(map: &CategoryMap) -> Result<(), String> {
     if !map.contains_key("others") {
-        return Err("دستهٔ «others» باید وجود داشته باشد".into());
+        return Err("the 'others' category must exist".into());
     }
     let dir = data_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

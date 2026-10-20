@@ -67,13 +67,10 @@ def _load_winforms():
 # ══════════════════════════════════════════════════════════════════
 
 _LABELS = {
-    "open": {"fa": "باز کردن در مرورگر", "en": "Open in browser"},
-    "startup": {"fa": "اجرا هنگام روشن شدن ویندوز", "en": "Start with Windows"},
-    "quit": {"fa": "خروج", "en": "Exit"},
-    "tooltip": {
-        "fa": "مرتب‌کننده فایل — در حال اجرا روی پورت {port}",
-        "en": "File Sorter — running on port {port}",
-    },
+    "open": "Open in browser",
+    "startup": "Start with Windows",
+    "quit": "Exit",
+    "tooltip": "File Sorter — running on port {port}",
 }
 
 
@@ -86,11 +83,10 @@ class TrayController:
     caller can shut the HTTP server down before the pump unwinds.
     """
 
-    def __init__(self, url: str, port: int, language: str = "fa",
+    def __init__(self, url: str, port: int,
                  on_quit=None, autostart_root=None):
         self.url = url
         self.port = port
-        self.language = language if language in ("fa", "en") else "fa"
         self.on_quit = on_quit
         self.autostart_root = autostart_root  # injectable registry key (tests)
         # kept as attributes so pythonnet doesn't collect the .NET objects
@@ -103,10 +99,10 @@ class TrayController:
     # ── text ─────────────────────────────────────────────────────
 
     def _label(self, key: str) -> str:
-        return _LABELS[key][self.language]
+        return _LABELS[key]
 
     def tooltip(self) -> str:
-        return _LABELS["tooltip"][self.language].format(port=self.port)
+        return _LABELS["tooltip"].format(port=self.port)
 
     # ── autostart toggle ─────────────────────────────────────────
 
@@ -192,8 +188,7 @@ class TrayController:
 #  Entry point: service + tray together
 # ══════════════════════════════════════════════════════════════════
 
-def run_tray_service(port: int = 8175, token: str = None,
-                     language: str = None) -> None:
+def run_tray_service(port: int = 8175, token: str = None) -> None:
     """Start the headless service and keep it alive under the tray icon.
 
     Blocks until the user quits from the tray menu. The service runs on
@@ -202,17 +197,8 @@ def run_tray_service(port: int = 8175, token: str = None,
     service = FileSorterService(token=token, port=port)
     service.start()
 
-    # Label the tray in the language the user chose in the app (the
-    # controller's persisted settings); fall back to Persian.
-    if language is None:
-        try:
-            language = service.api.controller.settings.get("language", "fa")
-        except Exception:
-            language = "fa"
-
     controller = TrayController(
-        url=service.url(), port=service.port, language=language,
-        on_quit=service.shutdown,
+        url=service.url(), port=service.port, on_quit=service.shutdown,
     )
     print(f"FileSorter service running at {service.url()} (tray icon active)")
     print(f"API token: {service.token}")

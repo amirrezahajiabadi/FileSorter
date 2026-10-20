@@ -40,7 +40,6 @@ export const TERMINAL_EVENT_KINDS: ReadonlySet<EventKind> = new Set([
 
 export type DuplicateMode = 'skip' | 'rename' | 'overwrite';
 export type ThemeName = 'light' | 'dark';
-export type LangCode = 'en' | 'fa';
 
 export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
   'total',
@@ -65,7 +64,6 @@ export const EVENT_KINDS: ReadonlySet<EventKind> = new Set([
 export interface CategoryMeta {
   icon: string;
   nameEn: string;
-  nameFa: string;
 }
 
 export interface SmartRule {
@@ -82,7 +80,6 @@ export interface AppState {
   recentFolders: string[];
   watchedFolders: string[];
   theme: ThemeName;
-  language: LangCode;
 }
 
 export type TaskKind = 'cleanup' | 'disk_scan' | 'dup_scan';
@@ -317,22 +314,22 @@ export interface SortItemEvent {
 // ── Fallback display metadata (used until Python state arrives) ──
 // Mirrors the constants once shipped in web/js/data.js.
 export const DEFAULT_CATEGORY_META: Record<string, CategoryMeta> = {
-  images: { icon: '📸', nameEn: 'Images', nameFa: 'تصاویر' },
-  documents: { icon: '📄', nameEn: 'Documents', nameFa: 'اسناد' },
-  videos: { icon: '🎬', nameEn: 'Videos', nameFa: 'ویدئو' },
-  audio: { icon: '🎵', nameEn: 'Audio', nameFa: 'صوتی' },
-  archives: { icon: '📦', nameEn: 'Archives', nameFa: 'آرشیو' },
-  code: { icon: '💻', nameEn: 'Code', nameFa: 'کد' },
-  data: { icon: '🗃️', nameEn: 'Data', nameFa: 'داده' },
-  ebooks: { icon: '📚', nameEn: 'E-Books', nameFa: 'کتاب‌ها' },
-  executables: { icon: '⚙️', nameEn: 'Executables', nameFa: 'اجراپذیرها' },
-  fonts: { icon: '🔤', nameEn: 'Fonts', nameFa: 'فونت‌ها' },
-  others: { icon: '❓', nameEn: 'Unknown', nameFa: 'ناشناس' },
+  images: { icon: '📸', nameEn: 'Images' },
+  documents: { icon: '📄', nameEn: 'Documents' },
+  videos: { icon: '🎬', nameEn: 'Videos' },
+  audio: { icon: '🎵', nameEn: 'Audio' },
+  archives: { icon: '📦', nameEn: 'Archives' },
+  code: { icon: '💻', nameEn: 'Code' },
+  data: { icon: '🗃️', nameEn: 'Data' },
+  ebooks: { icon: '📚', nameEn: 'E-Books' },
+  executables: { icon: '⚙️', nameEn: 'Executables' },
+  fonts: { icon: '🔤', nameEn: 'Fonts' },
+  others: { icon: '❓', nameEn: 'Unknown' },
 };
 
-export function categoryName(id: string, lang: LangCode): string {
+export function categoryName(id: string): string {
   const meta = DEFAULT_CATEGORY_META[id];
-  return lang === 'fa' ? meta?.nameFa ?? id : meta?.nameEn ?? id;
+  return meta?.nameEn ?? id;
 }
 
 export function categoryIcon(id: string): string {

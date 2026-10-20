@@ -142,9 +142,9 @@ pub fn collect_files(
 pub fn normalize_root(root: &Path) -> Result<PathBuf, String> {
     let root = root
         .canonicalize()
-        .map_err(|e| format!("پوشه در دسترس نیست: {}", e))?;
+        .map_err(|e| format!("folder unavailable: {}", e))?;
     if !root.is_dir() {
-        return Err("مسیر داده‌شده یک پوشه نیست".into());
+        return Err("the given path is not a folder".into());
     }
     Ok(root)
 }

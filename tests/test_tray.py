@@ -13,9 +13,8 @@ from app import autostart
 from app.tray import TrayController, TrayUnavailable
 
 
-def make_controller(language="fa", **kw):
-    return TrayController(url="http://127.0.0.1:8175/", port=8175,
-                          language=language, **kw)
+def make_controller(**kw):
+    return TrayController(url="http://127.0.0.1:8175/", port=8175, **kw)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -32,23 +31,11 @@ def test_run_raises_tray_unavailable_when_winforms_missing(monkeypatch):
 #  Labels / tooltip
 # ══════════════════════════════════════════════════════════════════
 
-def test_labels_persian():
-    c = make_controller(language="fa")
-    assert c._label("open") == "باز کردن در مرورگر"
-    assert c._label("quit") == "خروج"
-    assert "8175" in c.tooltip()
-
-
 def test_labels_english():
-    c = make_controller(language="en")
+    c = make_controller()
     assert c._label("open") == "Open in browser"
     assert c._label("startup") == "Start with Windows"
     assert c.tooltip() == "File Sorter — running on port 8175"
-
-
-def test_unknown_language_falls_back_to_persian():
-    c = make_controller(language="fr")
-    assert c._label("open") == "باز کردن در مرورگر"
 
 
 # ══════════════════════════════════════════════════════════════════

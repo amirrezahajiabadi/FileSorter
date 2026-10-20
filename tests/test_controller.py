@@ -28,13 +28,6 @@ def controller(tmp_path, monkeypatch):
 #  Settings
 # ══════════════════════════════════════════════════════════════════
 
-def test_set_language_persists(controller, tmp_path):
-    controller.set_language("en")
-    assert controller.language == "en"
-    from app.settings_manager import load_settings
-    assert load_settings()["language"] == "en"
-
-
 def test_set_theme_persists(controller):
     controller.set_theme("dark")
     assert controller.theme_name == "dark"
@@ -107,7 +100,7 @@ def test_sort_log_entries_include_name_and_category(controller, tmp_path):
 
 
 def test_update_categories_persists_meta(controller, tmp_path):
-    controller.update_categories({"memes": [".jpg"], "others": []}, meta={"memes": {"icon": "🎭", "nameEn": "Memes", "nameFa": "میم"}})
+    controller.update_categories({"memes": [".jpg"], "others": []}, meta={"memes": {"icon": "🎭", "nameEn": "Memes"}})
     assert controller.category_meta["memes"]["icon"] == "🎭"
 
 
@@ -198,11 +191,11 @@ def test_update_smart_rules_persists(controller):
         {**controller.categories, "invoices": []}, meta=None
     )
     controller.update_smart_rules([
-        {"keywords": ["invoice", "فاکتور"], "category": "invoices"},
+        {"keywords": ["invoice", "фактура"], "category": "invoices"},
         {"keywords": ["receipt"], "category": "nope"},  # dropped: no such category
     ])
     assert controller.smart_rules == [
-        {"keywords": ["invoice", "فاکتور"], "category": "invoices"},
+        {"keywords": ["invoice", "фактура"], "category": "invoices"},
     ]
 
 

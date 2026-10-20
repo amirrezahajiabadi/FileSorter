@@ -1,68 +1,9 @@
 /* FileSorter v2 — Pure Liquid Glass Design System.
-   Bilingual Typography (Estedad for Persian, Manrope for English & numbers),
+   Typography (Manrope),
    ultra-refined liquid glassmorphism, ambient liquid background refraction,
    and tactile spring micro-animations. Zero colored halos. */
 
-/* ── Fonts: Estedad (Persian) & Manrope (English) ────────── */
-
-/* Estedad — Variable & Explicit Weight Bindings for 100% Browser Compatibility */
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2-variations"),
-       url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estedad";
-  src: url("./assets/fonts/Estedad.woff2") format("woff2");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
+/* ── Fonts: Manrope ─────────────────────────────────────────── */
 
 /* Manrope — Variable & Explicit Weight Bindings */
 @font-face {
@@ -256,7 +197,7 @@ body,
   height: 100%;
 }
 
-/* Global font cascade: Estedad first for Persian, Manrope for Latin */
+/* Global font cascade: Manrope for all text */
 html,
 body,
 button,
@@ -278,7 +219,7 @@ strong,
 th,
 td,
 label {
-  font-family: "Estedad", "Manrope", system-ui, -apple-system, sans-serif;
+  font-family: "Manrope", system-ui, -apple-system, sans-serif;
 }
 
 body {
@@ -294,22 +235,11 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Persian Mode Typography & Direction */
-html[lang="fa"],
-html[lang="fa"] *,
-[data-lang="fa"],
-[data-lang="fa"] * {
-  direction: rtl;
-  font-family: "Estedad", "Manrope", system-ui, -apple-system, sans-serif !important;
-}
-
-/* English Mode Typography & Direction */
-html[lang="en"],
-html[lang="en"] *,
-[data-lang="en"],
-[data-lang="en"] * {
+/* Left-to-right (English) Typography & Direction */
+html,
+html * {
   direction: ltr;
-  font-family: "Manrope", "Estedad", system-ui, -apple-system, sans-serif !important;
+  font-family: "Manrope", system-ui, -apple-system, sans-serif;
 }
 
 /* Monospace Code Typography */
@@ -1051,11 +981,7 @@ table {
   font-size: 13px;
 }
 
-html[lang="fa"] table {
-  text-align: right;
-}
-
-html[lang="en"] table {
+table {
   text-align: left;
 }
 
@@ -1122,44 +1048,6 @@ tr:hover td {
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-}
-
-.lang-selector {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.lang-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 22px;
-  border-radius: 14px;
-  border: 1px solid var(--btn-border);
-  background: var(--btn-bg);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  box-shadow: var(--btn-specular);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.lang-btn:hover {
-  background: var(--btn-bg-hover);
-  border-color: var(--btn-border-hover);
-  color: var(--text);
-  transform: translateY(-1.5px);
-  box-shadow: var(--btn-specular-hover);
-}
-
-.lang-btn.active {
-  background: var(--surface-strong);
-  border-color: var(--line-strong);
-  color: var(--text);
-  font-weight: 700;
-  box-shadow: var(--btn-primary-specular);
 }
 
 .settings-grid {

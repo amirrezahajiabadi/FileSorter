@@ -62,17 +62,17 @@ export interface DiskStats {
 export type CategoryMap = Record<string, string[]>;
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  images: "تصاویر",
-  documents: "اسناد",
-  videos: "ویدیوها",
-  audio: "صداها",
-  archives: "آرشیوها",
-  code: "کدها",
-  data: "داده‌ها",
-  ebooks: "کتاب‌ها",
-  executables: "اجرایی‌ها",
-  fonts: "فونت‌ها",
-  others: "سایر",
+  images: "Images",
+  documents: "Documents",
+  videos: "Videos",
+  audio: "Audio",
+  archives: "Archives",
+  code: "Source Code",
+  data: "Data Files",
+  ebooks: "E-Books",
+  executables: "Executables",
+  fonts: "Fonts",
+  others: "Other Files",
 };
 
 export const CATEGORY_ICONS: Record<string, string> = {

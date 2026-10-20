@@ -29,7 +29,6 @@ import type {
   DriveInfo,
   DupGroup,
   EventKind,
-  LangCode,
   PlanItem,
   SortDone,
   SortItemEvent,
@@ -57,8 +56,7 @@ export interface BridgeApi {
    *  recent-folders list. */
   record_recent_folder(path: string): Promise<string[]>;
   toggle_theme(): Promise<ThemeName>;
-  toggle_language(): Promise<LangCode>;
-  get_strings(lang: LangCode): Promise<Record<string, string>>;
+  get_strings(): Promise<Record<string, string>>;
   analyze_folder(path: string): Promise<AnalysisReport>;
   plan_sort(path: string, duplicate_mode?: DuplicateMode): Promise<PlanItem[]>;
   start_sort(
@@ -211,7 +209,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 
 // Must track APP_VERSION in app/constants.py — this is only the browser
 // preview's stand-in for the version the Python core reports in get_state().
-const SAMPLE_VERSION = '6.2.0';
+const SAMPLE_VERSION = '6.3.0';
 
 const SAMPLE_STATE: AppState = {
   version: SAMPLE_VERSION,
@@ -222,7 +220,6 @@ const SAMPLE_STATE: AppState = {
   recentFolders: [],
   watchedFolders: [],
   theme: 'dark',
-  language: 'en',
 };
 
 const SAMPLE_REPORT: AnalysisReport = {
@@ -264,7 +261,7 @@ const SAMPLE_PLAN: PlanItem[] = [
   { name: 'main.ts', category: 'code', action: 'ok', final_name: 'main.ts' },
   { name: '2022-tax.pdf', category: 'documents', action: 'overwrite', final_name: '2022-tax.pdf' },
   { name: 'invoice-2024.pdf', category: 'documents', action: 'ok', final_name: 'invoice-2024.pdf' },
-  { name: 'فاکتور-1403.pdf', category: 'documents', action: 'ok', final_name: 'فاکتور-1403.pdf' },
+  { name: 'invoice-1403.pdf', category: 'documents', action: 'ok', final_name: 'invoice-1403.pdf' },
   { name: 'menu.pdf', category: 'documents', action: 'ok', final_name: 'menu.pdf' },
 ];
 
@@ -326,7 +323,7 @@ function dupSummary(groups: DupGroup[]): { groups: DupGroup[]; wasted: number } 
 
 function stemTokens(name: string): Set<string> {
   // Whole-word tokens of the stem (no extension); unicode letters/digits
-  // count as word chars so Persian filenames split the same as English.
+  // count as word chars so non-ASCII filenames split the same as English.
   const dot = name.lastIndexOf('.');
   const stem = dot > 0 ? name.slice(0, dot) : name;
   const parts = stem
@@ -412,12 +409,8 @@ function createMockBridge(): BridgeApi {
       SAMPLE_STATE.theme = SAMPLE_STATE.theme === 'dark' ? 'light' : 'dark';
       return SAMPLE_STATE.theme;
     },
-    async toggle_language(): Promise<LangCode> {
-      SAMPLE_STATE.language = SAMPLE_STATE.language === 'en' ? 'fa' : 'en';
-      return SAMPLE_STATE.language;
-    },
-    async get_strings(lang: LangCode): Promise<Record<string, string>> {
-      return STRINGS_MIRROR[lang];
+    async get_strings(): Promise<Record<string, string>> {
+      return STRINGS_MIRROR;
     },
     async analyze_folder(_path: string): Promise<AnalysisReport> {
       await sleep(250); // feel of a real scan

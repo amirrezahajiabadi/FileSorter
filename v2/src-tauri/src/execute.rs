@@ -56,21 +56,21 @@ fn move_one(source: &Path, dest: &Path) -> Result<(), String> {
         return Ok(());
     }
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("ساخت پوشه: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("create folder: {}", e))?;
     }
     // Same volume → rename is atomic and instant.
     match fs::rename(source, dest) {
         Ok(()) => Ok(()),
         Err(_) => {
             // Cross-volume or locked-by-rename: copy + verify + delete.
-            fs::copy(source, dest).map_err(|e| format!("کپی: {}", e))?;
+            fs::copy(source, dest).map_err(|e| format!("copy: {}", e))?;
             let src_len = fs::metadata(source).map(|m| m.len()).ok();
             let dst_len = fs::metadata(dest).map(|m| m.len()).ok();
             if src_len.is_none() || src_len != dst_len {
                 let _ = fs::remove_file(dest);
-                return Err("کپی ناقص — فایل حذف نشد".into());
+                return Err("incomplete copy — source not removed".into());
             }
-            fs::remove_file(source).map_err(|e| format!("حذف بعد از کپی: {}", e))?;
+            fs::remove_file(source).map_err(|e| format!("delete after copy: {}", e))?;
             Ok(())
         }
     }

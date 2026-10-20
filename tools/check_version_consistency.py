@@ -75,10 +75,10 @@ def collect_mismatches(app_version: str = None, repo: Path = ROOT) -> list[str]:
     strings_path = repo / "ui" / "src" / "generated" / "strings.ts"
     text = _read(strings_path)
     occurrences = text.count(app_version)
-    if occurrences < 2:
+    if occurrences < 1:
         problems.append(
             f"ui/src/generated/strings.ts: mentions {app_version!r} {occurrences}x, "
-            f"expected 2 (en + fa dev_line) — regenerate with "
+            f"expected 1 (dev_line) — regenerate with "
             f"`python ui/scripts/export_i18n.py`  ({strings_path})"
         )
 

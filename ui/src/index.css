@@ -21,7 +21,7 @@ html {
 }
 
 body, button, input, select, textarea {
-  font-family: 'Estedad', 'Manrope', 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Manrope', 'Inter', -apple-system, 'Segoe UI', sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-primary);
@@ -30,16 +30,6 @@ body, button, input, select, textarea {
   overflow: hidden;
   user-select: none;
 }
-
-html[lang="fa"],
-html[lang="fa"] *,
-[data-lang="fa"],
-[data-lang="fa"] * {
-  direction: rtl;
-  font-family: 'Estedad', 'Manrope', -apple-system, 'Segoe UI', sans-serif !important;
-}
-
-
 
 /* ---------- Light theme (default) ---------- */
 

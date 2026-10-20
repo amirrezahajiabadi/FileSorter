@@ -42,7 +42,6 @@ def test_get_state_returns_required_keys(api):
     assert "categories" in state
     assert "recentFolders" in state
     assert "theme" in state
-    assert "language" in state
 
 
 def test_get_state_version_matches_constants(api):
@@ -76,40 +75,11 @@ def test_toggle_theme_flips_light_to_dark(api):
 
 
 # ══════════════════════════════════════════════════════════════════
-#  toggle_language
-# ══════════════════════════════════════════════════════════════════
-
-def test_toggle_language_flips_fa_to_en(api):
-    api.controller.set_language("fa")
-    result = api.toggle_language()
-    assert result == "en"
-    assert api.controller.language == "en"
-
-
-def test_toggle_language_flips_en_to_fa(api):
-    api.controller.set_language("en")
-    result = api.toggle_language()
-    assert result == "fa"
-    assert api.controller.language == "fa"
-
-
-# ══════════════════════════════════════════════════════════════════
 #  get_strings
 # ══════════════════════════════════════════════════════════════════
 
 def test_get_strings_returns_dict(api):
-    strings = api.get_strings("en")
-    assert isinstance(strings, dict)
-    assert "app_title" in strings
-
-
-def test_get_strings_fa_returns_persian(api):
-    strings = api.get_strings("fa")
-    assert "مرتب" in strings["app_title"]
-
-
-def test_get_strings_unknown_lang_falls_back_to_en(api):
-    strings = api.get_strings("xx")
+    strings = api.get_strings()
     assert isinstance(strings, dict)
     assert "app_title" in strings
 

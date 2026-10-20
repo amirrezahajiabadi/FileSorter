@@ -1,11 +1,11 @@
-# 📁 File Sorter (v6.2.0)
+# 📁 File Sorter (v6.3.0)
 
 > **High-Performance Desktop File Organizer & Disk Reclamation Suite**  
-> *مرتب‌ساز فایل و پاک‌سازی هوشمند دیسک — قدرتمند، سبک و دو زبانه (فارسی / English)*
+> *Fast, lightweight desktop file organizer and smart disk cleanup suite*
 
 [![Tests](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml/badge.svg)](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml)
 [![Build & Release](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/release.yml/badge.svg)](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/release.yml)
-![Version](https://img.shields.io/badge/Version-6.2.0-blue.svg)
+![Version](https://img.shields.io/badge/Version-6.3.0-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.8+-4B8BBE?logo=python&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-Tauri_2.0-DEA584?logo=rust&logoColor=white)
 ![React](https://img.shields.io/badge/React-18_TypeScript-61DAFB?logo=react&logoColor=black)
@@ -16,13 +16,12 @@
 
 ---
 
-## 🌟 What's New in v6.2.0
+## 🌟 What's New in v6.3.0
 
-- ⚡ **Native Tauri 2 & Rust Engine (`v2/`):** Lightning-fast sorting, non-blocking asynchronous multi-threaded directory walking with Rayon, journaled safe undo, and SHA-256 chunked duplicate identification.
-- 🎨 **Craft UI Design System:** Premium dual-theme (**Dark / Light**) with persistent storage, tactile spring micro-animations on interactive controls (`active: scale(0.96)`), glassmorphism cards, and unified visual hierarchy.
-- 💾 **Disk Space Analyzer:** Real-time visual disk and folder space usage breakdowns by category and file size.
-- 🛡️ **Hardened Backend:** Resolved file-moving collisions, safe canonical path cleanup, atomic settings file writes, and robust loopback service recovery.
-- ✅ **Tested to Perfection:** 280+ Python test cases and 16 native Rust unit test suites pass completely.
+- 🌐 **English-Only UI:** Clean, unified internationalized interface across both the React desktop frontend and Tauri v2 frontend.
+- ✨ **Typography Overhaul:** Streamlined font stack centered on Manrope, Inter, Space Grotesk, and JetBrains Mono with optimized asset bundles.
+- 🧹 **Codebase Simplification:** Cleaned up bilingual toggles, string tables, and category metadata for leaner runtime performance.
+- 🧪 **Full Test Coverage:** 270+ automated tests passing with 100% version consistency validation.
 
 ---
 
@@ -33,7 +32,7 @@
 - **Copy or Move:** Safe copy by default; irreversible moves always require confirmation.
 - **Collision Protection:** Rename (e.g. `file (1).ext`), skip, or overwrite policies prevent accidental data loss.
 - **One-Click Undo:** Full rollback of the previous sort operation using journaled path records.
-- **Custom Categories & Smart Rules:** Extensible file extension rules and Unicode-aware keyword matching (e.g., `فاکتور` / `invoice`).
+- **Custom Categories & Smart Rules:** Extensible file extension rules and Unicode-aware keyword matching (e.g. `invoice`).
 
 ### 🔍 System & Disk Utilities
 - **Content-Identical Duplicate Finder:** Two-phase hashing (quick prefix + full SHA-256) detects duplicates across folders and drives with bulk-selection and trash management.

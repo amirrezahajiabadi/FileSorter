@@ -10,6 +10,18 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.3.0] — 2026-10-20
+
+### Changed
+- **English-only UI & Clean Typography.** The Persian language and its RTL layout were removed from
+  the whole project: the string table (`app/i18n.py`) is a single English map,
+  the language toggle and `toggle_language`/`get_strings(lang)` API are gone,
+  and category metadata no longer carries a `nameFa` field. The React UI
+  (`ui/`) and the Tauri frontend (`v2/`) drop their language switchers, RTL
+  blocks, Persian fonts (Estedad and Vazirmatn) and `fa-IR` number/date formatting;
+  the Tauri backend's error strings are English too. Clean typography is now unified
+  around Manrope, Inter, Space Grotesk, and JetBrains Mono.
+
 ## [6.2.0] — 2026-10-18
 
 ### Added
@@ -207,14 +219,14 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 ### Added
 - **System-Wide Cleanup.** The Junk Cleaner gains a **System-wide** section and the **Recycle Bin**:
   - Windows Temp (`C:/Windows/Temp`) now flows through the same scan/whitelist machinery as user junk, with unreadable sub-directories skipped silently and per-file deletions that need elevation reported and kept — the honest partial-result pattern from the drive scans.
-  - A new Recycle Bin block queries the shell (`SHQueryRecycleBinW`) for its real item count and size and empties it behind the existing two-step armed confirm (`SHEmptyRecycleBinW`), labeled in the app's language.
+  - A new Recycle Bin block queries the shell (`SHQueryRecycleBinW`) for its real item count and size and empties it behind the existing two-step armed confirm (`SHEmptyRecycleBinW`).
 - Zero new dependencies (`app/cleanup.py`, 9 new tests); live-verified against a real bin holding 27 items / 2.1 GB (queried, not emptied).
 
 ## [6.0.0] — 2026
 
 ### Added
 - **Always-On Background Mode.** The headless service now runs as a real background utility:
-  - `python main_web.py --headless --tray` keeps it under a **Windows system-tray icon** (`app/tray.py`) — a native WinForms NotifyIcon driven through pythonnet (already required by the windowed app, so still zero new dependencies) with *open in browser*, a *start with Windows* toggle, and a clean *quit*; the icon labels follow the app's saved language.
+  - `python main_web.py --headless --tray` keeps it under a **Windows system-tray icon** (`app/tray.py`) — a native WinForms NotifyIcon driven through pythonnet (already required by the windowed app, so still zero new dependencies) with *open in browser*, a *start with Windows* toggle, and a clean *quit*.
   - `python main_web.py --autostart on|off|status` (`app/autostart.py`) manages the silent run-at-login entry in the HKCU Run key — launched via pythonw from source, or the packaged exe when frozen — so the service and its scheduled tasks come up by themselves at boot, no admin rights.
 - Verified live: the real HKCU entry round-tripped on→off cleanly and a tray-mode service served requests through the full icon message pump. 25 new tests; zero new dependencies; the windowed app is untouched.
 
@@ -247,8 +259,8 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 ## [5.5.0] — 2026
 
 ### Added
-- **Smart Rules.** Sort by what a file *is called*, not only its type: ordered `{keywords → category}` rules match whole words in the filename stem (unicode-aware, so `فاکتور` matches «فاکتور-۱۴۰۳.pdf» the same way `invoice` matches `Invoice-2024.pdf`), and a matching rule wins over the extension fallback.
-- Rules flow through analysis, dry-run, the real sort and Watch mode alike (`app/sorter.py` → `AppController` → watcher), and are edited in a new Settings → Smart Rules tab with reordering. A rule whose target category gets deleted deactivates itself instead of erroring. 22 new tests; the browser demo sample gained `invoice-2024.pdf`/«فاکتور-1403.pdf» files so the re-routing is visible live.
+- **Smart Rules.** Sort by what a file *is called*, not only its type: ordered `{keywords → category}` rules match whole words in the filename stem (unicode-aware, so `invoice` matches `Invoice-2024.pdf`), and a matching rule wins over the extension fallback.
+- Rules flow through analysis, dry-run, the real sort and Watch mode alike (`app/sorter.py` → `AppController` → watcher), and are edited in a new Settings → Smart Rules tab with reordering. A rule whose target category gets deleted deactivates itself instead of erroring. 22 new tests; the browser demo sample gained `invoice-2024.pdf`/`invoice-1403.pdf` files so the re-routing is visible live.
 
 ## [5.4.0] — 2026
 
@@ -285,7 +297,7 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 ## [4.2.0] — 2026
 
 ### Added
-- First *real* Web UI screen (Phase 3 of [ROADMAP.md](ROADMAP.md), still parallel to the Tkinter app — run with `python main_web.py`, requires `pip install pywebview`). Features include: real folder picker, Sort (copy/move mode), duplicate handling (skip/rename/overwrite), Dry Run preview, Undo, Settings (categories), recent folders, theme toggle (dark/light), bilingual support (fa/en), self-hosted fonts (no CDN dependency), toast notifications, sorting animations, and Persian date formatting — all wired to the actual `AppController`.
+- First *real* Web UI screen (Phase 3 of [ROADMAP.md](ROADMAP.md), still parallel to the Tkinter app — run with `python main_web.py`, requires `pip install pywebview`). Features include: real folder picker, Sort (copy/move mode), duplicate handling (skip/rename/overwrite), Dry Run preview, Undo, Settings (categories), recent folders, theme toggle (dark/light), self-hosted fonts (no CDN dependency), toast notifications, and sorting animations — all wired to the actual `AppController`.
 
 ## [4.1.1] — 2026
 
@@ -360,7 +372,7 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 ## [3.0.0] — 2026
 
 ### Added
-- Bilingual UI (Persian/English), Dark/Light theme system with tuned palettes, full widget rebuild on toggle, settings now persist language & theme.
+- Dark/Light theme system with tuned palettes, full widget rebuild on toggle, settings now persist theme.
 
 ## [2.0.0] — 2026
 

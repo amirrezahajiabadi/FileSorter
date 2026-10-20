@@ -11,7 +11,7 @@ import {
   type SortPlan,
   type UndoReport,
 } from "./types";
-import { STRINGS, CATEGORY_LABELS_BILINGUAL, type Lang } from "./i18n";
+import { STRINGS, CATEGORY_LABELS } from "./i18n";
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
 type ActiveTab = "sort" | "dupes" | "disk" | "settings";
@@ -31,10 +31,6 @@ function formatBytes(n: number): string {
 export default function App() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     return (localStorage.getItem("fs_theme") as "dark" | "light") || "dark";
-  });
-
-  const [lang, setLang] = useState<Lang>(() => {
-    return (localStorage.getItem("fs_lang") as Lang) || "fa";
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("sort");
@@ -65,10 +61,9 @@ export default function App() {
   const [error, setError] = useState<string>("");
   const unlisteners = useRef<UnlistenFn[]>([]);
 
-  const t = STRINGS[lang];
-  const catLabels = CATEGORY_LABELS_BILINGUAL[lang];
-  const fmtNum = (n: number) => (lang === "fa" ? n.toLocaleString("fa-IR") : n.toLocaleString("en-US"));
-  const getCatLabel = (cat: string) => catLabels[cat] ?? cat;
+  const t = STRINGS;
+  const fmtNum = (n: number) => n.toLocaleString("en-US");
+  const getCatLabel = (cat: string) => CATEGORY_LABELS[cat] ?? cat;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -76,11 +71,10 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("lang", lang);
-    document.documentElement.setAttribute("dir", lang === "fa" ? "rtl" : "ltr");
-    document.documentElement.setAttribute("data-lang", lang);
-    localStorage.setItem("fs_lang", lang);
-  }, [lang]);
+    document.documentElement.setAttribute("lang", "en");
+    document.documentElement.setAttribute("dir", "ltr");
+    document.documentElement.setAttribute("data-lang", "en");
+  }, []);
 
   const toggleTheme = () => {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
@@ -350,13 +344,6 @@ export default function App() {
               <span className="capsule-btn-text">{t.reset_folder}</span>
             </button>
           )}
-          <button
-            className="capsule-btn-icon"
-            onClick={() => setLang(lang === "fa" ? "en" : "fa")}
-            title={lang === "fa" ? "Switch to English" : "تغییر به زبان فارسی"}
-          >
-            <span className="capsule-lang-text">{lang === "fa" ? "EN" : "فا"}</span>
-          </button>
           <button
             className="capsule-btn-icon"
             onClick={toggleTheme}
@@ -703,36 +690,10 @@ export default function App() {
         </section>
       )}
 
-      {/* TAB 4: Settings & Language */}
+      {/* TAB 4: Settings */}
       {activeTab === "settings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* Section 1: Language Switcher */}
-          <section className="glass settings-section">
-            <div className="settings-section-header">
-              <div>
-                <h3>{t.settings_lang_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>
-                  {t.settings_lang_desc}
-                </p>
-              </div>
-            </div>
-            <div className="lang-selector">
-              <button
-                className={`lang-btn ${lang === "fa" ? "active" : ""}`}
-                onClick={() => setLang("fa")}
-              >
-                {t.settings_lang_fa}
-              </button>
-              <button
-                className={`lang-btn ${lang === "en" ? "active" : ""}`}
-                onClick={() => setLang("en")}
-              >
-                {t.settings_lang_en}
-              </button>
-            </div>
-          </section>
-
-          {/* Section 2: Categories and File Formats */}
+          {/* Categories and File Formats */}
           <section className="glass">
             <div className="dupes-header" style={{ padding: "20px 24px 0" }}>
               <div>

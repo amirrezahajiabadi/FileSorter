@@ -14,8 +14,8 @@ is a side effect of good structure, not a goal on its own.
 
 ## Where things stand
 
-FileSorter is currently a solid, well-tested desktop file organizer: bilingual
-UI, dark/light themes, a proper package structure, automated tests + CI, and
+FileSorter is currently a solid, well-tested desktop file organizer: an
+English UI, dark/light themes, a proper package structure, automated tests + CI, and
 automated `.exe` releases on tag push. See [CHANGELOG.md](CHANGELOG.md)
 for the full version history.
 
@@ -77,12 +77,11 @@ Version numbers below are for organization only and can shift. See
   Tkinter app. Includes: folder picker, categories grid, sort (copy/move),
   duplicate handling (skip/rename/overwrite), analysis modal with charts,
   undo, settings (categories editor), recent folders, theme toggle,
-  bilingual (fa/en), self-hosted fonts, toast notifications,
-  sorting animations, Persian date formatting.
+  self-hosted fonts, toast notifications, sorting animations.
 - ✅ **v4.3** — Settings screen (categories) — fully implemented in v4.2
 - ✅ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection — fully implemented in v4.2
-- ✅ **v4.5** — Undo, bilingual (fa/en), and dark/light — fully implemented in v4.2
-- ✅ **v4.6** — Final polish: animations, visual details, full bilingual/theme
+- ✅ **v4.5** — Undo and dark/light — fully implemented in v4.2
+- ✅ **v4.6** — Final polish: animations, visual details, full theme
   testing — completed with toast notifications and self-hosted fonts
 - ✅ **v5.0** — 🎉 Old Tkinter UI removed entirely; the React UI (`ui/`) is
   the only interface. Official major release.
@@ -129,7 +128,7 @@ PowerToys. Candidate features, roughly in order of how naturally they fit:
 - ✅ **v5.8.0** — Drive-wide duplicate scanning: the Duplicates panel lists your drives and scans a whole drive for identical content — two-phase hashing with a cancel button that stops at the next file boundary and reports partial results (`app/duplicates.py` `cancel_event`, shared with the disk scan). 4 tests.
 - ✅ **v5.7.0** — Drive-wide disk analysis: the Storage panel lists your real drives (letter + free/total + usage bar) and scans a whole drive, not just a folder — unreadable system dirs skipped, progress streamed, and a Cancel button stops the walk at the next file and shows partial results (`app/disk_scan.py` `list_drives()` + `cancel_event`; `BaseApi.cancel_scan`). Verified live on a real 221.8 GB drive. 7 tests.
 - ✅ **v5.6.0** — Headless Service: the whole app runs with no window — `python main_web.py --headless` serves the React UI plus the exact same JSON vocabulary over a loopback HTTP server (JSON-RPC `POST /api` + Server-Sent Events `/events`), auth-gated by a per-run token (`app/service.py`; windowed app is now a thin subclass of the shared `app/api.py`). The browser preview now drives the real backend. This is the foundation drive-wide scans, scheduled runs, always-on watch and the AI module build on; zero new dependencies, 13 tests.
-- ✅ **v5.5.0** — Smart Rules: sort by filename, not just extension — ordered keyword→category rules beat the extension fallback (`invoice`/`فاکتور` → an "Invoices" folder), whole-word unicode matching, rules flow through analyze/plan/sort/watch and live in a Settings tab (`app/sorter.py` helpers, 22 tests). This is the seam a future content classifier will sit in.
+- ✅ **v5.5.0** — Smart Rules: sort by filename, not just extension — ordered keyword→category rules beat the extension fallback (`invoice` → an "Invoices" folder), whole-word unicode matching, rules flow through analyze/plan/sort/watch and live in a Settings tab (`app/sorter.py` helpers, 22 tests). This is the seam a future content classifier will sit in.
 - ✅ **v5.4.0** — Junk Cleaner: scans well-known user-scope junk locations (user temp, crash dumps, browser caches, thumbnail cache) and deletes what the user confirms — whitelisted to the scan's own results, two-step armed confirm, in-use files reported and kept (`app/cleanup.py`, 12 tests). Also fixed a desktop bug where dup/disk scans never emitted their done event.
 - ✅ **v5.3.0** — Disk space analysis: walks a chosen folder and shows what's actually eating the disk — per-category totals with a bar breakdown and the largest files — streamed over the JSON protocol (`app/disk_scan.py`, 8 tests). Drive-wide scanning is the headless-service follow-up.
 - ✅ **v5.2.0** — Duplicate Finder (per-folder): scans a chosen folder for content-identical files with two-phase hashing, groups them keeping one copy each, and deletes the selected copies behind a two-step confirm — deletion is whitelisted to the scan's own results (`app/duplicates.py`, 10 tests). Whole-drive scanning and scheduled cleanups are the headless-service follow-up.
@@ -149,7 +148,7 @@ a different category of tool wearing the same UI.
 ## 4. Smaller ideas worth keeping around
 
 - **Content-based smart rules** — sort by more than extension, e.g. a PDF with
-  "invoice" or "فاکتور" in the filename goes to a dedicated folder. A useful
+  "invoice" in the filename goes to a dedicated folder. A useful
   middle ground between plain extension rules and full AI analysis — much
   simpler to build, still genuinely smart.
 - **Watch / Scheduled mode** (already noted earlier in planning) — monitor a

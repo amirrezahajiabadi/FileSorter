@@ -117,34 +117,31 @@ def test_analyze_folder_empty_directory(tmp_path):
 #  build_suggestions
 # ══════════════════════════════════════════════════════════════════
 
-@pytest.mark.parametrize("lang", ["fa", "en"])
-def test_build_suggestions_empty_report_has_no_suggestions(lang):
+def test_build_suggestions_empty_report_has_no_suggestions():
     report = {
         "large_files": [], "old_files": [],
         "unknown_extensions": [], "by_category": {},
     }
-    assert build_suggestions(report, STRINGS[lang]) == []
+    assert build_suggestions(report, STRINGS) == []
 
 
-@pytest.mark.parametrize("lang", ["fa", "en"])
-def test_build_suggestions_flags_large_and_old_files(lang):
+def test_build_suggestions_flags_large_and_old_files():
     report = {
         "large_files": [("a.bin", 200_000_000)],
         "old_files": [("b.txt", 400)],
         "unknown_extensions": [],
         "by_category": {},
     }
-    suggestions = build_suggestions(report, STRINGS[lang])
+    suggestions = build_suggestions(report, STRINGS)
     assert len(suggestions) == 2
 
 
-@pytest.mark.parametrize("lang", ["fa", "en"])
-def test_build_suggestions_flags_many_others(lang):
+def test_build_suggestions_flags_many_others():
     report = {
         "large_files": [], "old_files": [], "unknown_extensions": [],
         "by_category": {"others": 6},
     }
-    suggestions = build_suggestions(report, STRINGS[lang])
+    suggestions = build_suggestions(report, STRINGS)
     assert len(suggestions) == 1
 
 
@@ -163,11 +160,12 @@ def test_match_rule_simple_keyword():
     assert match_rule_category("invoice.pdf", RULES_CATS, rules) == "invoices"
 
 
-def test_match_rule_persian_keyword():
-    rules = [{"keywords": ["فاکتور"], "category": "invoices"}]
-    assert match_rule_category("فاکتور-۱۴۰۳.pdf", RULES_CATS, rules) == "invoices"
-    # Persian digit token does not contain the keyword
-    assert match_rule_category("رسید.pdf", RULES_CATS, rules) is None
+def test_match_rule_unicode_keyword():
+    # Non-Latin scripts are matched the same way as ASCII words.
+    rules = [{"keywords": ["фактура"], "category": "invoices"}]
+    assert match_rule_category("фактура-2024.pdf", RULES_CATS, rules) == "invoices"
+    # A different token does not contain the keyword.
+    assert match_rule_category("квитанция.pdf", RULES_CATS, rules) is None
 
 
 def test_match_rule_whole_word_only():
@@ -207,11 +205,11 @@ def test_category_for_file_rule_beats_extension():
 
 def test_match_rule_category_multi_word_phrases():
     rules = [
-        {"keywords": ["bank statement", "صورت حساب"], "category": "invoices"}
+        {"keywords": ["bank statement", "выписка счет"], "category": "invoices"}
     ]
     assert match_rule_category("bank statement-2024.pdf", RULES_CATS, rules) == "invoices"
     assert match_rule_category("bank_statement.pdf", RULES_CATS, rules) == "invoices"
-    assert match_rule_category("صورت حساب دی ماه.pdf", RULES_CATS, rules) == "invoices"
+    assert match_rule_category("выписка счет декабрь.pdf", RULES_CATS, rules) == "invoices"
     assert match_rule_category("nonbank statement.pdf", RULES_CATS, rules) is None
 
 
@@ -226,7 +224,7 @@ def test_plan_sort_respects_rules(tmp_path):
     _write(tmp_path, "invoice-2024.pdf")
     _write(tmp_path, "letter.pdf")
     _write(tmp_path, "invoice_scan.jpg")
-    rules = [{"keywords": ["invoice", "فاکتور"], "category": "invoices"}]
+    rules = [{"keywords": ["invoice", "фактура"], "category": "invoices"}]
     plan = plan_sort(tmp_path, RULES_CATS, rules=rules)
     by_name = {p["name"]: p["category"] for p in plan}
     assert by_name["invoice-2024.pdf"] == "invoices"

@@ -4,8 +4,6 @@
  * mirror so the UI works in a plain browser.
  */
 
-import type { LangCode } from './protocol';
-
 export type StringTable = Record<string, string>;
 
 /** Look up one key, returning the key itself if it is missing. */
@@ -25,8 +23,4 @@ export function fmt(template: string, vars: Record<string, string | number>): st
 /** Flatten a multi-line template to a single readable line. */
 export function inline(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
-}
-
-export function langDir(lang: LangCode): 'rtl' | 'ltr' {
-  return lang === 'fa' ? 'rtl' : 'ltr';
 }

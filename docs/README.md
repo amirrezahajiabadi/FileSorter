@@ -2,7 +2,7 @@
 
 > Organize your files. Reclaim your disk. Keep it running in the background.
 
-A bilingual (فارسی / English) Windows desktop utility that sorts files into categorized
+An English-language Windows desktop utility that sorts files into categorized
 folders and helps you keep your disk clean — duplicate finder, disk-space analysis,
 junk cleaner, scheduled scans, system-tray background mode, and more. Built with a
 Python core and a React frontend; **zero runtime dependencies beyond `pywebview`**.
@@ -33,16 +33,15 @@ Python core and a React frontend; **zero runtime dependencies beyond `pywebview`
 | 🔍 **Duplicate Finder** | Finds content-identical files (two-phase hashing) in any folder or a whole drive, deletes the copies you pick behind a two-step confirm |
 | 📊 **Disk Analysis** | Shows what's eating your disk — per-category totals, size bars, largest files; scans folders or entire drives with a cancel button |
 | 🗑 **Junk Cleaner** | Finds and removes temp files & caches (user temp, crash dumps, browser caches, thumbnail cache, Windows Temp), plus a **Recycle Bin** status/empty |
-| 🧠 **Smart Rules** | Sorts by file *name*, not just extension — `invoice`/`فاکتور` → "Invoices"; unicode-aware whole-word matching, editable in Settings |
+| 🧠 **Smart Rules** | Sorts by file *name*, not just extension — `invoice` → "Invoices"; unicode-aware whole-word matching, editable in Settings |
 | 👀 **Watch Mode** | Auto-sorts newly arrived files in watched folders, live activity feed |
 | ⏰ **Scheduled Tasks** | Runs junk, disk and duplicate scans on a timer on the headless service — per-task intervals, Run now, recent-runs history |
 | 🪟 **Background Mode** | System-tray icon + **start with Windows** (`--autostart`) — the service is always on |
 
 ### Experience
-- **Bilingual** — full Persian and English, toggle anytime
 - **Dark / Light themes** — tuned palettes, every element legible in both
 - **Self-hosted fonts** — no CDN, works fully offline
-- Animated sorting line, toasts, Persian date formatting, recent folders, persisted settings
+- Animated sorting line, toasts, recent folders, persisted settings
 
 ---
 
@@ -87,7 +86,7 @@ FileSorter/
 │   ├── protocol.py              # typed JSON wire contract (events, state, plans)
 │   ├── controller.py            # AppController — all business logic
 │   ├── sorter.py                # pure sorting logic (categories, smart rules)
-│   ├── i18n.py                  # fa/en translations
+│   ├── i18n.py                  # English UI strings
 │   ├── settings_manager.py      # ~/.filesorter_settings.json persistence
 │   ├── api.py                   # BaseApi — shared window/web bridge
 │   ├── service.py               # headless HTTP/SSE service
