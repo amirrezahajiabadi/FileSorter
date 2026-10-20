@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -12,9 +12,51 @@ import {
   type UndoReport,
 } from "./types";
 import { STRINGS, CATEGORY_LABELS } from "./i18n";
-import PdfStudio from "./PdfStudio";
-import BatchRenamer from "./BatchRenamer";
-import ImageStudio from "./ImageStudio";
+
+const BatchRenamer = lazy(() => import("./BatchRenamer"));
+const ImageStudio = lazy(() => import("./ImageStudio"));
+const PdfStudio = lazy(() => import("./PdfStudio"));
+
+export type Theme = "dark" | "light" | "aurora" | "sunset";
+
+export interface ThemeMeta {
+  id: Theme;
+  name: string;
+  icon: string;
+  desc: string;
+  swatch: string[];
+}
+
+export const THEMES: ThemeMeta[] = [
+  {
+    id: "dark",
+    name: "Midnight Dark",
+    icon: "🌑",
+    desc: "Deep obsidian liquid glass with pure contrast and specular lines",
+    swatch: ["#07090e", "#161b26", "#ffffff"],
+  },
+  {
+    id: "light",
+    name: "Crystal Light",
+    icon: "☀️",
+    desc: "Bright frosted ice crystal glass with pristine clarity",
+    swatch: ["#eef2f7", "#ffffff", "#0f172a"],
+  },
+  {
+    id: "aurora",
+    name: "Cyber Aurora",
+    icon: "🌌",
+    desc: "Iridescent glass infused with vivid cyan, violet & emerald refraction",
+    swatch: ["#050814", "#06b6d4", "#a855f7"],
+  },
+  {
+    id: "sunset",
+    name: "Ruby Sunset",
+    icon: "🌅",
+    desc: "Warm crimson velvet glass glowing with magenta & amber refraction",
+    swatch: ["#0f0614", "#f43f5e", "#f97316"],
+  },
+];
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
 type ActiveTab = "sort" | "dupes" | "disk" | "renamer" | "images" | "pdf" | "settings";
@@ -32,8 +74,12 @@ function formatBytes(n: number): string {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    return (localStorage.getItem("fs_theme") as "dark" | "light") || "dark";
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem("fs_theme") as Theme | null;
+    if (saved && ["dark", "light", "aurora", "sunset"].includes(saved)) {
+      return saved;
+    }
+    return "dark";
   });
 
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(() => {
@@ -91,14 +137,32 @@ export default function App() {
     document.documentElement.setAttribute("data-lang", "en");
   }, []);
 
-  const toggleTheme = () => {
-    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const cycleTheme = () => {
+    setTheme((current) => {
+      const idx = THEMES.findIndex((t) => t.id === current);
+      return THEMES[(idx + 1) % THEMES.length].id;
+    });
   };
 
   useEffect(() => {
+    let scanRafId: number | null = null;
+    let latestScan: ScanProgress | null = null;
+
     const subs: Promise<UnlistenFn>[] = [
-      listen<ScanProgress>("scan-progress", (e) => setScan(e.payload)),
+      listen<ScanProgress>("scan-progress", (e) => {
+        latestScan = e.payload;
+        if (scanRafId === null) {
+          scanRafId = requestAnimationFrame(() => {
+            if (latestScan) setScan(latestScan);
+            scanRafId = null;
+          });
+        }
+      }),
       listen<{ stopped: boolean }>("scan-done", (e) => {
+        if (scanRafId !== null) {
+          cancelAnimationFrame(scanRafId);
+          scanRafId = null;
+        }
         setPhase(e.payload.stopped ? "idle" : "ready");
         setScan((s) => (s ? { ...s, done: true } : s));
       }),
@@ -397,7 +461,7 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Bottom: Quick Action Controls */}
+        {/* Bottom: Quick Action Controls & Theme Switcher */}
         <div className="sidebar-footer">
           {folder && (
             <button type="button" className="sidebar-action-btn" onClick={reset} title={t.reset_folder}>
@@ -405,19 +469,40 @@ export default function App() {
               {sidebarExpanded && <span className="sidebar-tab-label">{t.reset_folder}</span>}
             </button>
           )}
-          <button
-            type="button"
-            className="sidebar-action-btn"
-            onClick={toggleTheme}
-            title={theme === "dark" ? t.theme_light : t.theme_dark}
-          >
-            <span className="sidebar-tab-icon">{theme === "dark" ? "☀️" : "🌙"}</span>
-            {sidebarExpanded && (
-              <span className="sidebar-tab-label">
-                {theme === "dark" ? t.theme_light : t.theme_dark}
-              </span>
-            )}
-          </button>
+          {sidebarExpanded ? (
+            <div className="theme-switcher-box">
+              <div className="theme-switcher-header">
+                <span className="theme-switcher-title">🎨 {t.theme_title}</span>
+                <span className="theme-switcher-active-badge">
+                  {THEMES.find((x) => x.id === theme)?.name}
+                </span>
+              </div>
+              <div className="theme-grid-selector">
+                {THEMES.map((th) => (
+                  <button
+                    key={th.id}
+                    type="button"
+                    className={`theme-chip-btn ${theme === th.id ? "active" : ""}`}
+                    onClick={() => setTheme(th.id)}
+                    title={th.desc}
+                  >
+                    <span className="theme-chip-icon">{th.icon}</span>
+                    <span className="theme-chip-name">{th.name.split(" ")[0]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="sidebar-action-btn"
+              onClick={cycleTheme}
+              title={`Theme: ${THEMES.find((x) => x.id === theme)?.name} (Click to switch)`}
+              aria-label="Cycle theme"
+            >
+              <span className="sidebar-tab-icon">{THEMES.find((x) => x.id === theme)?.icon}</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -761,17 +846,71 @@ export default function App() {
       )}
 
       {/* TAB: Smart Batch Renamer */}
-      {activeTab === "renamer" && <BatchRenamer />}
+      {activeTab === "renamer" && (
+        <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Batch Renamer…</p></div>}>
+          <BatchRenamer />
+        </Suspense>
+      )}
 
       {/* TAB: Image Studio */}
-      {activeTab === "images" && <ImageStudio />}
+      {activeTab === "images" && (
+        <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Image Studio…</p></div>}>
+          <ImageStudio />
+        </Suspense>
+      )}
 
       {/* TAB: PDF Studio */}
-      {activeTab === "pdf" && <PdfStudio />}
+      {activeTab === "pdf" && (
+        <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading PDF Studio…</p></div>}>
+          <PdfStudio />
+        </Suspense>
+      )}
 
       {/* TAB 4: Settings */}
       {activeTab === "settings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Theme & Visual Appearance */}
+          <section className="glass" style={{ padding: "20px 24px" }}>
+            <div style={{ marginBottom: "16px" }}>
+              <h3 style={{ margin: "0 0 6px 0", fontSize: "16px", fontWeight: 700 }}>
+                🎨 {t.theme_title}
+              </h3>
+              <p className="muted" style={{ margin: 0, fontSize: "13px" }}>
+                {t.theme_desc}
+              </p>
+            </div>
+
+            <div className="theme-cards-grid">
+              {THEMES.map((th) => (
+                <div
+                  key={th.id}
+                  className={`theme-card ${theme === th.id ? "active" : ""}`}
+                  onClick={() => setTheme(th.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setTheme(th.id);
+                    }
+                  }}
+                >
+                  <div className="theme-card-top">
+                    <span className="theme-card-icon">{th.icon}</span>
+                    <span className="theme-card-title">{th.name}</span>
+                    {theme === th.id && <span className="theme-card-badge">Active</span>}
+                  </div>
+                  <p className="theme-card-desc">{th.desc}</p>
+                  <div className="theme-card-swatches">
+                    {th.swatch.map((c, i) => (
+                      <span key={i} className="theme-swatch-dot" style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* Categories and File Formats */}
           <section className="glass">
             <div className="dupes-header" style={{ padding: "20px 24px 0" }}>

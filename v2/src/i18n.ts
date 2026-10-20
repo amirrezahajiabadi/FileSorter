@@ -4,6 +4,8 @@ export interface I18nStrings {
   reset_folder: string;
   theme_dark: string;
   theme_light: string;
+  theme_title: string;
+  theme_desc: string;
   tab_sort: string;
   tab_dupes: string;
   tab_disk: string;
@@ -77,6 +79,8 @@ export const STRINGS: I18nStrings = {
   reset_folder: "↺ New Folder",
   theme_dark: "Switch to dark theme",
   theme_light: "Switch to light theme",
+  theme_title: "Theme & Appearance",
+  theme_desc: "Choose from liquid glass themes: pure dark, crystal light, or glowing chromatic glass combinations.",
   tab_sort: "File Sorter",
   tab_dupes: "Duplicate Finder",
   tab_disk: "Disk Space Analyzer",
