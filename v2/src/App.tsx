@@ -36,6 +36,18 @@ export default function App() {
     return (localStorage.getItem("fs_theme") as "dark" | "light") || "dark";
   });
 
+  const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(() => {
+    return localStorage.getItem("fs_sidebar_expanded") !== "false";
+  });
+
+  const toggleSidebar = () => {
+    setSidebarExpanded((prev) => {
+      const next = !prev;
+      localStorage.setItem("fs_sidebar_expanded", String(next));
+      return next;
+    });
+  };
+
   const [activeTab, setActiveTab] = useState<ActiveTab>("sort");
   const [phase, setPhase] = useState<Phase>("idle");
   const [folder, setFolder] = useState<string>("");
@@ -290,109 +302,140 @@ export default function App() {
   const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
 
   return (
-    <main className="app">
-      {/* Floating Capsule Navbar (Supaste Style) */}
-      <header className="capsule-nav">
-        {/* Left: Brand */}
-        <div className="capsule-brand">
-          <div className="capsule-logo">
-            <span className="capsule-logo-icon">⚡</span>
+    <div className={`app-layout ${sidebarExpanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
+      {/* Left Glass Vertical Sidebar */}
+      <aside className="sidebar-glass" aria-label="Sidebar Navigation">
+        {/* Top: Brand & Collapse Toggle */}
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="sidebar-logo">
+              <span className="sidebar-logo-icon">⚡</span>
+            </div>
+            {sidebarExpanded && (
+              <div className="sidebar-title-group">
+                <span className="sidebar-title">{t.app_title}</span>
+                <span className="sidebar-badge">v2.0</span>
+              </div>
+            )}
           </div>
-          <span className="capsule-title">{t.app_title}</span>
-          <span className="capsule-badge">v2.0</span>
+          <button
+            type="button"
+            className="sidebar-toggle-btn"
+            onClick={toggleSidebar}
+            title={sidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+            aria-label={sidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+          >
+            {sidebarExpanded ? "◀" : "▶"}
+          </button>
         </div>
 
-        {/* Center: Segmented Floating Tabs */}
-        <nav className="capsule-tabs">
+        {/* Center: Vertical Navigation Tabs */}
+        <nav className="sidebar-nav">
           <button
-            className={`capsule-tab ${activeTab === "sort" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "sort" ? "active" : ""}`}
             onClick={() => setActiveTab("sort")}
             title={t.tab_sort}
           >
-            <span className="tab-icon">📁</span>
-            <span className="tab-label">{t.tab_sort}</span>
+            <span className="sidebar-tab-icon">📁</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_sort}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "dupes" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "dupes" ? "active" : ""}`}
             onClick={() => setActiveTab("dupes")}
             title={t.tab_dupes}
           >
-            <span className="tab-icon">🔍</span>
-            <span className="tab-label">{t.tab_dupes}</span>
-            {dupes.length > 0 && <span className="capsule-tab-badge">{dupes.length}</span>}
+            <span className="sidebar-tab-icon">🔍</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_dupes}</span>}
+            {dupes.length > 0 && <span className="sidebar-tab-badge">{dupes.length}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "renamer" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "renamer" ? "active" : ""}`}
             onClick={() => setActiveTab("renamer")}
             title={t.tab_renamer}
           >
-            <span className="tab-icon">✏️</span>
-            <span className="tab-label">{t.tab_renamer}</span>
+            <span className="sidebar-tab-icon">✏️</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_renamer}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "images" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "images" ? "active" : ""}`}
             onClick={() => setActiveTab("images")}
             title={t.tab_images}
           >
-            <span className="tab-icon">🖼️</span>
-            <span className="tab-label">{t.tab_images}</span>
+            <span className="sidebar-tab-icon">🖼️</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_images}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "pdf" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "pdf" ? "active" : ""}`}
             onClick={() => setActiveTab("pdf")}
             title={t.tab_pdf}
           >
-            <span className="tab-icon">📑</span>
-            <span className="tab-label">{t.tab_pdf}</span>
+            <span className="sidebar-tab-icon">📑</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_pdf}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "disk" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "disk" ? "active" : ""}`}
             onClick={() => setActiveTab("disk")}
             title={t.tab_disk}
           >
-            <span className="tab-icon">📊</span>
-            <span className="tab-label">{t.tab_disk}</span>
+            <span className="sidebar-tab-icon">📊</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_disk}</span>}
           </button>
           <button
-            className={`capsule-tab ${activeTab === "settings" ? "active" : ""}`}
+            type="button"
+            className={`sidebar-tab ${activeTab === "settings" ? "active" : ""}`}
             onClick={() => setActiveTab("settings")}
             title={t.tab_settings}
           >
-            <span className="tab-icon">⚙️</span>
-            <span className="tab-label">{t.tab_settings}</span>
+            <span className="sidebar-tab-icon">⚙️</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_settings}</span>}
           </button>
         </nav>
 
-        {/* Right: Quick Action Controls */}
-        <div className="capsule-actions">
+        {/* Bottom: Quick Action Controls */}
+        <div className="sidebar-footer">
           {folder && (
-            <button className="capsule-btn-pill" onClick={reset} title={t.reset_folder}>
-              <span>↺</span>
-              <span className="capsule-btn-text">{t.reset_folder}</span>
+            <button type="button" className="sidebar-action-btn" onClick={reset} title={t.reset_folder}>
+              <span className="sidebar-tab-icon">↺</span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.reset_folder}</span>}
             </button>
           )}
           <button
-            className="capsule-btn-icon"
+            type="button"
+            className="sidebar-action-btn"
             onClick={toggleTheme}
             title={theme === "dark" ? t.theme_light : t.theme_dark}
           >
-            {theme === "dark" ? "☀️" : "🌙"}
+            <span className="sidebar-tab-icon">{theme === "dark" ? "☀️" : "🌙"}</span>
+            {sidebarExpanded && (
+              <span className="sidebar-tab-label">
+                {theme === "dark" ? t.theme_light : t.theme_dark}
+              </span>
+            )}
           </button>
         </div>
-      </header>
+      </aside>
 
-      {error && (
-        <div className="error-bar" role="alert" onClick={() => setError("")}>
-          <span>⚠️ {error}</span>
-          <span style={{ fontSize: "12px", opacity: 0.8 }}>✕</span>
-        </div>
-      )}
+      {/* Main Content Area */}
+      <main className="content-area">
+        <div className="content-container">
+          {error && (
+            <div className="error-bar" role="alert" onClick={() => setError("")}>
+              <span>⚠️ {error}</span>
+              <span style={{ fontSize: "12px", opacity: 0.8 }}>✕</span>
+            </div>
+          )}
 
-      {settingsNotice && (
-        <div className="notice-bar glass">
-          <span>✓ {settingsNotice}</span>
-        </div>
-      )}
+          {settingsNotice && (
+            <div className="notice-bar glass">
+              <span>✓ {settingsNotice}</span>
+            </div>
+          )}
 
       {/* TAB 1: Sorter */}
       {activeTab === "sort" && (
@@ -795,8 +838,10 @@ export default function App() {
       )}
 
       <footer className="muted">
-        {t.footer_text} <span className="mono">{t.footer_journal}</span>
-      </footer>
-    </main>
+            {t.footer_text} <span className="mono">{t.footer_journal}</span>
+          </footer>
+        </div>
+      </main>
+    </div>
   );
 }
