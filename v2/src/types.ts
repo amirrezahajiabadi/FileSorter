@@ -88,3 +88,16 @@ export const CATEGORY_ICONS: Record<string, string> = {
   fonts: "A",
   others: "•",
 };
+
+export interface ExtractedImagePayload {
+  filename: string;
+  data: number[];
+}
+
+export interface SaveImagesReport {
+  target_dir: string;
+  saved_count: number;
+  total_bytes: number;
+  file_paths: string[];
+}
+

@@ -14,6 +14,7 @@
 - **Duplicate Cleaner:** Fast SHA-256 detection to find and remove identical duplicate files.
 - **Disk Analyzer:** Visual breakdown of folder space and largest files.
 - **Junk Cleaner:** Safely clean temporary caches, crash dumps, and empty Recycle Bin.
+- **PDF Studio:** Convert collections of images to PDF documents or extract all pages as high-resolution images.
 - **Modern UI:** Sleek, responsive interface with Dark/Light themes.
 
 ---

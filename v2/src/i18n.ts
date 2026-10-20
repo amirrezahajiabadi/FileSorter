@@ -7,7 +7,12 @@ export interface I18nStrings {
   tab_sort: string;
   tab_dupes: string;
   tab_disk: string;
+  tab_pdf: string;
   tab_settings: string;
+  pdf_title: string;
+  pdf_desc: string;
+  pdf_mode_img2pdf: string;
+  pdf_mode_pdf2img: string;
   hero_title: string;
   hero_subtitle: string;
   hero_drop_btn: string;
@@ -73,7 +78,12 @@ export const STRINGS: I18nStrings = {
   tab_sort: "File Sorter",
   tab_dupes: "Duplicate Finder",
   tab_disk: "Disk Space Analyzer",
+  tab_pdf: "PDF Studio",
   tab_settings: "Settings",
+  pdf_title: "PDF Studio",
+  pdf_desc: "Convert image collections into clean PDF documents or extract all pages & pictures from existing PDFs.",
+  pdf_mode_img2pdf: "Images to PDF",
+  pdf_mode_pdf2img: "PDF to Images",
   hero_title: "Select a folder to organize",
   hero_subtitle: "Scan, plan, and categorize your files instantly without UI freezing.",
   hero_drop_btn: "📁 Browse Folder",

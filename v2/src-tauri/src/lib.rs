@@ -9,6 +9,7 @@
 pub mod categories;
 pub mod dupes;
 pub mod execute;
+pub mod pdf_ops;
 pub mod plan;
 pub mod undo;
 pub mod walk;
@@ -373,7 +374,15 @@ pub fn run() {
             get_categories,
             set_categories,
             reset_categories,
-            get_disk_stats
+            get_disk_stats,
+            pdf_ops::pick_image_files,
+            pdf_ops::pick_pdf_file,
+            pdf_ops::pick_save_pdf,
+            pdf_ops::pick_output_folder,
+            pdf_ops::read_file_binary,
+            pdf_ops::write_file_binary,
+            pdf_ops::save_extracted_images,
+            pdf_ops::open_in_file_manager
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

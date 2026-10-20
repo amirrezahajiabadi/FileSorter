@@ -10,6 +10,14 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.4.0] — 2026-10-20
+
+### Added
+- **PDF Studio (Images to PDF & PDF Page Extraction):**
+  - **Images to PDF:** Select multiple image files (JPG, PNG, WebP, BMP, GIF), visually reorder pages, configure page dimensions (Fit-to-Image, A4 Portrait, A4 Landscape) and margins, and compile them into a high-quality PDF document.
+  - **PDF to Images:** Parse and extract pages from any PDF document into crisp PNG or JPEG image files with customizable DPI scaling (150 DPI to 300 DPI) and selective page range support.
+  - **Native Rust I/O & Dialogs (`src/v2/src-tauri/src/pdf_ops.rs`):** Fast multi-file reading, batch image exporting, and one-click reveal in Windows Explorer.
+
 ## [6.3.0] — 2026-10-20
 
 ### Changed

@@ -10,7 +10,7 @@ export const STRINGS_MIRROR: Record<string, string> = {
   "edit_category_title": "Edit:",
   "extensions_label": "Extensions (one per line)",
   "header_subtitle": "Select a folder and click Analyze & Sort",
-  "dev_line": "Developed by HajAmir  \u2022  v6.3.0",
+  "dev_line": "Developed by HajAmir  \u2022  v6.4.0",
   "settings_btn": "\u2699  Settings",
   "selected_folder_label": "Selected Folder:",
   "no_folder": "No folder selected",

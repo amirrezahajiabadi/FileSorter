@@ -12,9 +12,10 @@ import {
   type UndoReport,
 } from "./types";
 import { STRINGS, CATEGORY_LABELS } from "./i18n";
+import PdfStudio from "./PdfStudio";
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
-type ActiveTab = "sort" | "dupes" | "disk" | "settings";
+type ActiveTab = "sort" | "dupes" | "disk" | "pdf" | "settings";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -325,6 +326,14 @@ export default function App() {
           >
             <span className="tab-icon">📊</span>
             <span className="tab-label">{t.tab_disk}</span>
+          </button>
+          <button
+            className={`capsule-tab ${activeTab === "pdf" ? "active" : ""}`}
+            onClick={() => setActiveTab("pdf")}
+            title={t.tab_pdf}
+          >
+            <span className="tab-icon">📑</span>
+            <span className="tab-label">{t.tab_pdf}</span>
           </button>
           <button
             className={`capsule-tab ${activeTab === "settings" ? "active" : ""}`}
@@ -689,6 +698,9 @@ export default function App() {
           )}
         </section>
       )}
+
+      {/* TAB: PDF Studio */}
+      {activeTab === "pdf" && <PdfStudio />}
 
       {/* TAB 4: Settings */}
       {activeTab === "settings" && (
