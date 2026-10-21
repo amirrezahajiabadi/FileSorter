@@ -1,48 +1,71 @@
-# FileSorter v2
+# FileSorter v2 — Flagship Desktop Edition
 
-A complete rewrite of FileSorter on **Tauri 2 + Rust**: a ~6 MB binary (down
-from 27 MB), sub-second start-up, no Python<->Web bridge and no lag.
+The primary, canonical edition of FileSorter built on **Tauri 2 + Rust + React 19**: a ~6 MB binary, sub-second startup, zero UI freezing, and full desktop feature parity.
 
-## Features (MVP)
-- Fast, parallel folder scanning (the `ignore` crate; a batch roughly every ~150 ms to the UI)
-- Three-stage duplicate analysis: size -> 64 KB prefix hash -> full SHA-256, with a persistent cache (a re-scan only hashes changed files)
-- Sorting into `sorted/<category>/` with `name (2).ext` naming - never overwrites
-- Moves via rename within a volume (instant), copy + verify + delete across volumes
-- Atomic undo journal in `%APPDATA%\FileSorterV2\undo` - crash-resistant, one-click undo
-- Locked files are skipped and reported; the app never crashes
-- Dark glassmorphism UI, self-hosted Manrope font
+---
 
-## Run and build
+## ⚡ Shipped Capabilities (Phase 1 Roadmap)
+
+- **Smart File Organizer:** Parallel folder scanning, rule matching, dry-run previews, and collision-free sorting (`sorted/<category>/`).
+- **Smart Keyword Rules:** Custom filename token matching rules prioritizing specific categories before standard file extension fallbacks.
+- **Junk & Cache Cleaner:** Safe user-scope purging of temporary files, browser caches (Chrome, Edge, Firefox), crash dumps, and Explorer thumbnail DBs.
+- **3-Stage Duplicate Finder:** Size matching → 64 KB prefix hash → full SHA-256 chunked hashing with persistent hash cache and quarantine support.
+- **Disk Space Analyzer:** Visual capacity inspection of system storage volumes (C:, D:) alongside folder-level category breakdowns and top largest files.
+- **Background Watch Mode:** Continuous folder monitoring (e.g. `Downloads`, `Desktop`) with automatic, instant organization of arriving files.
+- **Automated Task Scheduler:** Periodic background daemon running routine junk cleanups or folder sorts on user-defined intervals.
+- **Smart Batch Renamer:** Powerful bulk file renamer with RegEx substitution, prefixes, suffixes, sequential numbering, and case normalization.
+- **Image Studio:** Bulk image optimization and format conversion (WebP, JPEG, PNG) with dimension clamping and live size reduction metrics.
+- **PDF Studio:** Convert image collections into PDF documents or extract all pages as high-resolution images.
+- **Complete Journaled Undo:** Crash-resistant atomic journal in `%APPDATA%\FileSorterV2\undo` allows one-click rollback of any operation.
+- **Liquid Glass Design System:** 4 crafted themes (Midnight Dark, Crystal Light, Cyber Aurora, Ruby Sunset), accessible focus states (`:focus-visible`), and self-hosted Manrope variable typography.
+- **Interactive Onboarding:** 4-step guided tour introducing new users to the engine, theme selection, and core features.
+- **Integrated Auto-Update:** Built-in release check against GitHub API with one-click download and upgrade.
+
+---
+
+## 🚀 Run and Build
+
 ```bash
 cd v2
 npm install
-npm run tauri dev      # development run
-npm run tauri build    # release build + NSIS installer
-npm run tauri build -- --no-bundle   # exe only
+npm run tauri dev      # Development run with live reload
+npm run tauri build    # Release build + NSIS installer
 ```
 
 Outputs:
-- `src-tauri/target/release/filesorter2.exe` - standalone binary (~6.1 MB)
-- `src-tauri/target/release/bundle/nsis/FileSorter_2.0.0_x64-setup.exe` - installer (~2.1 MB)
+- `src-tauri/target/release/filesorter2.exe` — standalone portable executable (~6.5 MB)
+- `src-tauri/target/release/bundle/nsis/FileSorter_6.6.0_x64-setup.exe` — Windows installer (~2.4 MB)
 
-## Tests
+---
+
+## 🧪 Tests
+
 ```bash
-cd src-tauri && cargo test     # 16 core tests (walk/plan/dupes/undo/categories)
-cargo clippy --all-targets     # zero warnings
+cd src-tauri
+cargo test     # 22 unit tests passing
 ```
 
-## Architecture
+---
+
+## 🏗️ Architecture
+
 ```
 src-tauri/src/
-|-- categories.rs   categories + settings (atomic settings.json)
-|-- walk.rs         walk with StopFlag and time-batched delivery
-|-- dupes.rs        three-stage hash pipeline + JSON cache
-|-- plan.rs         plan building (pure, no filesystem access)
-|-- execute.rs      plan execution + duplicate quarantine
-`-- undo.rs         atomic journal + reverse replay
+|-- categories.rs    categories, smart rules, settings persistence
+|-- cleanup_ops.rs   junk and cache cleaner (safe user-scope cleaning)
+|-- disk_ops.rs      system drive enumeration and capacity query
+|-- dupes.rs         three-stage duplicate pipeline + persistent cache
+|-- execute.rs       plan execution + duplicate quarantine
+|-- image_ops.rs     native image optimization and format conversion
+|-- pdf_ops.rs       native PDF creation and page extraction
+|-- plan.rs          smart rules matching and pure destination planning
+|-- rename_ops.rs    batch renamer engine with journaled undo
+|-- schedule_ops.rs  background daemon running periodic automated tasks
+|-- undo.rs          atomic journal + reverse replay
+|-- update_ops.rs    GitHub releases auto-update checker
+|-- walk.rs          fast directory traversal with StopFlag
+|-- watch_ops.rs     background directory monitor and auto-sorter
+`-- lib.rs           Tauri 2 commands and event wiring
 ```
-Every long operation runs on its own thread and reports progress to the UI
-through events (`scan-progress`, `sort-done`, ...); the webview never blocks.
 
-Version 1 (Python) remains untouched at the repository root so v2 stays fully
-in step with it.
+Every long operation runs on its own background thread and streams progress events (`scan-progress`, `sort-done`, `watch-event`, `scheduled-task-done`), ensuring the webview never blocks.

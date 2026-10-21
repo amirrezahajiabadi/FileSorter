@@ -10,6 +10,43 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.6.0] — 2026-10-21 (Phase 1 Roadmap Complete)
+
+### Added
+- **Native Tauri 2 Flagship Transition & Architecture Stabilization:**
+  - Declared the Tauri 2 + Rust native architecture (`v2/`) as the official primary product edition.
+  - Transitioned the legacy Python v1 core to **Maintenance Mode (LTS)** with feature development frozen.
+- **Smart Keyword Rules (`categories.rs` + `plan.rs`):**
+  - Priority filename token matching engine that maps keywords to categories before falling back to extension matching.
+  - Full persistence in `settings.json` and interactive manager in the Settings tab.
+- **Junk & Cache Cleaner (`cleanup_ops.rs`):**
+  - Native scanner and cleaner for user-scope temporary files, application crash dumps, browser caches (Chrome, Edge, Firefox), and Windows Explorer thumbnail databases.
+  - Resilient execution: locked and permission-restricted files are reported and skipped without crashing.
+- **Background Watch Mode (`watch_ops.rs`):**
+  - Multi-directory polling watcher monitoring folders (e.g. `Downloads`, `Desktop`) for newly appearing files.
+  - Automatically sorts files into category destinations based on categories and smart rules.
+  - Live activity stream in the UI with real-time event reporting.
+- **Automated Task Scheduler (`schedule_ops.rs`):**
+  - Background daemon thread executing timed maintenance tasks (junk cleanup, automated folder sorting) on configurable intervals.
+  - Complete execution history and manual "Run Now" triggers.
+- **System Drive Capacity Analyzer (`disk_ops.rs`):**
+  - Windows logical drive discovery (`GetLogicalDrives` and `GetDiskFreeSpaceExW`) providing real-time volume utilization metrics across all local disks (C:, D:, etc.).
+- **Auto-Update Engine (`update_ops.rs` + `UpdateModal.tsx`):**
+  - In-app version checker querying GitHub Releases API with semantic version comparison.
+  - Dedicated update modal presenting release changelog highlights and one-click direct download links.
+- **Liquid Glass Design System & Accessibility:**
+  - Extended design tokens (spacing, radii, typography, glass refraction).
+  - High-contrast `:focus-visible` styling for comprehensive keyboard navigation.
+  - ARIA modal dialogs with focus trapping, Escape key dismissals, and live screen-reader regions.
+- **First-Run Onboarding Tour (`OnboardingModal.tsx`):**
+  - 4-step interactive guided introduction showcasing the Rust engine, live theme picker, feature highlights, and quick start folder picker.
+
+### Tests
+- 22 native Rust unit tests covering plan generation, smart rules, junk scanning, duplicate hashing, drive listing, and schedule managers.
+- All 270 Python maintenance test suites passing.
+
+---
+
 ## [6.5.0] — 2026-10-21
 
 ### Added

@@ -5,6 +5,82 @@ export interface PlannedMove {
   destination: string;
   category: string;
   size: number;
+  matched_rule?: string | null;
+}
+
+export interface SmartRule {
+  id: string;
+  name: string;
+  category: string;
+  keywords: string[];
+}
+
+export interface JunkLocation {
+  id: string;
+  name: string;
+  description: string;
+  paths: string[];
+  file_count: number;
+  total_bytes: number;
+}
+
+export interface CleanReport {
+  files_deleted: number;
+  bytes_freed: number;
+  files_failed: number;
+  skipped_locked: string[];
+}
+
+export interface WatchEventPayload {
+  folder: string;
+  filename: string;
+  category: string;
+  action: string;
+  timestamp: number;
+  error?: string | null;
+}
+
+export interface WatchStatus {
+  active: boolean;
+  folders: string[];
+  recent_events: WatchEventPayload[];
+}
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  kind: "junk" | "sort";
+  folder?: string | null;
+  interval_minutes: number;
+  enabled: boolean;
+  last_run?: number | null;
+}
+
+export interface TaskRunResult {
+  task_id: string;
+  task_name: string;
+  success: boolean;
+  summary: string;
+  timestamp: number;
+}
+
+export interface DriveInfo {
+  letter: string;
+  path: string;
+  total_bytes: number;
+  free_bytes: number;
+  used_bytes: number;
+}
+
+export interface UpdateCheckResult {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  release_name: string;
+  release_notes: string;
+  published_at: string;
+  download_url: string;
+  html_url: string;
 }
 
 export interface SortPlan {

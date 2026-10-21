@@ -23,6 +23,18 @@ The ideas below are about what comes *after* that foundation is fully settled.
 
 ---
 
+## 0. Phase 1 — Native Tauri v2 Transition & Parity Completion
+
+**Status:** ✅ complete — shipped as v6.6.0.
+
+- **Architecture Stabilization:** FileSorter v2 (`v2/` directory, Tauri 2 + Rust) officially declared as the primary flagship product. The legacy Python v1 engine transitioned to Maintenance Mode (LTS).
+- **Core Parity Delivered:** Smart Keyword Rules, Junk & Cache Cleaner, 3-stage Duplicate Finder, Disk Space Analyzer with drive monitoring, Background Watch Mode, and Automated Task Scheduler.
+- **Auto-Update Engine:** Built-in release check against GitHub Releases API with one-click installer downloads.
+- **Liquid Glass Design System:** Unified tokens, 4 themes, and accessible keyboard focus states (`:focus-visible`).
+- **First-Run Onboarding:** Guided 4-step walkthrough for theme selection and feature onboarding.
+
+---
+
 ## 1. UI/UX Overhaul
 
 **Status:** ✅ complete — shipped as v5.0.0.

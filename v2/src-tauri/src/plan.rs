@@ -14,6 +14,7 @@ pub struct PlannedMove {
     pub destination: PathBuf,
     pub category: String,
     pub size: u64,
+    pub matched_rule: Option<String>,
 }
 
 #[derive(serde::Serialize, Default)]
@@ -26,6 +27,49 @@ pub struct SortPlan {
     pub total_size: u64,
 }
 
+pub fn match_smart_rule(
+    path: &Path,
+    rules: &[crate::categories::SmartRule],
+    valid_categories: &std::collections::HashSet<&str>,
+) -> Option<(String, String)> {
+    let stem = path.file_stem()?.to_string_lossy().to_lowercase();
+    let tokens: Vec<&str> = stem
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if tokens.is_empty() {
+        return None;
+    }
+    let token_set: std::collections::HashSet<&str> = tokens.iter().copied().collect();
+    let stem_norm = format!(" {} ", tokens.join(" "));
+
+    for rule in rules {
+        if !valid_categories.contains(rule.category.as_str()) {
+            continue;
+        }
+        for kw in &rule.keywords {
+            let kw_clean = kw.trim().to_lowercase();
+            if kw_clean.is_empty() {
+                continue;
+            }
+            if token_set.contains(kw_clean.as_str()) {
+                return Some((rule.category.clone(), rule.name.clone()));
+            }
+            let kw_tokens: Vec<&str> = kw_clean
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if kw_tokens.len() > 1 {
+                let kw_norm = format!(" {} ", kw_tokens.join(" "));
+                if stem_norm.contains(&kw_norm) {
+                    return Some((rule.category.clone(), rule.name.clone()));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Build the plan: every file goes to `root/sorted/<category>/`.
 /// A file that is already in its destination directory is skipped.
 /// Name collisions are resolved with `name (2).ext`, `name (3).ext`, … so
@@ -35,6 +79,15 @@ pub fn build_plan(
     files: &[(PathBuf, u64)],
     cats: &Categories,
 ) -> SortPlan {
+    build_plan_with_rules(root, files, cats, &[])
+}
+
+pub fn build_plan_with_rules(
+    root: &Path,
+    files: &[(PathBuf, u64)],
+    cats: &Categories,
+    rules: &[crate::categories::SmartRule],
+) -> SortPlan {
     let output_dir = root.join(crate::categories::OUTPUT_DIR);
     let mut plan = SortPlan {
         root: root.to_path_buf(),
@@ -43,11 +96,17 @@ pub fn build_plan(
     };
     // Destination names already handed out inside each category dir.
     let mut used: HashMap<PathBuf, usize> = HashMap::new();
-    let mut count_by_idx: HashMap<u8, u64> = HashMap::new();
+    let mut count_by_cat: HashMap<String, u64> = HashMap::new();
+    let valid_cats: std::collections::HashSet<&str> = cats.names().iter().map(|s| s.as_str()).collect();
 
     for (path, size) in files {
-        let idx = cats.index_for_path(path);
-        let category = cats.name(idx).to_string();
+        let (category, matched_rule) = if let Some((rule_cat, rule_name)) = match_smart_rule(path, rules, &valid_cats) {
+            (rule_cat, Some(rule_name))
+        } else {
+            let idx = cats.index_for_path(path);
+            (cats.name(idx).to_string(), None)
+        };
+
         let dest_dir = output_dir.join(&category);
         let file_name = match path.file_name() {
             Some(n) => n.to_os_string(),
@@ -59,20 +118,21 @@ pub fn build_plan(
             continue;
         }
         let final_dest = unique_destination(&candidate, &mut used);
-        *count_by_idx.entry(idx).or_insert(0) += 1;
+        *count_by_cat.entry(category.clone()).or_insert(0) += 1;
         plan.total_size += size;
         plan.moves.push(PlannedMove {
             source: path.clone(),
             destination: final_dest,
             category,
             size: *size,
+            matched_rule,
         });
     }
+
     plan.counts = cats
         .names()
         .iter()
-        .enumerate()
-        .filter_map(|(i, name)| count_by_idx.get(&(i as u8)).map(|c| (name.clone(), *c)))
+        .filter_map(|name| count_by_cat.get(name).map(|c| (name.clone(), *c)))
         .collect();
     plan
 }
@@ -163,4 +223,34 @@ mod tests {
         let plan = build_plan(root, &files, &cats());
         assert!(plan.moves.is_empty());
     }
+
+    #[test]
+    fn smart_rules_override_extension_and_match_stem() {
+        let root = Path::new("C:\\base");
+        let files = vec![
+            (PathBuf::from("C:\\base\\invoice-2026-q1.png"), 100), // png normally -> images
+            (PathBuf::from("C:\\base\\tax-return-draft.txt"), 200),
+            (PathBuf::from("C:\\base\\ordinary-photo.png"), 300),
+        ];
+        let rules = vec![
+            crate::categories::SmartRule {
+                id: "r1".into(),
+                name: "Financial Docs".into(),
+                category: "documents".into(),
+                keywords: vec!["invoice".into(), "tax".into()],
+            },
+        ];
+        let plan = build_plan_with_rules(root, &files, &cats(), &rules);
+        assert_eq!(plan.moves.len(), 3);
+        // invoice-2026-q1.png should go to documents, not images
+        assert_eq!(plan.moves[0].category, "documents");
+        assert_eq!(plan.moves[0].matched_rule, Some("Financial Docs".into()));
+        // tax-return-draft.txt should go to documents
+        assert_eq!(plan.moves[1].category, "documents");
+        assert_eq!(plan.moves[1].matched_rule, Some("Financial Docs".into()));
+        // ordinary-photo.png should remain images
+        assert_eq!(plan.moves[2].category, "images");
+        assert_eq!(plan.moves[2].matched_rule, None);
+    }
 }
+

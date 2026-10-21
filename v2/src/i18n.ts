@@ -7,8 +7,11 @@ export interface I18nStrings {
   theme_title: string;
   theme_desc: string;
   tab_sort: string;
+  tab_junk: string;
   tab_dupes: string;
   tab_disk: string;
+  tab_watch: string;
+  tab_schedule: string;
   tab_pdf: string;
   tab_renamer: string;
   tab_images: string;
@@ -58,6 +61,44 @@ export interface I18nStrings {
   disk_col_path: string;
   disk_loading: string;
   disk_pick_first: string;
+  disk_drives_title: string;
+  junk_title: string;
+  junk_desc: string;
+  junk_btn_scan: string;
+  junk_btn_scanning: string;
+  junk_btn_clean: string;
+  junk_btn_cleaning: string;
+  junk_select_all: string;
+  junk_deselect_all: string;
+  junk_empty: string;
+  junk_cleaned_summary: string;
+  watch_title: string;
+  watch_desc: string;
+  watch_toggle_active: string;
+  watch_add_folder: string;
+  watch_no_folders: string;
+  watch_live_log: string;
+  watch_empty_log: string;
+  sched_title: string;
+  sched_desc: string;
+  sched_add_task: string;
+  sched_no_tasks: string;
+  sched_run_now: string;
+  sched_last_run: string;
+  sched_interval: string;
+  rules_title: string;
+  rules_desc: string;
+  rules_add_btn: string;
+  rules_no_rules: string;
+  rules_rule_name: string;
+  rules_category: string;
+  rules_keywords: string;
+  update_check_btn: string;
+  update_checking: string;
+  update_available: string;
+  update_latest: string;
+  update_btn_download: string;
+  onboarding_btn_tour: string;
   settings_title: string;
   settings_desc: string;
   settings_cat_title: string;
@@ -82,8 +123,11 @@ export const STRINGS: I18nStrings = {
   theme_title: "Theme & Appearance",
   theme_desc: "Choose from liquid glass themes: pure dark, crystal light, or glowing chromatic glass combinations.",
   tab_sort: "File Sorter",
+  tab_junk: "Junk Cleaner",
   tab_dupes: "Duplicate Finder",
-  tab_disk: "Disk Space Analyzer",
+  tab_disk: "Disk Space",
+  tab_watch: "Watch Mode",
+  tab_schedule: "Scheduler",
   tab_pdf: "PDF Studio",
   tab_renamer: "Batch Renamer",
   tab_images: "Image Studio",
@@ -132,9 +176,47 @@ export const STRINGS: I18nStrings = {
   disk_col_size: "Size",
   disk_col_path: "Full Path",
   disk_loading: "Loading disk usage stats…",
-  disk_pick_first: "Select a folder from the File Sorter tab first.",
+  disk_pick_first: "Select a folder or drive from below to analyze.",
+  disk_drives_title: "Detected Drives & Storage Volumes:",
+  junk_title: "Junk & Cache Cleaner",
+  junk_desc: "Safely scan and purge temporary caches, crash dumps, and thumbnail files without admin prompts.",
+  junk_btn_scan: "🔍 Scan Junk Locations",
+  junk_btn_scanning: "Scanning junk locations…",
+  junk_btn_clean: "🗑️ Clean Selected Junk",
+  junk_btn_cleaning: "Purging junk files…",
+  junk_select_all: "Select All",
+  junk_deselect_all: "Deselect All",
+  junk_empty: "No junk files detected in scanned locations.",
+  junk_cleaned_summary: "Cleaned files successfully.",
+  watch_title: "Background Watch Mode",
+  watch_desc: "Monitor your Downloads or Desktop folders and auto-sort new files as they arrive.",
+  watch_toggle_active: "Watch Active",
+  watch_add_folder: "+ Add Watched Folder",
+  watch_no_folders: "No folders are currently being watched. Add one above.",
+  watch_live_log: "Live Activity Stream:",
+  watch_empty_log: "No file events yet. Watched folders will report here automatically.",
+  sched_title: "Automated Task Scheduler",
+  sched_desc: "Keep your system clean and organized on automated timers in the background.",
+  sched_add_task: "+ Add Scheduled Task",
+  sched_no_tasks: "No automated tasks scheduled yet.",
+  sched_run_now: "Run Now",
+  sched_last_run: "Last run:",
+  sched_interval: "Interval:",
+  rules_title: "Smart Keyword Rules",
+  rules_desc: "Match keywords in filenames to prioritize specific categories before standard extensions.",
+  rules_add_btn: "+ Add Smart Rule",
+  rules_no_rules: "No smart rules configured. Add rules below to override default extension sorting.",
+  rules_rule_name: "Rule Name",
+  rules_category: "Target Category",
+  rules_keywords: "Keywords (comma separated)",
+  update_check_btn: "Check for Updates",
+  update_checking: "Checking…",
+  update_available: "New update available!",
+  update_latest: "FileSorter is up to date.",
+  update_btn_download: "Download Update",
+  onboarding_btn_tour: "Take Guided Tour",
   settings_title: "Settings",
-  settings_desc: "Customize categories and file extension rules.",
+  settings_desc: "Customize categories, smart keyword rules, and file extension mappings.",
   settings_cat_title: "Categories & File Extensions",
   settings_cat_desc: "Assign file formats to categories or add custom extensions.",
   settings_btn_save: "💾 Save Settings",

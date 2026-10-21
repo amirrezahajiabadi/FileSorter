@@ -4,14 +4,25 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   CATEGORY_ICONS,
   type CategoryMap,
+  type CleanReport,
   type DiskStats,
+  type DriveInfo,
   type DuplicateGroup,
   type ExecReport,
+  type JunkLocation,
   type ScanProgress,
+  type ScheduledTask,
+  type SmartRule,
   type SortPlan,
+  type TaskRunResult,
   type UndoReport,
+  type UpdateCheckResult,
+  type WatchEventPayload,
+  type WatchStatus,
 } from "./types";
 import { STRINGS, CATEGORY_LABELS } from "./i18n";
+import OnboardingModal from "./OnboardingModal";
+import UpdateModal from "./UpdateModal";
 
 const BatchRenamer = lazy(() => import("./BatchRenamer"));
 const ImageStudio = lazy(() => import("./ImageStudio"));
@@ -59,7 +70,7 @@ export const THEMES: ThemeMeta[] = [
 ];
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
-type ActiveTab = "sort" | "dupes" | "disk" | "renamer" | "images" | "pdf" | "settings";
+type ActiveTab = "sort" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "renamer" | "images" | "pdf" | "settings";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -107,16 +118,51 @@ export default function App() {
   const [dupeKeep, setDupeKeep] = useState<"oldest" | "newest">("oldest");
   const [quarantineReport, setQuarantineReport] = useState<ExecReport | null>(null);
 
-  // Disk space stats
+  // Disk space stats & drives
   const [diskStats, setDiskStats] = useState<DiskStats | null>(null);
+  const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [loadingDisk, setLoadingDisk] = useState(false);
+
+  // Junk Cleaner state
+  const [junkLocs, setJunkLocs] = useState<JunkLocation[]>([]);
+  const [selectedJunk, setSelectedJunk] = useState<Set<string>>(new Set());
+  const [junkBusy, setJunkBusy] = useState(false);
+  const [cleanReport, setCleanReport] = useState<CleanReport | null>(null);
+
+  // Watch Mode state
+  const [watchActive, setWatchActive] = useState<boolean>(false);
+  const [watchFolders, setWatchFolders] = useState<string[]>([]);
+  const [watchEvents, setWatchEvents] = useState<WatchEventPayload[]>([]);
+
+  // Scheduler state
+  const [tasks, setTasks] = useState<ScheduledTask[]>([]);
+  const [taskHistory, setTaskHistory] = useState<TaskRunResult[]>([]);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskKind, setNewTaskKind] = useState<"junk" | "sort">("junk");
+  const [newTaskFolder, setNewTaskFolder] = useState("");
+  const [newTaskInterval, setNewTaskInterval] = useState(60);
+
+  // Smart Rules state
+  const [smartRules, setSmartRules] = useState<SmartRule[]>([]);
+  const [newRuleName, setNewRuleName] = useState("");
+  const [newRuleCategory, setNewRuleCategory] = useState("documents");
+  const [newRuleKeywords, setNewRuleKeywords] = useState("");
 
   // Settings
   const [categories, setCategories] = useState<CategoryMap>({});
   const [newExts, setNewExts] = useState<Record<string, string>>({});
   const [settingsNotice, setSettingsNotice] = useState<string>("");
 
-  // Reports
+  // Onboarding & Update modals
+  const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
+    return localStorage.getItem("filesorter_onboarded") === null;
+  });
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [updateData, setUpdateData] = useState<UpdateCheckResult | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  // Reports & Error
   const [report, setReport] = useState<ExecReport | null>(null);
   const [undoReport, setUndoReport] = useState<UndoReport | null>(null);
   const [error, setError] = useState<string>("");
@@ -137,78 +183,140 @@ export default function App() {
     document.documentElement.setAttribute("data-lang", "en");
   }, []);
 
-  const cycleTheme = () => {
-    setTheme((current) => {
-      const idx = THEMES.findIndex((t) => t.id === current);
-      return THEMES[(idx + 1) % THEMES.length].id;
-    });
+  const closeOnboarding = () => {
+    localStorage.setItem("filesorter_onboarded", "true");
+    setOnboardingOpen(false);
   };
 
+  // Check for updates on startup
+  const checkForUpdates = useCallback(async (manual = false) => {
+    setCheckingUpdate(true);
+    try {
+      const res = await invoke<UpdateCheckResult>("check_app_updates");
+      setUpdateData(res);
+      if (res.has_update) {
+        setUpdateModalOpen(true);
+      } else if (manual) {
+        alert(t.update_latest);
+      }
+    } catch (e) {
+      if (manual) {
+        console.error("Update check failed", e);
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, [t.update_latest]);
+
+  useEffect(() => {
+    checkForUpdates(false);
+  }, [checkForUpdates]);
+
+  // Load initial settings, smart rules, watch state, and scheduled tasks
+  useEffect(() => {
+    invoke<CategoryMap>("get_categories")
+      .then(setCategories)
+      .catch(() => {});
+    invoke<SmartRule[]>("get_smart_rules")
+      .then(setSmartRules)
+      .catch(() => {});
+    invoke<WatchStatus>("watch_get_status")
+      .then((st) => {
+        setWatchActive(st.active);
+        setWatchFolders(st.folders);
+        setWatchEvents(st.recent_events);
+      })
+      .catch(() => {});
+    invoke<ScheduledTask[]>("get_scheduled_tasks")
+      .then(setTasks)
+      .catch(() => {});
+    invoke<TaskRunResult[]>("get_task_history")
+      .then(setTaskHistory)
+      .catch(() => {});
+    invoke<DriveInfo[]>("list_system_drives")
+      .then(setDrives)
+      .catch(() => {});
+  }, []);
+
+  // Event Listeners (Scan, Dupes, Sort, Quarantine, Undo, Watch, Schedule)
   useEffect(() => {
     let scanRafId: number | null = null;
     let latestScan: ScanProgress | null = null;
 
-    const subs: Promise<UnlistenFn>[] = [
-      listen<ScanProgress>("scan-progress", (e) => {
-        latestScan = e.payload;
+    const setupListeners = async () => {
+      const u1 = await listen<ScanProgress>("scan-progress", (ev) => {
+        latestScan = ev.payload;
         if (scanRafId === null) {
           scanRafId = requestAnimationFrame(() => {
             if (latestScan) setScan(latestScan);
             scanRafId = null;
           });
         }
-      }),
-      listen<{ stopped: boolean }>("scan-done", (e) => {
+      });
+      const u2 = await listen<{ stopped?: boolean; error?: string }>("scan-done", (ev) => {
         if (scanRafId !== null) {
           cancelAnimationFrame(scanRafId);
           scanRafId = null;
         }
-        setPhase(e.payload.stopped ? "idle" : "ready");
-        setScan((s) => (s ? { ...s, done: true } : s));
-      }),
-      listen<{ groups?: DuplicateGroup[]; error?: string }>("dupes-done", (e) => {
-        setDupeBusy(false);
-        if (e.payload.error) {
-          setError(e.payload.error);
+        if (ev.payload.error) {
+          setError(ev.payload.error);
+          setPhase("idle");
+        } else if (ev.payload.stopped) {
+          setPhase("idle");
         } else {
-          setDupes(e.payload.groups ?? []);
-        }
-      }),
-      listen<{ report?: ExecReport; error?: string }>("sort-done", (e) => {
-        if (e.payload.error) {
-          setError(e.payload.error);
           setPhase("ready");
-        } else if (e.payload.report) {
-          setReport(e.payload.report);
-          setPhase("done");
         }
-      }),
-      listen<{ report?: ExecReport; error?: string }>("quarantine-done", (e) => {
+      });
+      const u3 = await listen<{ groups?: DuplicateGroup[]; error?: string }>("dupes-done", (ev) => {
         setDupeBusy(false);
-        if (e.payload.error) {
-          setError(e.payload.error);
-        } else if (e.payload.report) {
-          setQuarantineReport(e.payload.report);
+        if (ev.payload.error) {
+          setError(ev.payload.error);
+        } else if (ev.payload.groups) {
+          setDupes(ev.payload.groups);
         }
-      }),
-      listen<{ report?: UndoReport; error?: string }>("undo-done", (e) => {
-        if (e.payload.error) {
-          setError(e.payload.error);
-        } else if (e.payload.report) {
-          setUndoReport(e.payload.report);
+      });
+      const u4 = await listen<{ report?: ExecReport; error?: string }>("sort-done", (ev) => {
+        setPhase("done");
+        if (ev.payload.error) {
+          setError(ev.payload.error);
+        } else if (ev.payload.report) {
+          setReport(ev.payload.report);
         }
-      }),
-    ];
-    Promise.all(subs).then((un) => {
-      unlisteners.current = un;
-    });
+      });
+      const u5 = await listen<{ report?: ExecReport; error?: string }>("quarantine-done", (ev) => {
+        setDupeBusy(false);
+        if (ev.payload.error) {
+          setError(ev.payload.error);
+        } else if (ev.payload.report) {
+          setQuarantineReport(ev.payload.report);
+          setDupes([]);
+        }
+      });
+      const u6 = await listen<{ report?: UndoReport; error?: string }>("undo-done", (ev) => {
+        if (ev.payload.error) {
+          setError(ev.payload.error);
+        } else if (ev.payload.report) {
+          setUndoReport(ev.payload.report);
+        }
+      });
+      const u7 = await listen<WatchEventPayload>("watch-event", (ev) => {
+        setWatchEvents((prev) => [ev.payload, ...prev].slice(0, 100));
+      });
+      const u8 = await listen<TaskRunResult>("scheduled-task-done", (ev) => {
+        setTaskHistory((prev) => [ev.payload, ...prev].slice(0, 50));
+        // refresh tasks to show updated last_run
+        invoke<ScheduledTask[]>("get_scheduled_tasks")
+          .then(setTasks)
+          .catch(() => {});
+      });
 
-    // Load initial settings
-    invoke<CategoryMap>("get_categories")
-      .then(setCategories)
-      .catch(() => {});
+      unlisteners.current = [u1, u2, u3, u4, u5, u6, u7, u8];
+    };
+
+    setupListeners();
 
     return () => {
+      if (scanRafId !== null) cancelAnimationFrame(scanRafId);
       unlisteners.current.forEach((u) => u());
       unlisteners.current = [];
     };
@@ -323,6 +431,158 @@ export default function App() {
     }
   };
 
+  // Junk Cleaner handlers
+  const handleScanJunk = async () => {
+    setJunkBusy(true);
+    setError("");
+    setCleanReport(null);
+    try {
+      const locs = await invoke<JunkLocation[]>("scan_junk");
+      setJunkLocs(locs);
+      setSelectedJunk(new Set(locs.map((l) => l.id)));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setJunkBusy(false);
+    }
+  };
+
+  const handleCleanJunk = async () => {
+    if (selectedJunk.size === 0) return;
+    setJunkBusy(true);
+    setError("");
+    try {
+      const rep = await invoke<CleanReport>("clean_junk", {
+        selectedIds: Array.from(selectedJunk),
+      });
+      setCleanReport(rep);
+      handleScanJunk();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setJunkBusy(false);
+    }
+  };
+
+  const toggleJunkSelection = (id: string) => {
+    setSelectedJunk((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Watch Mode handlers
+  const handleToggleWatch = async () => {
+    try {
+      const nextState = !watchActive;
+      const res = await invoke<boolean>("watch_set_active", { active: nextState });
+      setWatchActive(res);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleAddWatchFolder = async () => {
+    const picked = await invoke<string | null>("pick_folder");
+    if (!picked) return;
+    try {
+      const updated = await invoke<string[]>("watch_add_folder", { folder: picked });
+      setWatchFolders(updated);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleRemoveWatchFolder = async (f: string) => {
+    try {
+      const updated = await invoke<string[]>("watch_remove_folder", { folder: f });
+      setWatchFolders(updated);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // Scheduled Tasks handlers
+  const handleSaveTask = async () => {
+    if (!newTaskName.trim()) return;
+    const task: ScheduledTask = {
+      id: `task_${Date.now()}`,
+      name: newTaskName.trim(),
+      kind: newTaskKind,
+      folder: newTaskKind === "sort" ? newTaskFolder || null : null,
+      interval_minutes: Number(newTaskInterval) || 60,
+      enabled: true,
+      last_run: null,
+    };
+    try {
+      await invoke("save_scheduled_task", { task });
+      setTasks((prev) => [...prev, task]);
+      setShowAddTask(false);
+      setNewTaskName("");
+      setNewTaskFolder("");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleDeleteTask = async (id: string) => {
+    try {
+      await invoke("delete_scheduled_task", { id });
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleRunTaskNow = async (id: string) => {
+    try {
+      const res = await invoke<string>("run_scheduled_task_now", { id });
+      alert(`Task executed: ${res}`);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // Smart Rules handlers
+  const handleAddSmartRule = async () => {
+    if (!newRuleName.trim() || !newRuleKeywords.trim()) return;
+    const kws = newRuleKeywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+    const rule: SmartRule = {
+      id: `rule_${Date.now()}`,
+      name: newRuleName.trim(),
+      category: newRuleCategory,
+      keywords: kws,
+    };
+    const updated = [...smartRules, rule];
+    try {
+      await invoke("save_smart_rules", { rules: updated });
+      setSmartRules(updated);
+      setNewRuleName("");
+      setNewRuleKeywords("");
+      setSettingsNotice("Smart rule added successfully");
+      setTimeout(() => setSettingsNotice(""), 3000);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleDeleteSmartRule = async (id: string) => {
+    const updated = smartRules.filter((r) => r.id !== id);
+    try {
+      await invoke("save_smart_rules", { rules: updated });
+      setSmartRules(updated);
+      setSettingsNotice("Smart rule deleted");
+      setTimeout(() => setSettingsNotice(""), 3000);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const saveSettings = async () => {
     try {
       await invoke("set_categories", { map: categories });
@@ -363,22 +623,35 @@ export default function App() {
     });
   };
 
-  const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
+  const pct = (part: number, total: number) => (total > 0 ? ((part / total) * 100).toFixed(1) : "0");
 
   return (
-    <div className={`app-layout ${sidebarExpanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
-      {/* Left Glass Vertical Sidebar */}
-      <aside className="sidebar-glass" aria-label="Sidebar Navigation">
-        {/* Top: Brand & Collapse Toggle */}
+    <div className={`app-shell ${sidebarExpanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        isOpen={onboardingOpen}
+        onClose={closeOnboarding}
+        currentTheme={theme}
+        onSelectTheme={setTheme}
+        onPickFolder={pickFolder}
+      />
+
+      {/* Auto-Update Modal */}
+      <UpdateModal
+        isOpen={updateModalOpen}
+        onClose={() => setUpdateModalOpen(false)}
+        updateData={updateData}
+      />
+
+      {/* Left Collapsible Glass Sidebar */}
+      <aside className="sidebar-glass" aria-label="Main Navigation">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="sidebar-logo">
-              <span className="sidebar-logo-icon">⚡</span>
-            </div>
+            <span className="sidebar-brand-icon">📁</span>
             {sidebarExpanded && (
               <div className="sidebar-title-group">
                 <span className="sidebar-title">{t.app_title}</span>
-                <span className="sidebar-badge">v2.0</span>
+                <span className="sidebar-badge">v6.6.0</span>
               </div>
             )}
           </div>
@@ -406,6 +679,15 @@ export default function App() {
           </button>
           <button
             type="button"
+            className={`sidebar-tab ${activeTab === "junk" ? "active" : ""}`}
+            onClick={() => setActiveTab("junk")}
+            title={t.tab_junk}
+          >
+            <span className="sidebar-tab-icon">🗑️</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_junk}</span>}
+          </button>
+          <button
+            type="button"
             className={`sidebar-tab ${activeTab === "dupes" ? "active" : ""}`}
             onClick={() => setActiveTab("dupes")}
             title={t.tab_dupes}
@@ -413,6 +695,35 @@ export default function App() {
             <span className="sidebar-tab-icon">🔍</span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_dupes}</span>}
             {dupes.length > 0 && <span className="sidebar-tab-badge">{dupes.length}</span>}
+          </button>
+          <button
+            type="button"
+            className={`sidebar-tab ${activeTab === "disk" ? "active" : ""}`}
+            onClick={() => setActiveTab("disk")}
+            title={t.tab_disk}
+          >
+            <span className="sidebar-tab-icon">📊</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_disk}</span>}
+          </button>
+          <button
+            type="button"
+            className={`sidebar-tab ${activeTab === "watch" ? "active" : ""}`}
+            onClick={() => setActiveTab("watch")}
+            title={t.tab_watch}
+          >
+            <span className="sidebar-tab-icon">👁️</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_watch}</span>}
+            {watchActive && <span className="sidebar-tab-badge" style={{ backgroundColor: "#10b981" }}>ON</span>}
+          </button>
+          <button
+            type="button"
+            className={`sidebar-tab ${activeTab === "schedule" ? "active" : ""}`}
+            onClick={() => setActiveTab("schedule")}
+            title={t.tab_schedule}
+          >
+            <span className="sidebar-tab-icon">⏰</span>
+            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_schedule}</span>}
+            {tasks.length > 0 && <span className="sidebar-tab-badge">{tasks.length}</span>}
           </button>
           <button
             type="button"
@@ -440,15 +751,6 @@ export default function App() {
           >
             <span className="sidebar-tab-icon">📑</span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_pdf}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "disk" ? "active" : ""}`}
-            onClick={() => setActiveTab("disk")}
-            title={t.tab_disk}
-          >
-            <span className="sidebar-tab-icon">📊</span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_disk}</span>}
           </button>
           <button
             type="button"
@@ -482,12 +784,13 @@ export default function App() {
                   <button
                     key={th.id}
                     type="button"
-                    className={`theme-chip-btn ${theme === th.id ? "active" : ""}`}
+                    className={`theme-selector-btn ${theme === th.id ? "active" : ""}`}
                     onClick={() => setTheme(th.id)}
                     title={th.desc}
+                    aria-label={`Switch to ${th.name}`}
                   >
-                    <span className="theme-chip-icon">{th.icon}</span>
-                    <span className="theme-chip-name">{th.name.split(" ")[0]}</span>
+                    <span className="theme-selector-icon">{th.icon}</span>
+                    <span className="theme-selector-label">{th.name.split(" ")[0]}</span>
                   </button>
                 ))}
               </div>
@@ -496,8 +799,11 @@ export default function App() {
             <button
               type="button"
               className="sidebar-action-btn"
-              onClick={cycleTheme}
-              title={`Theme: ${THEMES.find((x) => x.id === theme)?.name} (Click to switch)`}
+              onClick={() => {
+                const idx = THEMES.findIndex((x) => x.id === theme);
+                setTheme(THEMES[(idx + 1) % THEMES.length].id);
+              }}
+              title={`Theme: ${THEMES.find((x) => x.id === theme)?.name}`}
               aria-label="Cycle theme"
             >
               <span className="sidebar-tab-icon">{THEMES.find((x) => x.id === theme)?.icon}</span>
@@ -507,479 +813,751 @@ export default function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="content-area">
-        <div className="content-container">
-          {error && (
-            <div className="error-bar" role="alert" onClick={() => setError("")}>
-              <span>⚠️ {error}</span>
-              <span style={{ fontSize: "12px", opacity: 0.8 }}>✕</span>
-            </div>
-          )}
+      <main className="main-content-flow">
+        {/* Top Header Bar */}
+        <div className="top-banner-bar">
+          <div className="banner-left">
+            <span className="flag-dot" />
+            <span className="banner-app-title">FileSorter v2 Flagship Edition</span>
+            <span className="badge-tag">Tauri 2 + Rust</span>
+          </div>
+          <div className="banner-right">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ fontSize: "12px", padding: "4px 10px" }}
+              onClick={() => setOnboardingOpen(true)}
+            >
+              🧭 {t.onboarding_btn_tour}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ fontSize: "12px", padding: "4px 10px" }}
+              onClick={() => checkForUpdates(true)}
+              disabled={checkingUpdate}
+            >
+              {checkingUpdate ? t.update_checking : updateData?.has_update ? `🚀 ${t.update_available}` : `⚡ ${t.update_check_btn}`}
+            </button>
+          </div>
+        </div>
 
-          {settingsNotice && (
-            <div className="notice-bar glass">
-              <span>✓ {settingsNotice}</span>
-            </div>
-          )}
+        {error && (
+          <div className="glass alert alert-error">
+            <span>⚠ {error}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setError("")}>✕</button>
+          </div>
+        )}
 
-      {/* TAB 1: Sorter */}
-      {activeTab === "sort" && (
-        <>
-          {phase === "idle" && (
-            <section className="hero glass">
-              <h2>{t.hero_title}</h2>
-              <p className="muted">{t.hero_subtitle}</p>
-              <button className="btn btn-primary" onClick={pickFolder}>
-                {t.hero_drop_btn}
-              </button>
-            </section>
-          )}
-
-          {phase === "scanning" && (
-            <section className="hero glass">
-              <h2>{t.hero_scanning}</h2>
-              <p className="muted mono">{folder}</p>
-              <div className="meter">
-                <div
-                  className="meter-fill"
-                  style={{
-                    width: `${scan ? (scan.done ? 100 : pct(scan.total_so_far, Math.max(scan.total_so_far, 1)) * 0.9) : 0}%`,
-                  }}
-                />
+        {/* TAB 1: Organize / File Sorter */}
+        {activeTab === "sort" && (
+          <>
+            <header className="hero glass">
+              <div className="hero-text">
+                <h2>{t.hero_title}</h2>
+                <p className="muted">{t.hero_subtitle}</p>
               </div>
-              <p style={{ fontWeight: 600 }}>
-                {scan ? fmtNum(scan.total_so_far) : 0} {t.hero_files_found}
-                {scan && scan.bytes_so_far > 0 ? ` — ${formatBytes(scan.bytes_so_far)}` : ""}
-              </p>
-              <button className="btn btn-ghost" onClick={stopScan}>
-                ✕ {t.hero_stop}
-              </button>
-            </section>
-          )}
 
-          {phase === "ready" && plan && (
-            <>
-              <section className="summary glass">
-                <div className="stat">
-                  <b>{fmtNum(plan.moves.length)}</b>
-                  <span>{t.summary_files}</span>
-                </div>
-                <div className="stat">
-                  <b>{formatBytes(plan.total_size)}</b>
-                  <span>{t.summary_size}</span>
-                </div>
-                <div className="stat">
-                  <b>{fmtNum(plan.counts.length)}</b>
-                  <span>{t.summary_categories}</span>
-                </div>
-                <div className="summary-actions">
-                  <button className="btn btn-ghost" onClick={() => setShowMoves(!showMoves)}>
-                    {showMoves ? t.btn_hide_moves : `👁️ ${t.btn_show_moves}`}
-                  </button>
-                </div>
-              </section>
-
-              {showMoves && plan.moves.length > 0 && (
-                <section className="glass table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{t.disk_col_name}</th>
-                        <th>{t.summary_categories}</th>
-                        <th>{t.disk_col_size}</th>
-                        <th>{t.disk_col_path}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {plan.moves.slice(0, 100).map((m, idx) => (
-                        <tr key={idx}>
-                          <td className="mono ellipsis">{m.source.split(/[\\/]/).pop()}</td>
-                          <td>{getCatLabel(m.category)}</td>
-                          <td className="mono">{formatBytes(m.size)}</td>
-                          <td className="muted mono ellipsis">{m.destination}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {plan.moves.length > 100 && (
-                    <p className="muted" style={{ padding: "10px 16px", margin: 0 }}>
-                      + {fmtNum(plan.moves.length - 100)} ...
-                    </p>
-                  )}
-                </section>
-              )}
-
-              <section className="cards">
-                {plan.counts.map(([cat, count]) => (
-                  <div key={cat} className="card glass">
-                    <span className="card-icon">{CATEGORY_ICONS[cat] ?? "•"}</span>
-                    <div>
-                      <b>{getCatLabel(cat)}</b>
-                      <span className="muted">{fmtNum(count)} {t.settings_formats_count}</span>
-                    </div>
-                  </div>
-                ))}
-              </section>
-
-              <section className="actions">
-                <button className="btn btn-primary" onClick={executeSort} disabled={plan.moves.length === 0}>
-                  {t.btn_sort_now} ({fmtNum(plan.moves.length)})
-                </button>
-                <button className="btn btn-ghost" onClick={pickFolder}>
-                  {t.reset_folder}
-                </button>
-              </section>
-            </>
-          )}
-
-          {phase === "sorting" && (
-            <section className="hero glass">
-              <h2>{t.btn_sorting}</h2>
-              <div className="meter">
-                <div className="meter-fill indeterminate" />
-              </div>
-              <p className="muted">{t.app_subtitle}</p>
-            </section>
-          )}
-
-          {phase === "done" && report && (
-            <section className="hero glass">
-              <h2>{t.sort_done_title}</h2>
-              <p>
-                <b>{fmtNum(report.moved)}</b> {t.sort_done_desc}
-                {report.skipped > 0 ? ` — ${fmtNum(report.skipped)} ${t.undo_skipped}` : ""}
-              </p>
-              {report.skipped_examples.length > 0 && (
-                <details className="mono muted">
-                  <summary>Details</summary>
-                  <pre>{report.skipped_examples.join("\n")}</pre>
-                </details>
-              )}
-              <div className="actions">
-                <button className="btn btn-primary" onClick={undoLast}>
-                  {t.btn_undo}
-                </button>
-                <button className="btn btn-ghost" onClick={pickFolder}>
-                  {t.reset_folder}
-                </button>
-              </div>
-              {undoReport && (
-                <p className={undoReport.skipped > 0 ? "warn" : "ok"} style={{ fontWeight: 600 }}>
-                  {fmtNum(undoReport.restored)} {t.undo_success}
-                </p>
-              )}
-            </section>
-          )}
-        </>
-      )}
-
-      {/* TAB 2: Duplicate Finder */}
-      {activeTab === "dupes" && (
-        <section className="glass dupes">
-          <div className="dupes-header">
-            <div>
-              <h3>{t.dupes_title}</h3>
-              <p className="muted" style={{ margin: "4px 0 0" }}>
-                {t.dupes_desc}
-              </p>
-            </div>
-            <div className="summary-actions">
               {folder ? (
-                <button className="btn btn-primary" onClick={runDupes} disabled={dupeBusy}>
-                  {dupeBusy ? t.dupes_btn_scanning : t.dupes_btn_scan}
-                </button>
+                <div className="folder-chip">
+                  <span className="folder-icon">📁</span>
+                  <span className="mono folder-path" title={folder}>{folder}</span>
+                  <button className="btn btn-ghost" onClick={pickFolder}>Change</button>
+                </div>
               ) : (
-                <button className="btn btn-primary" onClick={pickFolder}>
-                  {t.hero_drop_btn}
-                </button>
+                <div className="dropzone-liquid" onClick={pickFolder}>
+                  <div className="dropzone-icon">📁</div>
+                  <button className="btn btn-primary btn-large">{t.hero_drop_btn}</button>
+                  <p className="muted dropzone-hint">Click anywhere inside this liquid card to select folder</p>
+                </div>
               )}
-            </div>
-          </div>
 
-          {quarantineReport && (
-            <div className="notice-bar glass" style={{ margin: "14px 0" }}>
-              ✓ {fmtNum(quarantineReport.moved)} {t.dupes_quarantine_done}
-            </div>
-          )}
+              {phase === "scanning" && scan && (
+                <div className="scan-status animate-fade-in">
+                  <div className="scan-metrics">
+                    <span className="pulse-dot" />
+                    <span><b>{fmtNum(scan.total_so_far)}</b> {t.hero_files_found}</span>
+                    <span className="muted mono">({formatBytes(scan.bytes_so_far)})</span>
+                  </div>
+                  <div className="scan-controls">
+                    <div className="meter"><div className="meter-fill indeterminate" /></div>
+                    <button className="btn btn-ghost btn-sm" onClick={stopScan}>{t.hero_stop}</button>
+                  </div>
+                </div>
+              )}
+            </header>
 
-          {dupes.length > 0 ? (
-            <>
-              <div className="summary" style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
-                <div className="stat">
-                  <b>{fmtNum(dupes.length)}</b>
-                  <span>{t.tab_dupes}</span>
+            {plan && phase !== "done" && (
+              <section className="glass plan-review animate-fade-in">
+                <div className="summary">
+                  <div className="stat"><b>{fmtNum(plan.moves.length)}</b><span>{t.summary_files}</span></div>
+                  <div className="stat"><b>{formatBytes(plan.total_size)}</b><span>{t.summary_size}</span></div>
+                  <div className="stat"><b>{plan.counts.length}</b><span>{t.summary_categories}</span></div>
                 </div>
-                <div className="stat">
-                  <b style={{ color: "var(--text)" }}>{formatBytes(dupes.reduce((s, g) => s + g.wasted, 0))}</b>
-                  <span>{t.dupes_reclaimable}</span>
+
+                <div className="category-chips">
+                  {plan.counts.map(([cat, count]) => (
+                    <span key={cat} className="cat-chip">
+                      <span className="cat-icon">{CATEGORY_ICONS[cat] ?? "•"}</span>
+                      <span className="cat-name">{getCatLabel(cat)}</span>
+                      <span className="cat-count mono">{fmtNum(count)}</span>
+                    </span>
+                  ))}
                 </div>
-                <div className="summary-actions" style={{ alignItems: "center" }}>
-                  <button
-                    className={`btn ${dupeKeep === "oldest" ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setDupeKeep("oldest")}
-                  >
-                    {t.dupes_keep_oldest}
+
+                <div className="actions">
+                  <button className="btn btn-primary btn-large" onClick={executeSort} disabled={phase === "sorting" || plan.moves.length === 0}>
+                    {phase === "sorting" ? t.btn_sorting : t.btn_sort_now}
                   </button>
-                  <button
-                    className={`btn ${dupeKeep === "newest" ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setDupeKeep("newest")}
-                  >
-                    {t.dupes_keep_newest}
+                  <button className="btn btn-ghost" onClick={() => setShowMoves(!showMoves)}>
+                    {showMoves ? t.btn_hide_moves : t.btn_show_moves}
                   </button>
-                  <button className="btn btn-primary" onClick={quarantineDuplicates} disabled={dupeBusy}>
-                    {t.dupes_btn_quarantine}
-                  </button>
+                  <button className="btn btn-ghost" onClick={loadResults}>{t.btn_rescan}</button>
                 </div>
-              </div>
 
-              <ul>
-                {dupes.map((g) => (
-                  <li key={g.hash}>
-                    <span className="mono">{fmtNum(g.files.length)} copies</span>
-                    <span className="mono">{formatBytes(g.wasted)}</span>
-                    <div>
-                      <b className="ellipsis" style={{ display: "block" }}>
-                        {g.files[0].path.split(/[\\/]/).pop()}
-                      </b>
-                      <span className="muted mono ellipsis" style={{ fontSize: "11px", display: "block" }}>
-                        {g.files.map((f) => f.path).join("  |  ")}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            !dupeBusy && (
-              <p className="muted" style={{ padding: "32px 0", textAlign: "center" }}>
-                {folder ? t.dupes_empty : t.disk_pick_first}
-              </p>
-            )
-          )}
-        </section>
-      )}
-
-      {/* TAB 3: Disk Space */}
-      {activeTab === "disk" && (
-        <section className="glass disk-bars">
-          <div className="dupes-header">
-            <div>
-              <h3>{t.disk_title}</h3>
-              <p className="muted" style={{ margin: "4px 0 0" }}>
-                {t.disk_desc}
-              </p>
-            </div>
-            {folder && (
-              <button className="btn btn-ghost" onClick={loadDiskStats} disabled={loadingDisk}>
-                {loadingDisk ? t.disk_loading : `🔄 ${t.btn_rescan}`}
-              </button>
-            )}
-          </div>
-
-          {diskStats ? (
-            <>
-              <div className="summary" style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
-                <div className="stat">
-                  <b>{fmtNum(diskStats.total_files)}</b>
-                  <span>{t.disk_total_files}</span>
-                </div>
-                <div className="stat">
-                  <b>{formatBytes(diskStats.total_bytes)}</b>
-                  <span>{t.disk_total_size}</span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", margin: "16px 0" }}>
-                <b>{t.disk_category_breakdown}</b>
-                {diskStats.category_breakdown.map(([cat, count, bytes]) => {
-                  const share = pct(bytes, diskStats.total_bytes);
-                  return (
-                    <div key={cat} className="disk-bar-row">
-                      <div className="disk-bar-header">
-                        <span>
-                          {CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)} ({fmtNum(count)} {t.settings_formats_count})
-                        </span>
-                        <span className="mono">
-                          {formatBytes(bytes)} ({share}%)
-                        </span>
-                      </div>
-                      <div className="meter" style={{ width: "100%" }}>
-                        <div className="meter-fill" style={{ width: `${share}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{ marginTop: "20px" }}>
-                <b>{t.disk_largest_files}</b>
-                <div className="table-container" style={{ marginTop: "10px" }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{t.disk_col_name}</th>
-                        <th>{t.disk_col_size}</th>
-                        <th>{t.disk_col_path}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {diskStats.largest_files.map(([filePath, size], i) => (
-                        <tr key={i}>
-                          <td className="mono ellipsis">{filePath.split(/[\\/]/).pop()}</td>
-                          <td className="mono" style={{ color: "var(--text)" }}>
-                            {formatBytes(size)}
-                          </td>
-                          <td className="muted mono ellipsis">{filePath}</td>
+                {showMoves && (
+                  <div className="table-container" style={{ marginTop: "16px" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Source File</th>
+                          <th>Destination</th>
+                          <th>Category</th>
+                          <th>Size</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-              {folder ? t.disk_loading : t.disk_pick_first}
-            </p>
-          )}
-        </section>
-      )}
-
-      {/* TAB: Smart Batch Renamer */}
-      {activeTab === "renamer" && (
-        <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Batch Renamer…</p></div>}>
-          <BatchRenamer />
-        </Suspense>
-      )}
-
-      {/* TAB: Image Studio */}
-      {activeTab === "images" && (
-        <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Image Studio…</p></div>}>
-          <ImageStudio />
-        </Suspense>
-      )}
-
-      {/* TAB: PDF Studio */}
-      {activeTab === "pdf" && (
-        <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading PDF Studio…</p></div>}>
-          <PdfStudio />
-        </Suspense>
-      )}
-
-      {/* TAB 4: Settings */}
-      {activeTab === "settings" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* Theme & Visual Appearance */}
-          <section className="glass" style={{ padding: "20px 24px" }}>
-            <div style={{ marginBottom: "16px" }}>
-              <h3 style={{ margin: "0 0 6px 0", fontSize: "16px", fontWeight: 700 }}>
-                🎨 {t.theme_title}
-              </h3>
-              <p className="muted" style={{ margin: 0, fontSize: "13px" }}>
-                {t.theme_desc}
-              </p>
-            </div>
-
-            <div className="theme-cards-grid">
-              {THEMES.map((th) => (
-                <div
-                  key={th.id}
-                  className={`theme-card ${theme === th.id ? "active" : ""}`}
-                  onClick={() => setTheme(th.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setTheme(th.id);
-                    }
-                  }}
-                >
-                  <div className="theme-card-top">
-                    <span className="theme-card-icon">{th.icon}</span>
-                    <span className="theme-card-title">{th.name}</span>
-                    {theme === th.id && <span className="theme-card-badge">Active</span>}
+                      </thead>
+                      <tbody>
+                        {plan.moves.slice(0, 100).map((m, i) => (
+                          <tr key={i}>
+                            <td className="mono ellipsis">{m.source.split(/[\\/]/).pop()}</td>
+                            <td className="mono ellipsis">{m.destination.replace(plan.root, "")}</td>
+                            <td>
+                              <span className="cat-cell">{m.category}</span>
+                              {m.matched_rule && (
+                                <span className="badge-tag" style={{ marginLeft: "6px" }} title="Matched via Smart Rule">
+                                  🎯 {m.matched_rule}
+                                </span>
+                              )}
+                            </td>
+                            <td className="mono">{formatBytes(m.size)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <p className="theme-card-desc">{th.desc}</p>
-                  <div className="theme-card-swatches">
-                    {th.swatch.map((c, i) => (
-                      <span key={i} className="theme-swatch-dot" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                )}
+              </section>
+            )}
 
-          {/* Categories and File Formats */}
-          <section className="glass">
-            <div className="dupes-header" style={{ padding: "20px 24px 0" }}>
-              <div>
-                <h3>{t.settings_cat_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>
-                  {t.settings_cat_desc}
+            {phase === "done" && report && (
+              <section className="glass report-card animate-fade-in">
+                <h3>{t.sort_done_title}</h3>
+                <p className="muted">
+                  <b>{fmtNum(report.moved)}</b> {t.sort_done_desc} ({formatBytes(report.bytes_moved)})
                 </p>
+                <div className="actions" style={{ marginTop: "16px" }}>
+                  <button className="btn btn-primary" onClick={undoLast}>{t.btn_undo}</button>
+                  <button className="btn btn-ghost" onClick={reset}>{t.btn_rescan}</button>
+                </div>
+              </section>
+            )}
+
+            {undoReport && (
+              <div className="glass alert alert-success" style={{ marginTop: "16px" }}>
+                <span>✓ <b>{fmtNum(undoReport.restored)}</b> {t.undo_success}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TAB 2: Junk & Cache Cleaner */}
+        {activeTab === "junk" && (
+          <section className="glass">
+            <div className="dupes-header">
+              <div>
+                <h3>{t.junk_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>{t.junk_desc}</p>
               </div>
               <div className="summary-actions">
-                <button className="btn btn-primary" onClick={saveSettings}>
-                  {t.settings_btn_save}
+                <button className="btn btn-ghost" onClick={handleScanJunk} disabled={junkBusy}>
+                  {junkBusy ? t.junk_btn_scanning : t.junk_btn_scan}
                 </button>
-                <button className="btn btn-ghost" onClick={resetSettings}>
-                  {t.settings_btn_reset}
-                </button>
+                {junkLocs.length > 0 && (
+                  <button className="btn btn-primary" onClick={handleCleanJunk} disabled={junkBusy || selectedJunk.size === 0}>
+                    {junkBusy ? t.junk_btn_cleaning : t.junk_btn_clean}
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="settings-grid" style={{ padding: "20px 24px" }}>
-              {Object.entries(categories).map(([cat, exts]) => (
-                <div key={cat} className="glass cat-box">
-                  <div className="cat-box-header">
-                    <span>
-                      {CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)}
-                    </span>
-                    <span className="muted mono" style={{ fontSize: "11px" }}>
-                      {fmtNum(exts.length)} {t.settings_formats_count}
-                    </span>
-                  </div>
-                  <div className="tags">
-                    {exts.map((e) => (
-                      <span key={e} className="tag mono">
-                        {e}
-                        <button onClick={() => removeExtension(cat, e)} title="Remove">
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="add-tag-form">
-                    <input
-                      type="text"
-                      placeholder={t.settings_add_placeholder}
-                      value={newExts[cat] || ""}
-                      onChange={(e) => setNewExts({ ...newExts, [cat]: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addExtension(cat);
-                        }
-                      }}
-                      style={{ flex: 1 }}
-                    />
-                    <button className="btn btn-icon btn-ghost" onClick={() => addExtension(cat)} title={t.settings_add_btn}>
-                      {t.settings_add_btn}
+            {cleanReport && (
+              <div className="glass alert alert-success" style={{ margin: "16px 0" }}>
+                <span>
+                  ✓ {t.junk_cleaned_summary} Purged <b>{fmtNum(cleanReport.files_deleted)}</b> files (<b>{formatBytes(cleanReport.bytes_freed)}</b> freed).
+                  {cleanReport.files_failed > 0 && ` (${cleanReport.files_failed} in-use files safely skipped)`}
+                </span>
+              </div>
+            )}
+
+            {junkLocs.length > 0 ? (
+              <>
+                <div style={{ display: "flex", gap: "10px", margin: "16px 0" }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedJunk(new Set(junkLocs.map((l) => l.id)))}>
+                    {t.junk_select_all}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedJunk(new Set())}>
+                    {t.junk_deselect_all}
+                  </button>
+                </div>
+                <div className="junk-grid">
+                  {junkLocs.map((loc) => (
+                    <label key={loc.id} className="junk-card">
+                      <input
+                        type="checkbox"
+                        checked={selectedJunk.has(loc.id)}
+                        onChange={() => toggleJunkSelection(loc.id)}
+                      />
+                      <div className="junk-card-info">
+                        <strong>{loc.name}</strong>
+                        <p>{loc.description}</p>
+                        <div className="junk-card-meta">
+                          <span>{fmtNum(loc.file_count)} files</span>
+                          <b>{formatBytes(loc.total_bytes)}</b>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
+                Click &quot;Scan Junk Locations&quot; above to discover temporary files and caches.
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* TAB 3: Duplicates Finder */}
+        {activeTab === "dupes" && (
+          <section className="glass">
+            <div className="dupes-header">
+              <div>
+                <h3>{t.dupes_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>{t.dupes_desc}</p>
+              </div>
+              {folder && (
+                <button className="btn btn-primary" onClick={runDupes} disabled={dupeBusy || phase === "scanning"}>
+                  {dupeBusy ? t.dupes_btn_scanning : t.dupes_btn_scan}
+                </button>
+              )}
+            </div>
+
+            {quarantineReport && (
+              <div className="glass alert alert-success" style={{ margin: "16px 0" }}>
+                <span>✓ <b>{fmtNum(quarantineReport.moved)}</b> {t.dupes_quarantine_done}</span>
+              </div>
+            )}
+
+            {dupes.length > 0 ? (
+              <div style={{ marginTop: "20px" }}>
+                <div className="dupes-toolbar">
+                  <span>{t.dupes_reclaimable} <b>{formatBytes(dupes.reduce((acc, g) => acc + g.wasted, 0))}</b></span>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <select
+                      className="btn btn-ghost"
+                      value={dupeKeep}
+                      onChange={(e) => setDupeKeep(e.target.value as "oldest" | "newest")}
+                    >
+                      <option value="oldest">{t.dupes_keep_oldest}</option>
+                      <option value="newest">{t.dupes_keep_newest}</option>
+                    </select>
+                    <button className="btn btn-primary" onClick={quarantineDuplicates} disabled={dupeBusy}>
+                      {t.dupes_btn_quarantine}
                     </button>
                   </div>
                 </div>
-              ))}
+
+                <div className="dupes-list">
+                  {dupes.slice(0, 50).map((g, i) => (
+                    <div key={i} className="glass dupe-group">
+                      <div className="dupe-group-header">
+                        <span className="mono">{formatBytes(g.size)} per file ({g.files.length} copies)</span>
+                        <span className="badge-tag">Waste: {formatBytes(g.wasted)}</span>
+                      </div>
+                      <div className="dupe-files">
+                        {g.files.map((f, fi) => (
+                          <div key={fi} className="dupe-file-row mono ellipsis">
+                            <span>{f.is_keeper ? "★ [Keep]" : "✕ [Move]"} {f.path}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
+                {folder ? t.dupes_empty : "Select a folder first to analyze duplicates."}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* TAB 4: Disk Space */}
+        {activeTab === "disk" && (
+          <section className="glass disk-bars">
+            <div className="dupes-header">
+              <div>
+                <h3>{t.disk_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>{t.disk_desc}</p>
+              </div>
+              {folder && (
+                <button className="btn btn-ghost" onClick={loadDiskStats} disabled={loadingDisk}>
+                  {loadingDisk ? t.disk_loading : `🔄 ${t.btn_rescan}`}
+                </button>
+              )}
+            </div>
+
+            {/* Detected Drives Overview */}
+            {drives.length > 0 && (
+              <div style={{ margin: "16px 0" }}>
+                <b>{t.disk_drives_title}</b>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px", marginTop: "10px" }}>
+                  {drives.map((d) => {
+                    const usagePct = pct(d.used_bytes, d.total_bytes);
+                    return (
+                      <div key={d.letter} className="glass" style={{ padding: "12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                          <b>Drive ({d.letter}:)</b>
+                          <span className="mono" style={{ fontSize: "11px" }}>{formatBytes(d.free_bytes)} free</span>
+                        </div>
+                        <div className="meter" style={{ width: "100%", height: "6px", marginBottom: "6px" }}>
+                          <div className="meter-fill" style={{ width: `${usagePct}%` }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)" }}>
+                          <span>{usagePct}% used</span>
+                          <span>Total: {formatBytes(d.total_bytes)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {diskStats ? (
+              <>
+                <div className="summary" style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
+                  <div className="stat"><b>{fmtNum(diskStats.total_files)}</b><span>{t.disk_total_files}</span></div>
+                  <div className="stat"><b>{formatBytes(diskStats.total_bytes)}</b><span>{t.disk_total_size}</span></div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", margin: "16px 0" }}>
+                  <b>{t.disk_category_breakdown}</b>
+                  {diskStats.category_breakdown.map(([cat, count, bytes]) => {
+                    const share = pct(bytes, diskStats.total_bytes);
+                    return (
+                      <div key={cat} className="disk-bar-row">
+                        <div className="disk-bar-header">
+                          <span>{CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)} ({fmtNum(count)} {t.settings_formats_count})</span>
+                          <span className="mono">{formatBytes(bytes)} ({share}%)</span>
+                        </div>
+                        <div className="meter" style={{ width: "100%" }}>
+                          <div className="meter-fill" style={{ width: `${share}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ marginTop: "20px" }}>
+                  <b>{t.disk_largest_files}</b>
+                  <div className="table-container" style={{ marginTop: "10px" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t.disk_col_name}</th>
+                          <th>{t.disk_col_size}</th>
+                          <th>{t.disk_col_path}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diskStats.largest_files.map(([filePath, size], i) => (
+                          <tr key={i}>
+                            <td className="mono ellipsis">{filePath.split(/[\\/]/).pop()}</td>
+                            <td className="mono">{formatBytes(size)}</td>
+                            <td className="mono ellipsis muted">{filePath}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
+                {folder ? t.disk_loading : t.disk_pick_first}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* TAB 5: Watch Mode */}
+        {activeTab === "watch" && (
+          <section className="glass">
+            <div className="dupes-header">
+              <div>
+                <h3>{t.watch_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>{t.watch_desc}</p>
+              </div>
+              <button className="btn btn-primary" onClick={handleAddWatchFolder}>
+                {t.watch_add_folder}
+              </button>
+            </div>
+
+            <div className="watch-toggle-box" style={{ marginTop: "16px" }}>
+              <label className="watch-switch">
+                <input
+                  type="checkbox"
+                  checked={watchActive}
+                  onChange={handleToggleWatch}
+                />
+                <span className="watch-slider" />
+              </label>
+              <div>
+                <b>{t.watch_toggle_active}: {watchActive ? "ACTIVE" : "PAUSED"}</b>
+                <p className="muted" style={{ margin: 0, fontSize: "12px" }}>
+                  When active, newly appearing files in watched directories are automatically organized into categories.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginTop: "16px" }}>
+              <b>Monitored Folders ({watchFolders.length}):</b>
+              {watchFolders.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+                  {watchFolders.map((wf) => (
+                    <div key={wf} className="feed-row">
+                      <span className="mono ellipsis">📁 {wf}</span>
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleRemoveWatchFolder(wf)}>Remove</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted" style={{ padding: "16px 0" }}>{t.watch_no_folders}</p>
+              )}
+            </div>
+
+            <div style={{ marginTop: "24px" }}>
+              <b>{t.watch_live_log}</b>
+              <div className="feed-box">
+                {watchEvents.length > 0 ? (
+                  watchEvents.map((ev, i) => (
+                    <div key={i} className="feed-row">
+                      <span>✓ Auto-sorted: <b>{ev.filename}</b> → <i>{ev.category}</i></span>
+                      <span className="muted mono" style={{ fontSize: "11px" }}>
+                        {new Date(ev.timestamp * 1000).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted" style={{ padding: "24px 0", textAlign: "center" }}>{t.watch_empty_log}</p>
+                )}
+              </div>
             </div>
           </section>
-        </div>
-      )}
+        )}
 
-      <footer className="muted">
-            {t.footer_text} <span className="mono">{t.footer_journal}</span>
-          </footer>
-        </div>
+        {/* TAB 6: Scheduler */}
+        {activeTab === "schedule" && (
+          <section className="glass">
+            <div className="dupes-header">
+              <div>
+                <h3>{t.sched_title}</h3>
+                <p className="muted" style={{ margin: "4px 0 0" }}>{t.sched_desc}</p>
+              </div>
+              <button className="btn btn-primary" onClick={() => setShowAddTask(true)}>
+                {t.sched_add_task}
+              </button>
+            </div>
+
+            {showAddTask && (
+              <div className="glass" style={{ padding: "16px", margin: "16px 0", border: "1px solid var(--line-strong)" }}>
+                <b>New Scheduled Task</b>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
+                  <input
+                    type="text"
+                    placeholder="Task Name (e.g. Daily Cleanup)"
+                    value={newTaskName}
+                    onChange={(e) => setNewTaskName(e.target.value)}
+                  />
+                  <select
+                    className="btn btn-ghost"
+                    value={newTaskKind}
+                    onChange={(e) => setNewTaskKind(e.target.value as "junk" | "sort")}
+                  >
+                    <option value="junk">Junk &amp; Temp Cleanup</option>
+                    <option value="sort">Auto-Sort Folder</option>
+                  </select>
+                </div>
+                {newTaskKind === "sort" && (
+                  <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                    <input
+                      type="text"
+                      placeholder="Folder Path"
+                      value={newTaskFolder}
+                      onChange={(e) => setNewTaskFolder(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={async () => {
+                        const p = await invoke<string | null>("pick_folder");
+                        if (p) setNewTaskFolder(p);
+                      }}
+                    >
+                      Browse
+                    </button>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+                  <span>Interval (minutes):</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newTaskInterval}
+                    onChange={(e) => setNewTaskInterval(Number(e.target.value))}
+                    style={{ width: "100px" }}
+                  />
+                  <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+                    <button className="btn btn-ghost" onClick={() => setShowAddTask(false)}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSaveTask}>Save Task</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="sched-table-box">
+              {tasks.length > 0 ? (
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Task Name</th>
+                        <th>Type</th>
+                        <th>Interval</th>
+                        <th>Last Run</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((tk) => (
+                        <tr key={tk.id}>
+                          <td><b>{tk.name}</b> {tk.folder && <small className="muted mono">({tk.folder})</small>}</td>
+                          <td><span className="badge-tag">{tk.kind.toUpperCase()}</span></td>
+                          <td>{tk.interval_minutes} min</td>
+                          <td className="muted mono">
+                            {tk.last_run ? new Date(tk.last_run * 1000).toLocaleString() : "Never"}
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleRunTaskNow(tk.id)}>
+                                {t.sched_run_now}
+                              </button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteTask(tk.id)}>
+                                ✕
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>{t.sched_no_tasks}</p>
+              )}
+            </div>
+
+            {taskHistory.length > 0 && (
+              <div style={{ marginTop: "24px" }}>
+                <b>Recent Automated Runs:</b>
+                <div className="feed-box">
+                  {taskHistory.map((h, i) => (
+                    <div key={i} className="feed-row">
+                      <span>{h.success ? "✓" : "⚠"} <b>{h.task_name}</b>: {h.summary}</span>
+                      <span className="muted mono" style={{ fontSize: "11px" }}>
+                        {new Date(h.timestamp * 1000).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* TAB 7: Smart Batch Renamer */}
+        {activeTab === "renamer" && (
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Batch Renamer…</p></div>}>
+            <BatchRenamer />
+          </Suspense>
+        )}
+
+        {/* TAB 8: Image Studio */}
+        {activeTab === "images" && (
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Image Studio…</p></div>}>
+            <ImageStudio />
+          </Suspense>
+        )}
+
+        {/* TAB 9: PDF Studio */}
+        {activeTab === "pdf" && (
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading PDF Studio…</p></div>}>
+            <PdfStudio />
+          </Suspense>
+        )}
+
+        {/* TAB 10: Settings */}
+        {activeTab === "settings" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {settingsNotice && (
+              <div className="glass alert alert-success">
+                <span>✓ {settingsNotice}</span>
+              </div>
+            )}
+
+            {/* Smart Keyword Rules Manager */}
+            <section className="glass" style={{ padding: "20px 24px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <h3 style={{ margin: "0 0 6px 0", fontSize: "16px", fontWeight: 700 }}>
+                  🎯 {t.rules_title}
+                </h3>
+                <p className="muted" style={{ margin: 0, fontSize: "13px" }}>
+                  {t.rules_desc}
+                </p>
+              </div>
+
+              {smartRules.length > 0 ? (
+                <div className="table-container" style={{ marginBottom: "16px" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Rule Name</th>
+                        <th>Target Category</th>
+                        <th>Matched Keywords</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {smartRules.map((r) => (
+                        <tr key={r.id}>
+                          <td><b>{r.name}</b></td>
+                          <td><span className="cat-cell">{r.category}</span></td>
+                          <td>
+                            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                              {r.keywords.map((kw, i) => (
+                                <span key={i} className="tag mono">{kw}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteSmartRule(r.id)}>✕</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="muted" style={{ padding: "12px 0" }}>{t.rules_no_rules}</p>
+              )}
+
+              {/* Add Rule Form */}
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  type="text"
+                  placeholder="Rule Name (e.g. Financial Invoices)"
+                  value={newRuleName}
+                  onChange={(e) => setNewRuleName(e.target.value)}
+                  style={{ flex: 1, minWidth: "160px" }}
+                />
+                <select
+                  className="btn btn-ghost"
+                  value={newRuleCategory}
+                  onChange={(e) => setNewRuleCategory(e.target.value)}
+                >
+                  {Object.keys(categories).map((c) => (
+                    <option key={c} value={c}>{getCatLabel(c)}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Keywords (e.g. invoice, bill, receipt)"
+                  value={newRuleKeywords}
+                  onChange={(e) => setNewRuleKeywords(e.target.value)}
+                  style={{ flex: 1.5, minWidth: "200px" }}
+                />
+                <button className="btn btn-primary" onClick={handleAddSmartRule}>
+                  {t.rules_add_btn}
+                </button>
+              </div>
+            </section>
+
+            {/* Categories and File Formats */}
+            <section className="glass">
+              <div className="dupes-header" style={{ padding: "20px 24px 0" }}>
+                <div>
+                  <h3>{t.settings_cat_title}</h3>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>{t.settings_cat_desc}</p>
+                </div>
+                <div className="summary-actions">
+                  <button className="btn btn-primary" onClick={saveSettings}>{t.settings_btn_save}</button>
+                  <button className="btn btn-ghost" onClick={resetSettings}>{t.settings_btn_reset}</button>
+                </div>
+              </div>
+
+              <div className="settings-grid" style={{ padding: "20px 24px" }}>
+                {Object.entries(categories).map(([cat, exts]) => (
+                  <div key={cat} className="glass cat-box">
+                    <div className="cat-box-header">
+                      <span>{CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)}</span>
+                      <span className="muted mono" style={{ fontSize: "11px" }}>
+                        {fmtNum(exts.length)} {t.settings_formats_count}
+                      </span>
+                    </div>
+                    <div className="tags">
+                      {exts.map((e) => (
+                        <span key={e} className="tag mono">
+                          {e}
+                          <button onClick={() => removeExtension(cat, e)} title="Remove">✕</button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="add-tag-form">
+                      <input
+                        type="text"
+                        placeholder={t.settings_add_placeholder}
+                        value={newExts[cat] || ""}
+                        onChange={(e) => setNewExts({ ...newExts, [cat]: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addExtension(cat);
+                          }
+                        }}
+                      />
+                      <button className="btn btn-ghost btn-sm" onClick={() => addExtension(cat)}>
+                        {t.settings_add_btn}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );

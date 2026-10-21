@@ -14,6 +14,10 @@ async generator without this file changing at all.
 
 Every method is safe to call from any thread; the controller itself
 never starts threads — the caller decides that too.
+
+NOTE (v6.6.0+): The Python engine is now in Maintenance Mode (LTS). Primary
+development and feature enhancements are concentrated on the Tauri 2 + Rust
+flagship edition in `v2/`.
 """
 
 import shutil

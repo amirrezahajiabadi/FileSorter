@@ -7,17 +7,22 @@
 //! `app.state::<…>()`.
 
 pub mod categories;
+pub mod cleanup_ops;
+pub mod disk_ops;
 pub mod dupes;
 pub mod execute;
 pub mod image_ops;
 pub mod pdf_ops;
 pub mod plan;
 pub mod rename_ops;
+pub mod schedule_ops;
 pub mod undo;
+pub mod update_ops;
 pub mod walk;
+pub mod watch_ops;
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -178,7 +183,8 @@ fn plan_sort(app: AppHandle) -> Result<plan::SortPlan, String> {
         Ok((root, st.files.clone()))
     })?;
     let cats = Categories::from_map(&categories::load_categories());
-    Ok(plan::build_plan(&root, &files, &cats))
+    let rules = categories::load_rules();
+    Ok(plan::build_plan_with_rules(&root, &files, &cats, &rules))
 }
 
 #[tauri::command]
@@ -189,7 +195,8 @@ fn sort_execute(app: AppHandle) -> Result<(), String> {
         }
         let root = st.root.clone().ok_or("scan root missing")?;
         let cats = Categories::from_map(&categories::load_categories());
-        Ok((plan::build_plan(&root, &st.files, &cats), st.stop.clone()))
+        let rules = categories::load_rules();
+        Ok((plan::build_plan_with_rules(&root, &st.files, &cats, &rules), st.stop.clone()))
     })?;
     let handle = app.clone();
     std::thread::spawn(move || {
@@ -303,6 +310,107 @@ fn reset_categories() -> Result<categories::CategoryMap, String> {
     categories::reset_categories()
 }
 
+#[tauri::command]
+fn get_smart_rules() -> Vec<categories::SmartRule> {
+    categories::load_rules()
+}
+
+#[tauri::command]
+fn save_smart_rules(rules: Vec<categories::SmartRule>) -> Result<(), String> {
+    categories::save_rules(&rules)
+}
+
+#[tauri::command]
+fn scan_junk() -> Result<Vec<cleanup_ops::JunkLocation>, String> {
+    Ok(cleanup_ops::scan_junk_locations())
+}
+
+#[tauri::command]
+fn clean_junk(selected_ids: Vec<String>) -> Result<cleanup_ops::CleanReport, String> {
+    Ok(cleanup_ops::clean_junk_locations(&selected_ids))
+}
+
+#[tauri::command]
+fn watch_get_status(app: AppHandle) -> watch_ops::WatchStatus {
+    let mgr = app.state::<Arc<watch_ops::WatchManager>>();
+    mgr.get_status()
+}
+
+#[tauri::command]
+fn watch_set_active(app: AppHandle, active: bool) -> Result<bool, String> {
+    let mgr = app.state::<Arc<watch_ops::WatchManager>>();
+    mgr.set_active(active);
+    let folders = mgr.get_folders();
+    let _ = categories::save_watch_settings(&folders, active);
+    Ok(active)
+}
+
+#[tauri::command]
+fn watch_add_folder(app: AppHandle, folder: String) -> Result<Vec<String>, String> {
+    let mgr = app.state::<Arc<watch_ops::WatchManager>>();
+    let updated = mgr.add_folder(folder);
+    let _ = categories::save_watch_settings(&updated, mgr.is_active());
+    Ok(updated)
+}
+
+#[tauri::command]
+fn watch_remove_folder(app: AppHandle, folder: String) -> Result<Vec<String>, String> {
+    let mgr = app.state::<Arc<watch_ops::WatchManager>>();
+    let updated = mgr.remove_folder(&folder);
+    let _ = categories::save_watch_settings(&updated, mgr.is_active());
+    Ok(updated)
+}
+
+#[tauri::command]
+fn get_scheduled_tasks(app: AppHandle) -> Vec<schedule_ops::ScheduledTask> {
+    let mgr = app.state::<Arc<schedule_ops::ScheduleManager>>();
+    mgr.get_tasks()
+}
+
+#[tauri::command]
+fn save_scheduled_task(app: AppHandle, task: schedule_ops::ScheduledTask) -> Result<(), String> {
+    let mgr = app.state::<Arc<schedule_ops::ScheduleManager>>();
+    mgr.add_or_update_task(task);
+    categories::save_tasks(&mgr.get_tasks())
+}
+
+#[tauri::command]
+fn delete_scheduled_task(app: AppHandle, id: String) -> Result<(), String> {
+    let mgr = app.state::<Arc<schedule_ops::ScheduleManager>>();
+    mgr.delete_task(&id);
+    categories::save_tasks(&mgr.get_tasks())
+}
+
+#[tauri::command]
+fn run_scheduled_task_now(app: AppHandle, id: String) -> Result<String, String> {
+    let mgr = app.state::<Arc<schedule_ops::ScheduleManager>>();
+    let tasks = mgr.get_tasks();
+    let task = tasks.iter().find(|t| t.id == id).cloned().ok_or("task not found")?;
+    schedule_ops::execute_task(&task)
+}
+
+#[tauri::command]
+fn get_task_history(app: AppHandle) -> Vec<schedule_ops::TaskRunResult> {
+    let mgr = app.state::<Arc<schedule_ops::ScheduleManager>>();
+    mgr.get_history()
+}
+
+#[tauri::command]
+fn list_system_drives() -> Vec<disk_ops::DriveInfo> {
+    disk_ops::list_drives()
+}
+
+#[tauri::command]
+fn check_app_updates() -> Result<update_ops::UpdateCheckResult, String> {
+    update_ops::check_for_updates("6.6.0")
+}
+
+#[tauri::command]
+fn open_external_url(app: AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener().open_url(&url, None::<&str>).map_err(|e| e.to_string())
+}
+
 #[derive(serde::Serialize)]
 struct DiskStats {
     total_files: usize,
@@ -360,10 +468,29 @@ fn get_disk_stats(app: AppHandle) -> Result<DiskStats, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let (saved_watch_folders, saved_watch_active) = categories::load_watch_settings();
+    let watch_manager = Arc::new(watch_ops::WatchManager::new());
+    watch_manager.set_folders(saved_watch_folders);
+    watch_manager.set_active(saved_watch_active);
+
+    let saved_tasks = categories::load_tasks();
+    let schedule_manager = Arc::new(schedule_ops::ScheduleManager::new());
+    schedule_manager.set_tasks(saved_tasks);
+
+    let wm_loop = watch_manager.clone();
+    let sm_loop = schedule_manager.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(SharedScan::new(ScanState::default()))
+        .manage(watch_manager)
+        .manage(schedule_manager)
+        .setup(move |app| {
+            watch_ops::spawn_watch_loop(wm_loop, app.handle().clone());
+            schedule_ops::spawn_schedule_loop(sm_loop, app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             pick_folder,
             scan_start,
@@ -376,6 +503,22 @@ pub fn run() {
             get_categories,
             set_categories,
             reset_categories,
+            get_smart_rules,
+            save_smart_rules,
+            scan_junk,
+            clean_junk,
+            watch_get_status,
+            watch_set_active,
+            watch_add_folder,
+            watch_remove_folder,
+            get_scheduled_tasks,
+            save_scheduled_task,
+            delete_scheduled_task,
+            run_scheduled_task_now,
+            get_task_history,
+            list_system_drives,
+            check_app_updates,
+            open_external_url,
             get_disk_stats,
             pdf_ops::pick_image_files,
             pdf_ops::pick_pdf_file,

@@ -33,9 +33,38 @@ pub fn default_categories() -> CategoryMap {
     ])
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SmartRule {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub keywords: Vec<String>,
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SettingsFile {
+    #[serde(default = "default_categories")]
     categories: CategoryMap,
+    #[serde(default)]
+    rules: Vec<SmartRule>,
+    #[serde(default)]
+    watch_folders: Vec<String>,
+    #[serde(default)]
+    watch_active: bool,
+    #[serde(default)]
+    tasks: Vec<crate::schedule_ops::ScheduledTask>,
+}
+
+impl Default for SettingsFile {
+    fn default() -> Self {
+        Self {
+            categories: default_categories(),
+            rules: Vec::new(),
+            watch_folders: Vec::new(),
+            watch_active: false,
+            tasks: Vec::new(),
+        }
+    }
 }
 
 /// `%APPDATA%\FileSorterV2` — overridable with [`set_data_dir`] (tests).
@@ -69,13 +98,29 @@ pub fn settings_path() -> PathBuf {
     data_dir().join("settings.json")
 }
 
-pub fn load_categories() -> CategoryMap {
+fn read_settings() -> SettingsFile {
     match fs::read_to_string(settings_path()) {
-        Ok(text) => match serde_json::from_str::<SettingsFile>(&text) {
-            Ok(file) if file.categories.contains_key("others") => file.categories,
-            _ => default_categories(),
-        },
-        Err(_) => default_categories(),
+        Ok(text) => serde_json::from_str::<SettingsFile>(&text).unwrap_or_default(),
+        Err(_) => SettingsFile::default(),
+    }
+}
+
+fn write_settings(settings: &SettingsFile) -> Result<(), String> {
+    let dir = data_dir();
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let tmp = dir.join("settings.json.tmp");
+    let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    fs::write(&tmp, json).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, settings_path()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn load_categories() -> CategoryMap {
+    let file = read_settings();
+    if file.categories.contains_key("others") {
+        file.categories
+    } else {
+        default_categories()
     }
 }
 
@@ -83,22 +128,47 @@ pub fn save_categories(map: &CategoryMap) -> Result<(), String> {
     if !map.contains_key("others") {
         return Err("the 'others' category must exist".into());
     }
-    let dir = data_dir();
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let tmp = dir.join("settings.json.tmp");
-    let json = serde_json::to_string_pretty(&SettingsFile {
-        categories: map.clone(),
-    })
-    .map_err(|e| e.to_string())?;
-    fs::write(&tmp, json).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, settings_path()).map_err(|e| e.to_string())?;
-    Ok(())
+    let mut file = read_settings();
+    file.categories = map.clone();
+    write_settings(&file)
 }
 
 pub fn reset_categories() -> Result<CategoryMap, String> {
     let defaults = default_categories();
     save_categories(&defaults)?;
     Ok(defaults)
+}
+
+pub fn load_rules() -> Vec<SmartRule> {
+    read_settings().rules
+}
+
+pub fn save_rules(rules: &[SmartRule]) -> Result<(), String> {
+    let mut file = read_settings();
+    file.rules = rules.to_vec();
+    write_settings(&file)
+}
+
+pub fn load_watch_settings() -> (Vec<String>, bool) {
+    let file = read_settings();
+    (file.watch_folders, file.watch_active)
+}
+
+pub fn save_watch_settings(folders: &[String], active: bool) -> Result<(), String> {
+    let mut file = read_settings();
+    file.watch_folders = folders.to_vec();
+    file.watch_active = active;
+    write_settings(&file)
+}
+
+pub fn load_tasks() -> Vec<crate::schedule_ops::ScheduledTask> {
+    read_settings().tasks
+}
+
+pub fn save_tasks(tasks: &[crate::schedule_ops::ScheduledTask]) -> Result<(), String> {
+    let mut file = read_settings();
+    file.tasks = tasks.to_vec();
+    write_settings(&file)
 }
 
 /// Immutable snapshot: extension (lowercased, with dot) → dense category index.
