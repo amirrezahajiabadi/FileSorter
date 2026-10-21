@@ -28,7 +28,7 @@ const BatchRenamer = lazy(() => import("./BatchRenamer"));
 const ImageStudio = lazy(() => import("./ImageStudio"));
 const PdfStudio = lazy(() => import("./PdfStudio"));
 
-export type Theme = "dark" | "light" | "aurora" | "sunset";
+export type Theme = "fluent" | "dark" | "light" | "aurora" | "sunset";
 
 export interface ThemeMeta {
   id: Theme;
@@ -39,6 +39,13 @@ export interface ThemeMeta {
 }
 
 export const THEMES: ThemeMeta[] = [
+  {
+    id: "fluent",
+    name: "Fluent Mica",
+    icon: "💎",
+    desc: "Windows 11 Mica acrylic liquid glass with vibrant cyan & sapphire ribbons",
+    swatch: ["#060b18", "#00f0ff", "#e024c3"],
+  },
   {
     id: "dark",
     name: "Midnight Dark",
@@ -87,10 +94,10 @@ function formatBytes(n: number): string {
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("fs_theme") as Theme | null;
-    if (saved && ["dark", "light", "aurora", "sunset"].includes(saved)) {
+    if (saved && ["fluent", "dark", "light", "aurora", "sunset"].includes(saved)) {
       return saved;
     }
-    return "dark";
+    return "fluent";
   });
 
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(() => {
@@ -814,26 +821,59 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="main-content-flow">
-        {/* Top Header Bar */}
+        {/* Top Header Bar - Fluent Windows 11 Explorer style */}
         <div className="top-banner-bar">
           <div className="banner-left">
-            <span className="flag-dot" />
-            <span className="banner-app-title">FileSorter v2 Flagship Edition</span>
-            <span className="badge-tag">Tauri 2 + Rust</span>
+            <div className="fluent-address-bar">
+              <div className="fluent-nav-arrows">
+                <button
+                  type="button"
+                  className="fluent-arrow-btn"
+                  onClick={() => setActiveTab("sort")}
+                  title={t.tab_sort}
+                  aria-label="Home"
+                >
+                  🏠
+                </button>
+              </div>
+              <div className="fluent-breadcrumb-pill">
+                <span className="fluent-crumb-icon">📂</span>
+                <span className="fluent-crumb-root">FileSorter</span>
+                <span className="fluent-crumb-sep">›</span>
+                <span className="fluent-crumb-current">
+                  {activeTab === "sort" ? t.tab_sort :
+                   activeTab === "junk" ? t.tab_junk :
+                   activeTab === "dupes" ? t.tab_dupes :
+                   activeTab === "disk" ? t.tab_disk :
+                   activeTab === "watch" ? t.tab_watch :
+                   activeTab === "schedule" ? t.tab_schedule :
+                   activeTab === "renamer" ? t.tab_renamer :
+                   activeTab === "images" ? t.tab_images :
+                   activeTab === "pdf" ? t.tab_pdf : t.tab_settings}
+                </span>
+                {folder && (
+                  <>
+                    <span className="fluent-crumb-sep">›</span>
+                    <span className="fluent-crumb-folder" title={folder}>{folder.split(/[\\/]/).pop()}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <span className="badge-tag fluent-badge">Tauri 2 + Rust</span>
           </div>
           <div className="banner-right">
             <button
               type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: "12px", padding: "4px 10px" }}
+              className="btn btn-ghost fluent-banner-btn"
+              style={{ fontSize: "12px", padding: "5px 12px" }}
               onClick={() => setOnboardingOpen(true)}
             >
               🧭 {t.onboarding_btn_tour}
             </button>
             <button
               type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: "12px", padding: "4px 10px" }}
+              className="btn btn-ghost fluent-banner-btn"
+              style={{ fontSize: "12px", padding: "5px 12px" }}
               onClick={() => checkForUpdates(true)}
               disabled={checkingUpdate}
             >
@@ -842,15 +882,16 @@ export default function App() {
           </div>
         </div>
 
-        {error && (
-          <div className="glass alert alert-error">
-            <span>⚠ {error}</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => setError("")}>✕</button>
-          </div>
-        )}
+        <div className="content-body">
+          {error && (
+            <div className="glass alert alert-error">
+              <span>⚠ {error}</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => setError("")}>✕</button>
+            </div>
+          )}
 
-        {/* TAB 1: Organize / File Sorter */}
-        {activeTab === "sort" && (
+          {/* TAB 1: Organize / File Sorter */}
+          {activeTab === "sort" && (
           <>
             <header className="hero glass">
               <div className="hero-text">
@@ -1127,21 +1168,24 @@ export default function App() {
             {drives.length > 0 && (
               <div style={{ margin: "16px 0" }}>
                 <b>{t.disk_drives_title}</b>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px", marginTop: "10px" }}>
+                <div className="fluent-drives-grid">
                   {drives.map((d) => {
                     const usagePct = pct(d.used_bytes, d.total_bytes);
                     return (
-                      <div key={d.letter} className="glass" style={{ padding: "12px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                          <b>Drive ({d.letter}:)</b>
-                          <span className="mono" style={{ fontSize: "11px" }}>{formatBytes(d.free_bytes)} free</span>
-                        </div>
-                        <div className="meter" style={{ width: "100%", height: "6px", marginBottom: "6px" }}>
-                          <div className="meter-fill" style={{ width: `${usagePct}%` }} />
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)" }}>
-                          <span>{usagePct}% used</span>
-                          <span>Total: {formatBytes(d.total_bytes)}</span>
+                      <div key={d.letter} className="glass fluent-drive-card">
+                        <div className="fluent-drive-icon">💽</div>
+                        <div className="fluent-drive-info">
+                          <div className="fluent-drive-header">
+                            <span className="fluent-drive-name">Local Disk ({d.letter}:)</span>
+                            <span className="mono fluent-drive-free">{formatBytes(d.free_bytes)} free</span>
+                          </div>
+                          <div className="meter fluent-drive-meter">
+                            <div className="meter-fill" style={{ width: `${usagePct}%` }} />
+                          </div>
+                          <div className="fluent-drive-meta">
+                            <span>{formatBytes(d.free_bytes)} free of {formatBytes(d.total_bytes)}</span>
+                            <span className="mono">{usagePct}%</span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1563,6 +1607,7 @@ export default function App() {
             </section>
           </div>
         )}
+        </div>
       </main>
     </div>
   );
