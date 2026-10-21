@@ -10,6 +10,27 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.7.1] — 2026-10-21
+
+### Fixed
+- **Watch Mode could overwrite already-sorted files (`watch_ops.rs`):** `fs::rename` replaces an existing destination on Windows, so a newly arriving file with a name already present in `sorted/` silently destroyed the earlier copy. Destinations are now made unique on disk, the copy fallback verifies the byte length before deleting the source, files younger than two seconds are left alone (writers still hold the handle), and failed moves are retried instead of being blacklisted.
+- **Path traversal through category / rename / export names (`paths.rs`):** a category key, batch-rename target or exported file name such as `..\..\Users` or `D:\backup` could move files outside `root\sorted`. All name inputs are now validated as a single ordinary path component, with a defence-in-depth check in the planner.
+- **Undo journal lost on crash and after partial restores (`execute.rs`, `undo.rs`, `rename_ops.rs`):** the journal is flushed every 200 moves instead of once at the end; entries that cannot be restored stay in the journal for a retry; journal names are collision-proof when two operations start in the same millisecond.
+- **PDF Studio was unusable (`PdfStudio.tsx`):** pdf.js transfers (detaches) the buffer it is given, so the reported size was `0 B` and “Extract Pages” always failed. Both passes now work on copies.
+- **Junk Cleaner followed junctions (`cleanup_ops.rs`):** `Path::is_dir` follows reparse points, letting the cleaner traverse (and delete) an unrelated tree or loop forever. Symlinks/junctions are now skipped in both scanning and deletion.
+- **Sort after Stop did nothing (`lib.rs`):** `sort_execute` reused the scan's stop flag, which stays set after “Stop”; the next sort aborted immediately, reported success and wiped the preview. Every run gets a fresh flag and only a run that moved files clears the snapshot.
+- **Scan and cleanup panels could spin forever (`ui/src/store.ts`):** the backend returns `false` when a scan is already running and emits no events; the UI now resets the panel and shows a notice, guards duplicate/disk scans against each other, and cancels the backend scan when a panel closes.
+- **Windows path splitting (`DiskPanel.tsx`, `UndoModal.tsx`, `store.ts`):** `/[\/]/` split on `/` only; file and folder names are now derived correctly from `\` paths.
+- **Event ordering (`app/api.py`):** a flush in flight could deliver log rows after the terminal `done` event. Delivery and terminal pushes now share one lock order.
+- **Smaller v2 fixes:** “Top 20 largest files” is ordered largest-first again; the updater reads the Cargo version instead of a hard-coded `6.7.0`; corrupt `settings.json` is backed up before defaults replace it; the hash cache keeps full hashes (no full rehash on every scan) and stays bounded to the scanned folder; walker options are honoured instead of silently applying global gitignore rules; junk scan/clean, update checks, scheduled “Run Now”, PDF I/O and batch rename run off the UI thread; failed sorts keep the plan on screen; watch events render skipped/failed moves with their error; the duplicate keeper marker follows the selected policy; batch rename rejects traversal names and supports case-only renames; listener registration no longer leaks on unmount; junk results are no longer wiped by the automatic re-scan.
+- **Smaller v1 fixes:** scheduled-task completion toasts resolve the right summary keys; the cleanup delete guard is actually armed (no concurrent deletes); the initial theme matches the backend default; a failed init falls back to the generated string table; windows paths in the delete toast and duplicate pagination reset correctly; theme/browse failures surface a notice.
+
+### Tests
+- 25 native Rust unit tests (new `paths.rs` traversal suite; undo retry-after-occupied test) and 271 Python tests (new coalescing regression test) passing.
+- Version consistency checker now also validates `v2/package.json`, `v2/src-tauri/Cargo.toml` and `v2/src-tauri/tauri.conf.json`; tag `v6.7.1` verified against them.
+
+---
+
 ## [6.7.0] — 2026-10-21
 
 ### Added
