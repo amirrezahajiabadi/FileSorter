@@ -1,5 +1,9 @@
 # Runtime dependencies
-pywebview
+# Pinned: pywebview 6 builds the JS bridge by introspecting the js_api
+# object, so a new major can silently change what reaches window.pywebview.api
+# (6.x already did). The pinned version is the one the desktop bridge tests and
+# the release build are verified against.
+pywebview==6.2.1
 
 # ── Dev-only ──────────────────────────────────────────────────────
 # To build the desktop app with PyInstaller (build the UI first):

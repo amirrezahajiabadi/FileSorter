@@ -28,7 +28,7 @@ def api(tmp_path, monkeypatch):
     
     api_instance = Api()
     # Mock the window object
-    api_instance.window = MagicMock()
+    api_instance._window = MagicMock()
     return api_instance
 
 
@@ -154,14 +154,14 @@ def test_restore_defaults_resets_categories(api):
 
 def test_push_calls_evaluate_js(api):
     api._push("test_event", {"key": "value"})
-    api.window.evaluate_js.assert_called_once()
-    call_args = api.window.evaluate_js.call_args[0][0]
+    api._window.evaluate_js.assert_called_once()
+    call_args = api._window.evaluate_js.call_args[0][0]
     assert "window.onSortEvent" in call_args
     assert "test_event" in call_args
 
 
 def test_push_does_nothing_without_window(api):
-    api.window = None
+    api._window = None
     # Should not raise
     api._push("test_event", {"key": "value"})
 
@@ -171,19 +171,19 @@ def test_push_does_nothing_without_window(api):
 # ══════════════════════════════════════════════════════════════════
 
 def test_browse_folder_returns_path(api, tmp_path):
-    api.window.create_file_dialog.return_value = [str(tmp_path)]
+    api._window.create_file_dialog.return_value = [str(tmp_path)]
     result = api.browse_folder()
     assert result == str(tmp_path)
 
 
 def test_browse_folder_returns_none_on_cancel(api):
-    api.window.create_file_dialog.return_value = []
+    api._window.create_file_dialog.return_value = []
     result = api.browse_folder()
     assert result is None
 
 
 def test_browse_folder_records_recent(api, tmp_path):
-    api.window.create_file_dialog.return_value = [str(tmp_path)]
+    api._window.create_file_dialog.return_value = [str(tmp_path)]
     api.browse_folder()
     assert str(tmp_path) in api.controller.recent_folders
 
@@ -197,7 +197,7 @@ def _event_kinds(api):
     """Parse every evaluate_js call into its event kind."""
     import json as _json
     kinds = []
-    for c in api.window.evaluate_js.call_args_list:
+    for c in api._window.evaluate_js.call_args_list:
         arg = c.args[0]
         payload = arg[len("window.onSortEvent("):-1]
         kinds.append(_json.loads(payload)["kind"])
@@ -214,7 +214,7 @@ def test_run_dup_scan_pushes_dup_done(api, tmp_path):
     assert "dup_done" in _event_kinds(api)
     import json as _json
     done_payload = None
-    for c in api.window.evaluate_js.call_args_list:
+    for c in api._window.evaluate_js.call_args_list:
         arg = c.args[0]
         payload = arg[len("window.onSortEvent("):-1]
         msg = _json.loads(payload)
@@ -225,11 +225,11 @@ def test_run_dup_scan_pushes_dup_done(api, tmp_path):
 
 
 def test_run_dup_scan_pushes_error_on_exception(api, tmp_path):
-    api.window.reset_mock()
+    api._window.reset_mock()
     with patch.object(api.controller, "scan_duplicates", side_effect=RuntimeError("boom")):
         api._run_dup_scan(str(tmp_path))
     import json as _json
-    arg = api.window.evaluate_js.call_args.args[0]
+    arg = api._window.evaluate_js.call_args.args[0]
     payload = arg[len("window.onSortEvent("):-1]
     assert _json.loads(payload)["kind"] == "error"
 
@@ -303,3 +303,64 @@ def test_plan_via_api_applies_smart_rules(api, tmp_path):
     by_name = {p["name"]: p["category"] for p in plan}
     assert by_name["invoice-2024.pdf"] == "invoices"
     assert by_name["letter.pdf"] == "documents"
+
+
+# ══════════════════════════════════════════════════════════════════
+#  pywebview bridge exposure
+# ══════════════════════════════════════════════════════════════════
+#
+# pywebview 6 builds window.pywebview.api by walking *every* public
+# attribute of the js_api object: callables become bridge methods and
+# non-callables are descended into as nested namespaces (unless they set
+# _serializable = False). A public `self.window` therefore made it walk the
+# native window graph until it blew the recursion limit, the bridge was
+# never injected, and the desktop app rendered a blank page whose Browse
+# button could not open a dialog (v6.7.1 regression).
+
+
+def _pywebview_walk(obj, base_name="", functions=None, depth=0):
+    """Mirror of pywebview's util.get_functions bridge walk."""
+    if functions is None:
+        functions = {}
+    assert depth < 4, f"bridge walk descended too deep at {base_name!r}"
+    for name in dir(obj):
+        if name.startswith("_"):
+            continue
+        full_name = f"{base_name}.{name}" if base_name else name
+        attr = getattr(obj, name)
+        if not getattr(attr, "_serializable", True):
+            continue
+        if callable(attr):
+            functions[full_name] = attr
+        else:
+            _pywebview_walk(attr, full_name, functions, depth + 1)
+    return functions
+
+
+def test_public_non_callables_are_hidden_from_the_bridge(api):
+    offenders = [
+        name
+        for name in dir(api)
+        if not name.startswith("_")
+        and not callable(getattr(api, name))
+        and getattr(getattr(api, name), "_serializable", True) is not False
+    ]
+    assert offenders == []
+
+
+def test_bridge_exposes_the_whole_ui_api(api):
+    exposed = _pywebview_walk(api)
+    for name in (
+        "get_state",
+        "get_strings",
+        "browse_folder",
+        "record_recent_folder",
+        "analyze_folder",
+        "plan_sort",
+        "start_sort",
+        "undo_sort",
+        "find_duplicates",
+        "add_task",
+    ):
+        assert name in exposed, f"{name} missing from the JS bridge"
+    assert not any("window" in path or "native" in path for path in exposed)

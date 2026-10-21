@@ -105,6 +105,17 @@ class BaseApi:
             run_job=self._run_task_job,
             on_done=self._on_task_done,
         )
+        # pywebview 6 discovers the JS API by walking every public attribute
+        # of this object and descending into each non-callable one as a
+        # nested namespace. The controller and the two background managers
+        # are implementation details: descending into them drags locks,
+        # callbacks and OS handles into the scan (and can stall the bridge
+        # build), so hide them from that walk.
+        for _nested in (self.controller, self.watch_manager, self.task_scheduler):
+            try:
+                _nested._serializable = False
+            except Exception:  # pragma: no cover - exotic attribute types
+                pass
 
     # ── Subclass hooks ──────────────────────────────────────────
 

@@ -20,15 +20,30 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* The viewport height belongs to the page, not to every control: this
+   selector used to set height:100vh on buttons and inputs too, so each
+   button grew to the full window height and pushed the content out of
+   sight (the app looked blank with only the header visible). */
+body {
+  height: 100vh;
+  overflow: hidden;
+}
+
 body, button, input, select, textarea {
   font-family: 'Manrope', 'Inter', -apple-system, 'Segoe UI', sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-primary);
-  height: 100vh;
-  overflow: hidden;
   user-select: none;
+}
+
+/* Buttons opt out of the browser's 3D default; components style their own
+   surface (border: 0 must not be lost or every button shows an outset
+   bevel). */
+button {
+  border: 0;
+  cursor: pointer;
 }
 
 /* ---------- Light theme (default) ---------- */
@@ -99,6 +114,35 @@ body, button, input, select, textarea {
   --r-lg: 16px;
   --r-xl: 20px;
   --r-full: 9999px;
+
+  /* Legacy token aliases. App.css still references the pre-6.3 names for
+     accents, status colors and a few surfaces; without these aliases those
+     declarations were invalid, so primary buttons rendered with a
+     transparent background (white text on a white card — effectively an
+     invisible Browse button) and status badges lost their tint. Defined
+     with var() so the dark theme resolves them from its own palette. */
+  --accent-primary: var(--accent);
+  --accent-primary-hover: var(--accent-hover);
+  --accent-primary-active: var(--accent-active);
+  --accent-primary-light: var(--accent-soft);
+  --accent-secondary: var(--green);
+  --border-default: var(--border);
+  --overlay: rgba(12, 12, 14, 0.45);
+  --status-success: var(--green);
+  --status-success-bg: var(--green-soft);
+  --status-warning: var(--amber);
+  --status-warning-bg: var(--amber-soft);
+  --status-error: var(--red);
+  --status-error-bg: var(--red-soft);
+  --status-info: var(--blue);
+  --status-info-bg: var(--blue-soft);
+  --warning: var(--amber);
+  --danger: var(--red);
+  --text-strong: var(--text-primary);
+  --text-dim: var(--text-muted);
+  --bg-default: var(--bg-primary);
+  --bg: var(--bg-primary);
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 /* ---------- Dark theme ---------- */

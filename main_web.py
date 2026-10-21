@@ -38,13 +38,19 @@ class Api(BaseApi):
 
     def __init__(self):
         super().__init__()
-        self.window = None  # set in main() once the window exists
+        # Private on purpose: pywebview 6 builds the JS bridge by walking
+        # every public attribute of this object and treating a non-callable
+        # one as a nested namespace. A public `window` made it introspect
+        # the native WinForms window graph, which recursed until the bridge
+        # build blew up — window.pywebview.api stayed empty and every call
+        # from the page failed (blank app, no folder dialog).
+        self._window = None  # set in main() once the window exists
 
     def browse_folder(self):
         """Open a native folder-picker dialog. Returns the chosen path,
         or None if the user cancelled.
         """
-        result = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
         if not result:
             return None
         path = result[0]
@@ -52,11 +58,11 @@ class Api(BaseApi):
         return path
 
     def _push(self, kind: str, payload) -> None:
-        if not self.window:
+        if not self._window:
             return
         data = json.dumps({"kind": kind, "payload": payload}, default=str)
         try:
-            self.window.evaluate_js(f"window.onSortEvent({data})")
+            self._window.evaluate_js(f"window.onSortEvent({data})")
         except Exception:
             # The webview can reject evaluate_js while the window is
             # closing or when the page is mid-navigation; one failed
@@ -73,14 +79,14 @@ class Api(BaseApi):
         (Every row used to be a separate blocking evaluate_js call; on a
         fast sort the flush could never keep up, the backlog grew
         without bound and the UI froze.)"""
-        if not self.window or not payloads:
+        if not self._window or not payloads:
             return
         script = "\n".join(
             f"window.onSortEvent({json.dumps({'kind': kind, 'payload': p}, default=str)})"
             for p in payloads
         )
         try:
-            self.window.evaluate_js(script)
+            self._window.evaluate_js(script)
         except Exception:
             pass
 
@@ -141,7 +147,7 @@ def main(argv=None) -> None:
     window = webview.create_window(
         "FileSorter", serve_dist(), js_api=api, width=800, height=800
     )
-    api.window = window
+    api._window = window
     webview.start()
 
 

@@ -29,7 +29,15 @@ function syncDesktopHandler(): void {
 }
 
 export function isDesktop(): boolean {
-  return typeof window !== 'undefined' && !!window.pywebview?.api;
+  if (typeof window === 'undefined') return false;
+  // pywebview creates window.pywebview.api before it attaches the methods.
+  // Treating that empty shell as "desktop" bound the transport to an api
+  // object with no functions, so the first bridge call threw and the app
+  // rendered with no categories and a dead Browse button. Require the
+  // method we are about to call, and let waitForDesktopBridge() keep
+  // polling until the bridge is actually usable.
+  const api = window.pywebview?.api as Record<string, unknown> | undefined;
+  return !!api && typeof api.get_state === 'function';
 }
 
 export function subscribeEvents(cb: (msg: SortEvent) => void): () => void {

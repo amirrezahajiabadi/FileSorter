@@ -726,6 +726,9 @@ export async function init(): Promise<void> {
     document.documentElement.dir = 'ltr';
     set({
       ready: true,
+      // Re-read after initTransport(): the transport is resolved after this
+      // module loaded, so the value captured in `initial` is always 'mock'.
+      transport: transportKind,
       desktop: isDesktop(),
       theme: app.theme,
       version: app.version,
@@ -739,7 +742,14 @@ export async function init(): Promise<void> {
     console.error('init failed:', err);
     // Render with the generated mirror instead of an empty table: with no
     // strings every label became its raw i18n key and the app looked broken.
-    set({ ready: true, strings: STRINGS_MIRROR });
+    // The notice matters too: without it the page just looked empty and
+    // there was no hint that the backend bridge never answered.
+    set({
+      ready: true,
+      transport: transportKind,
+      strings: STRINGS_MIRROR,
+      notice: { kind: 'error', text: `Could not reach the FileSorter backend: ${String(err)}` },
+    });
   }
 }
 
