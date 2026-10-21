@@ -87,6 +87,7 @@ export interface SortPlan {
   root: string;
   output_dir: string;
   moves: PlannedMove[];
+  total_moves?: number;
   counts: [string, number][];
   total_size: number;
 }

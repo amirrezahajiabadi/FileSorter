@@ -50,17 +50,24 @@ pub fn check_for_updates(current_version: &str) -> Result<UpdateCheckResult, Str
     let url = "https://api.github.com/repos/amirrezahajiabadi/FileSorter/releases/latest";
 
     // Call curl.exe with timeout
-    let output = std::process::Command::new("curl.exe")
-        .args([
-            "-s",
-            "-m",
-            "10",
-            url,
-            "-H",
-            "User-Agent: FileSorter-Desktop",
-            "-H",
-            "Accept: application/vnd.github.v3+json",
-        ])
+    let mut cmd = std::process::Command::new("curl.exe");
+    cmd.args([
+        "-s",
+        "-m",
+        "10",
+        url,
+        "-H",
+        "User-Agent: FileSorter-Desktop",
+        "-H",
+        "Accept: application/vnd.github.v3+json",
+    ]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = cmd
         .output()
         .map_err(|e| format!("Failed to check for updates: {}", e))?;
 

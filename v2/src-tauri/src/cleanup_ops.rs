@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JunkLocation {
@@ -133,28 +134,28 @@ pub fn get_defined_locations() -> Vec<(String, String, String, Vec<PathBuf>)> {
 fn walk_dir_stats(path: &Path, is_thumb: bool) -> (u64, u64) {
     let mut count = 0u64;
     let mut bytes = 0u64;
+    let mut stack = vec![path.to_path_buf()];
 
-    let entries = match fs::read_dir(path) {
-        Ok(e) => e,
-        Err(_) => return (0, 0),
-    };
-
-    for entry in entries.flatten() {
-        let p = entry.path();
-        if p.is_dir() {
-            let (c, b) = walk_dir_stats(&p, is_thumb);
-            count += c;
-            bytes += b;
-        } else if p.is_file() {
-            if is_thumb {
-                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if !name.starts_with("thumbcache_") {
-                    continue;
+    while let Some(current) = stack.pop() {
+        let entries = match fs::read_dir(&current) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.is_file() {
+                if is_thumb {
+                    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    if !name.starts_with("thumbcache_") {
+                        continue;
+                    }
                 }
-            }
-            if let Ok(meta) = entry.metadata() {
-                count += 1;
-                bytes += meta.len();
+                if let Ok(meta) = entry.metadata() {
+                    count += 1;
+                    bytes += meta.len();
+                }
             }
         }
     }
@@ -164,66 +165,73 @@ fn walk_dir_stats(path: &Path, is_thumb: bool) -> (u64, u64) {
 
 pub fn scan_junk_locations() -> Vec<JunkLocation> {
     let defs = get_defined_locations();
-    let mut results = Vec::new();
+    defs.into_par_iter()
+        .map(|(id, name, desc, paths)| {
+            let is_thumb = id == "thumbnails";
+            let mut file_count = 0u64;
+            let mut total_bytes = 0u64;
+            let path_strs: Vec<String> = paths.iter().map(|p| p.to_string_lossy().to_string()).collect();
 
-    for (id, name, desc, paths) in defs {
-        let is_thumb = id == "thumbnails";
-        let mut file_count = 0u64;
-        let mut total_bytes = 0u64;
-        let path_strs: Vec<String> = paths.iter().map(|p| p.to_string_lossy().to_string()).collect();
+            for p in &paths {
+                let (c, b) = walk_dir_stats(p, is_thumb);
+                file_count += c;
+                total_bytes += b;
+            }
 
-        for p in &paths {
-            let (c, b) = walk_dir_stats(p, is_thumb);
-            file_count += c;
-            total_bytes += b;
-        }
-
-        results.push(JunkLocation {
-            id,
-            name,
-            description: desc,
-            paths: path_strs,
-            file_count,
-            total_bytes,
-        });
-    }
-
-    results
+            JunkLocation {
+                id,
+                name,
+                description: desc,
+                paths: path_strs,
+                file_count,
+                total_bytes,
+            }
+        })
+        .collect()
 }
 
 fn delete_recursive(path: &Path, is_thumb: bool, rep: &mut CleanReport) {
-    let entries = match fs::read_dir(path) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
+    let mut dirs_to_remove = Vec::new();
+    let mut stack = vec![path.to_path_buf()];
 
-    for entry in entries.flatten() {
-        let p = entry.path();
-        if p.is_dir() {
-            delete_recursive(&p, is_thumb, rep);
-            // Try removing empty directory if not top-level
-            let _ = fs::remove_dir(&p);
-        } else if p.is_file() {
-            if is_thumb {
-                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if !name.starts_with("thumbcache_") {
-                    continue;
+    while let Some(current) = stack.pop() {
+        let entries = match fs::read_dir(&current) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                dirs_to_remove.push(p.clone());
+                stack.push(p);
+            } else if p.is_file() {
+                if is_thumb {
+                    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    if !name.starts_with("thumbcache_") {
+                        continue;
+                    }
                 }
-            }
-            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-            match fs::remove_file(&p) {
-                Ok(_) => {
-                    rep.files_deleted += 1;
-                    rep.bytes_freed += size;
-                }
-                Err(_) => {
-                    rep.files_failed += 1;
-                    if rep.skipped_locked.len() < 50 {
-                        rep.skipped_locked.push(p.to_string_lossy().to_string());
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                match fs::remove_file(&p) {
+                    Ok(_) => {
+                        rep.files_deleted += 1;
+                        rep.bytes_freed += size;
+                    }
+                    Err(_) => {
+                        rep.files_failed += 1;
+                        if rep.skipped_locked.len() < 50 {
+                            rep.skipped_locked.push(p.to_string_lossy().to_string());
+                        }
                     }
                 }
             }
         }
+    }
+
+    // Remove empty subdirectories bottom-up (reverse of discovery order)
+    for dir in dirs_to_remove.into_iter().rev() {
+        let _ = fs::remove_dir(dir);
     }
 }
 

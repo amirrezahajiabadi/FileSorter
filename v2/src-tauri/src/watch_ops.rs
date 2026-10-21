@@ -129,8 +129,29 @@ pub fn snapshot_folder(dir: &Path) -> DirSnapshot {
     snap
 }
 
+pub fn is_transient_or_download(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    if lower.ends_with(".crdownload")
+        || lower.ends_with(".part")
+        || lower.ends_with(".tmp")
+        || lower.ends_with(".download")
+        || lower.ends_with(".!ut")
+        || lower.ends_with(".aria2")
+    {
+        return true;
+    }
+    if name.starts_with("~$") || name.starts_with(".~") {
+        return true;
+    }
+    false
+}
+
 pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
     std::thread::spawn(move || {
+        let mut cached_cats: Option<Categories> = None;
+        let mut cached_rules = Vec::new();
+        let mut loop_count: usize = 0;
+
         loop {
             std::thread::sleep(Duration::from_secs(2));
 
@@ -143,9 +164,15 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                 continue;
             }
 
-            let cats_map = categories::load_categories();
-            let cats = Categories::from_map(&cats_map);
-            let rules = categories::load_rules();
+            if cached_cats.is_none() || loop_count % 15 == 0 {
+                let cats_map = categories::load_categories();
+                cached_cats = Some(Categories::from_map(&cats_map));
+                cached_rules = categories::load_rules();
+            }
+            loop_count = loop_count.wrapping_add(1);
+
+            let cats = cached_cats.as_ref().unwrap();
+            let rules = &cached_rules;
 
             for folder_str in folders {
                 let folder_path = PathBuf::from(&folder_str);
@@ -153,7 +180,7 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                     continue;
                 }
 
-                let current_snap = snapshot_folder(&folder_path);
+                let mut current_snap = snapshot_folder(&folder_path);
 
                 let prev_snap = {
                     let lock = manager.snapshots.lock().unwrap();
@@ -168,14 +195,18 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                 };
 
                 // Find newly added files
+                let mut moved_names = Vec::new();
                 for (name, fp) in &current_snap {
+                    if is_transient_or_download(name) {
+                        continue;
+                    }
                     if !prev.contains_key(name) {
                         // New file detected!
                         let source_file = folder_path.join(name);
                         let file_size = fp.1;
                         let files = vec![(source_file.clone(), file_size)];
 
-                        let plan = plan::build_plan_with_rules(&folder_path, &files, &cats, &rules);
+                        let plan = plan::build_plan_with_rules(&folder_path, &files, cats, rules);
                         if let Some(mv) = plan.moves.first() {
                             let mut action = "moved".to_string();
                             let mut err_msg = None;
@@ -189,12 +220,15 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                                 match fs::copy(&mv.source, &mv.destination) {
                                     Ok(_) => {
                                         let _ = fs::remove_file(&mv.source);
+                                        moved_names.push(name.clone());
                                     }
                                     Err(copy_err) => {
                                         action = "failed".to_string();
                                         err_msg = Some(format!("rename: {}, copy: {}", e, copy_err));
                                     }
                                 }
+                            } else {
+                                moved_names.push(name.clone());
                             }
 
                             let event = WatchEventPayload {
@@ -215,10 +249,14 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                     }
                 }
 
-                // Update stored snapshot
+                // Remove moved files from snapshot and reuse without extra disk read
+                for name in moved_names {
+                    current_snap.remove(&name);
+                }
+
                 {
                     let mut lock = manager.snapshots.lock().unwrap();
-                    lock.insert(folder_str, snapshot_folder(&folder_path));
+                    lock.insert(folder_str, current_snap);
                 }
             }
         }

@@ -22,6 +22,7 @@ pub struct SortPlan {
     pub root: PathBuf,
     pub output_dir: PathBuf,
     pub moves: Vec<PlannedMove>,
+    pub total_moves: usize,
     /// Aggregate per category: index → count. Names come from `Categories`.
     pub counts: Vec<(String, u64)>,
     pub total_size: u64,
@@ -129,6 +130,7 @@ pub fn build_plan_with_rules(
         });
     }
 
+    plan.total_moves = plan.moves.len();
     plan.counts = cats
         .names()
         .iter()

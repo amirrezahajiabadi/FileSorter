@@ -127,11 +127,13 @@ fn hash_full(path: &Path) -> Result<String, String> {
 }
 
 fn hex(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push_str(&format!("{:02x}", b));
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut v = Vec::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        v.push(HEX_CHARS[(b >> 4) as usize]);
+        v.push(HEX_CHARS[(b & 0x0f) as usize]);
     }
-    out
+    unsafe { String::from_utf8_unchecked(v) }
 }
 
 /// Run the full pipeline over the walked files. `progress` fires after each
@@ -146,6 +148,8 @@ pub fn find_duplicates<F>(
 where
     F: FnMut(usize),
 {
+    use rayon::prelude::*;
+
     // Stage 1: group by size (zero-byte files are noise, never duplicates).
     let mut by_size: BTreeMap<u64, Vec<PathBuf>> = BTreeMap::new();
     for (path, size) in files {
@@ -160,24 +164,25 @@ where
         .flat_map(|(size, group)| group.into_iter().map(move |p| (p, size)))
         .collect();
 
-    // Stage 2: head hashes (parallel, cache-aware).
+    // Stage 2: head hashes (parallel across cores with Rayon).
     let mut done = 0usize;
-    let mut heads: Vec<(PathBuf, u64, i64, String)> = Vec::new();
+    let mut heads: Vec<(PathBuf, u64, i64, String)> = Vec::with_capacity(candidates.len());
     for chunk in candidates.chunks(256) {
-        let results: Vec<Option<_>> = chunk
-            .iter()
-            .map(|(path, size)| -> Option<(PathBuf, u64, i64, String)> {
+        let results: Vec<Option<(PathBuf, u64, i64, String)>> = chunk
+            .par_iter()
+            .map(|(path, size)| {
                 let meta = fs::metadata(path).ok()?;
                 let mtime = mtime_millis(&meta);
                 if let Some(head) = cache.valid_cached(path, mtime, *size, false) {
                     return Some((path.clone(), *size, mtime, head));
                 }
                 let head = hash_head(path, &meta).ok()?;
-                cache.store(path.clone(), mtime, *size, head.clone(), None);
                 Some((path.clone(), *size, mtime, head))
             })
             .collect();
+
         for r in results.into_iter().flatten() {
+            cache.store(r.0.clone(), r.2, r.1, r.3.clone(), None);
             heads.push(r);
         }
         done += chunk.len();
@@ -197,17 +202,34 @@ where
         .collect();
     full_needed.sort_by_key(|k| k.0); // smallest first: early progress on cheap files
 
+    // Collect all paths needing full hashes
+    let mut all_to_hash: Vec<(PathBuf, u64, i64, String)> = Vec::new();
     for (size, head) in &full_needed {
-        let paths = by_head.get(&(*size, head.clone())).unwrap().clone();
-        for (path, size, mtime) in paths {
-            if let Some(full) = cache.valid_cached(&path, mtime, size, true) {
-                cache.store(path.clone(), mtime, size, head.clone(), Some(full));
-                continue;
-            }
-            if let Ok(full) = hash_full(&path) {
-                cache.store(path.clone(), mtime, size, head.clone(), Some(full));
+        if let Some(paths) = by_head.get(&(*size, head.clone())) {
+            for (path, s, mtime) in paths {
+                all_to_hash.push((path.clone(), *s, *mtime, head.clone()));
             }
         }
+    }
+
+    for chunk in all_to_hash.chunks(128) {
+        let hashed_chunk: Vec<Option<(PathBuf, u64, i64, String, String)>> = chunk
+            .par_iter()
+            .map(|(path, s, mtime, head)| {
+                if let Some(full) = cache.valid_cached(path, *mtime, *s, true) {
+                    return Some((path.clone(), *s, *mtime, head.clone(), full));
+                }
+                if let Ok(full) = hash_full(path) {
+                    return Some((path.clone(), *s, *mtime, head.clone(), full));
+                }
+                None
+            })
+            .collect();
+
+        for item in hashed_chunk.into_iter().flatten() {
+            cache.store(item.0, item.2, item.1, item.3, Some(item.4));
+        }
+        done += chunk.len();
         progress(done);
     }
 

@@ -152,27 +152,33 @@ pub fn spawn_schedule_loop(manager: Arc<ScheduleManager>, app: AppHandle) {
                 let last = task.last_run.unwrap_or(0);
 
                 if now >= last.saturating_add(interval_secs) {
-                    // Due for run!
-                    let run_res = execute_task(&task);
+                    // Due for run! Mark last_run immediately so it isn't picked up multiple times
                     task.last_run = Some(now);
                     manager.add_or_update_task(task.clone());
                     let _ = crate::categories::save_tasks(&manager.get_tasks());
 
-                    let (success, summary) = match run_res {
-                        Ok(msg) => (true, msg),
-                        Err(e) => (false, e),
-                    };
+                    let task_to_run = task.clone();
+                    let mgr_clone = manager.clone();
+                    let app_clone = app.clone();
 
-                    let res_item = TaskRunResult {
-                        task_id: task.id.clone(),
-                        task_name: task.name.clone(),
-                        success,
-                        summary: summary.clone(),
-                        timestamp: now,
-                    };
+                    std::thread::spawn(move || {
+                        let run_res = execute_task(&task_to_run);
+                        let (success, summary) = match run_res {
+                            Ok(msg) => (true, msg),
+                            Err(e) => (false, e),
+                        };
 
-                    manager.record_history(res_item.clone());
-                    let _ = app.emit("scheduled-task-done", res_item);
+                        let res_item = TaskRunResult {
+                            task_id: task_to_run.id.clone(),
+                            task_name: task_to_run.name.clone(),
+                            success,
+                            summary,
+                            timestamp: now,
+                        };
+
+                        mgr_clone.record_history(res_item.clone());
+                        let _ = app_clone.emit("scheduled-task-done", res_item);
+                    });
                 }
             }
         }

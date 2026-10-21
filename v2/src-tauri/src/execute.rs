@@ -86,6 +86,7 @@ pub fn execute(plan: &SortPlan, stop: &crate::walk::StopFlag, on_progress: &dyn 
     let total = plan.moves.len() as u64;
     report.journal = journal_path.clone();
 
+    let mut last_progress = std::time::Instant::now();
     for m in &plan.moves {
         if stop.is_stopped() {
             break;
@@ -112,8 +113,12 @@ pub fn execute(plan: &SortPlan, stop: &crate::walk::StopFlag, on_progress: &dyn 
                 }
             }
         }
-        on_progress(report.moved, total);
+        if last_progress.elapsed() >= std::time::Duration::from_millis(50) {
+            on_progress(report.moved, total);
+            last_progress = std::time::Instant::now();
+        }
     }
+    on_progress(report.moved, total);
 
     // A journal with zero entries (nothing moved / stopped at once) should
     // not pollute the undo history.
@@ -139,6 +144,7 @@ pub fn quarantine_duplicates(
     report.journal = journal_path.clone();
     let total = files.len() as u64;
 
+    let mut last_progress = std::time::Instant::now();
     for f in files {
         if stop.is_stopped() {
             break;
@@ -161,8 +167,12 @@ pub fn quarantine_duplicates(
                 }
             }
         }
-        on_progress(report.moved, total);
+        if last_progress.elapsed() >= std::time::Duration::from_millis(50) {
+            on_progress(report.moved, total);
+            last_progress = std::time::Instant::now();
+        }
     }
+    on_progress(report.moved, total);
     if !journal.is_empty() {
         undo::append(&journal_path, &journal)?;
         report.op_id = journal.op_id;

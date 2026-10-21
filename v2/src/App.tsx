@@ -890,7 +890,7 @@ export default function App() {
             {plan && phase !== "done" && (
               <section className="glass plan-review animate-fade-in">
                 <div className="summary">
-                  <div className="stat"><b>{fmtNum(plan.moves.length)}</b><span>{t.summary_files}</span></div>
+                  <div className="stat"><b>{fmtNum(plan.total_moves ?? plan.moves.length)}</b><span>{t.summary_files}</span></div>
                   <div className="stat"><b>{formatBytes(plan.total_size)}</b><span>{t.summary_size}</span></div>
                   <div className="stat"><b>{plan.counts.length}</b><span>{t.summary_categories}</span></div>
                 </div>
@@ -906,7 +906,7 @@ export default function App() {
                 </div>
 
                 <div className="actions">
-                  <button className="btn btn-primary btn-large" onClick={executeSort} disabled={phase === "sorting" || plan.moves.length === 0}>
+                  <button className="btn btn-primary btn-large" onClick={executeSort} disabled={phase === "sorting" || (plan.total_moves ?? plan.moves.length) === 0}>
                     {phase === "sorting" ? t.btn_sorting : t.btn_sort_now}
                   </button>
                   <button className="btn btn-ghost" onClick={() => setShowMoves(!showMoves)}>
@@ -917,6 +917,11 @@ export default function App() {
 
                 {showMoves && (
                   <div className="table-container" style={{ marginTop: "16px" }}>
+                    {plan.total_moves && plan.total_moves > plan.moves.length && (
+                      <p className="muted" style={{ fontSize: "12px", margin: "0 0 10px 4px" }}>
+                        ⚡ Showing preview of first {plan.moves.length} of {fmtNum(plan.total_moves)} planned moves. All files will be processed on sort.
+                      </p>
+                    )}
                     <table>
                       <thead>
                         <tr>

@@ -90,17 +90,19 @@ fn spawn_walk(root: PathBuf, exclude_dir: Option<PathBuf>, opts: &WalkOptions, s
     rx
 }
 
-/// Collect loose files under `root` into time/bulk batches. Returns after the
-/// walk completes or `stop` is raised (the final batch carries `done: true`).
-pub fn collect_files(
+/// Stream loose files under `root` into time/bulk batches directly to a callback.
+/// Batches fire every ~150ms in real-time as files are discovered.
+pub fn stream_files<F>(
     root: &Path,
     exclude_dir: Option<&Path>,
     opts: &WalkOptions,
     stop: &StopFlag,
     min_batch: usize,
-) -> Vec<WalkBatch> {
+    mut on_batch: F,
+) where
+    F: FnMut(WalkBatch),
+{
     let rx = spawn_walk(root.to_path_buf(), exclude_dir.map(|p| p.to_path_buf()), opts, stop.clone());
-    let mut batches = Vec::new();
     let mut current: Vec<(PathBuf, u64)> = Vec::with_capacity(min_batch);
     let mut last_flush = Instant::now();
     let mut emitted: u64 = 0; // files already placed into previous batches
@@ -111,7 +113,7 @@ pub fn collect_files(
                 current.push((path, size));
                 if current.len() >= min_batch || last_flush.elapsed() >= BATCH_INTERVAL {
                     emitted += current.len() as u64;
-                    batches.push(WalkBatch {
+                    on_batch(WalkBatch {
                         files: std::mem::take(&mut current),
                         total_so_far: emitted,
                         done: false,
@@ -120,21 +122,32 @@ pub fn collect_files(
                 }
             }
             WalkMsg::Done(total) => {
-                if !current.is_empty() || batches.is_empty() {
-                    emitted += current.len() as u64;
-                    batches.push(WalkBatch { files: current, total_so_far: emitted.max(total), done: true });
-                } else if let Some(last) = batches.last_mut() {
-                    last.done = true;
-                }
-                return batches;
+                emitted += current.len() as u64;
+                on_batch(WalkBatch { files: current, total_so_far: emitted.max(total), done: true });
+                return;
             }
         }
     }
-    // Sender dropped without Done (walker thread panicked) — still return what we have.
-    if !current.is_empty() || batches.is_empty() {
+    // Sender dropped without Done (walker thread panicked) — still report what we have.
+    if !current.is_empty() {
         emitted += current.len() as u64;
-        batches.push(WalkBatch { files: current, total_so_far: emitted, done: true });
+        on_batch(WalkBatch { files: current, total_so_far: emitted, done: true });
     }
+}
+
+/// Collect loose files under `root` into time/bulk batches. Returns after the
+/// walk completes or `stop` is raised (the final batch carries `done: true`).
+pub fn collect_files(
+    root: &Path,
+    exclude_dir: Option<&Path>,
+    opts: &WalkOptions,
+    stop: &StopFlag,
+    min_batch: usize,
+) -> Vec<WalkBatch> {
+    let mut batches = Vec::new();
+    stream_files(root, exclude_dir, opts, stop, min_batch, |batch| {
+        batches.push(batch);
+    });
     batches
 }
 

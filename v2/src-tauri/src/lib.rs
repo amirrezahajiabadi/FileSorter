@@ -101,25 +101,26 @@ fn scan_start(root: String, app: AppHandle) -> Result<(), String> {
                 return;
             }
         };
-        let batches = walk::collect_files(&root, exclude.as_deref(), &opts, &stop, 500);
         let mut files: Vec<(PathBuf, u64)> = Vec::new();
         let mut bytes: u64 = 0;
-        for (i, batch) in batches.iter().enumerate() {
+        walk::stream_files(&root, exclude.as_deref(), &opts, &stop, 500, |mut batch| {
             for (_, s) in &batch.files {
                 bytes += s;
             }
-            files.extend(batch.files.iter().cloned());
-            let done = i + 1 == batches.len() || stop.is_stopped();
+            let count = batch.files.len();
+            let total = batch.total_so_far;
+            let done = batch.done || stop.is_stopped();
+            files.append(&mut batch.files);
             let _ = handle.emit(
                 "scan-progress",
                 ScanProgress {
-                    total_so_far: batch.total_so_far,
+                    total_so_far: total,
                     bytes_so_far: bytes,
-                    batch_files: batch.files.len(),
+                    batch_files: count,
                     done,
                 },
             );
-        }
+        });
         let stopped = stop.is_stopped();
         let _ = with_state(&handle, |st| {
             if !stopped {
@@ -184,7 +185,11 @@ fn plan_sort(app: AppHandle) -> Result<plan::SortPlan, String> {
     })?;
     let cats = Categories::from_map(&categories::load_categories());
     let rules = categories::load_rules();
-    Ok(plan::build_plan_with_rules(&root, &files, &cats, &rules))
+    let mut plan = plan::build_plan_with_rules(&root, &files, &cats, &rules);
+    if plan.moves.len() > 100 {
+        plan.moves.truncate(100);
+    }
+    Ok(plan)
 }
 
 #[tauri::command]
@@ -427,23 +432,35 @@ fn get_disk_stats(app: AppHandle) -> Result<DiskStats, String> {
         }
         let cats = Categories::from_map(&categories::load_categories());
         let total_files = st.files.len();
-        let total_bytes: u64 = st.files.iter().map(|(_, s)| *s).sum();
+        let mut total_bytes = 0u64;
 
-        let mut sorted_by_size = st.files.clone();
-        sorted_by_size.sort_by(|a, b| b.1.cmp(&a.1));
-        let largest_files: Vec<(String, u64)> = sorted_by_size
-            .into_iter()
-            .take(20)
-            .map(|(p, s)| (p.to_string_lossy().into_owned(), s))
-            .collect();
-
+        let mut top20: std::collections::BinaryHeap<std::cmp::Reverse<(u64, &PathBuf)>> =
+            std::collections::BinaryHeap::with_capacity(21);
         let mut cat_counts = std::collections::HashMap::new();
         let mut cat_bytes = std::collections::HashMap::new();
+
         for (p, s) in &st.files {
+            total_bytes += *s;
             let idx = cats.index_for_path(p);
             *cat_counts.entry(idx).or_insert(0u64) += 1;
             *cat_bytes.entry(idx).or_insert(0u64) += *s;
+
+            if top20.len() < 20 {
+                top20.push(std::cmp::Reverse((*s, p)));
+            } else if let Some(min_top) = top20.peek() {
+                if *s > min_top.0 .0 {
+                    top20.pop();
+                    top20.push(std::cmp::Reverse((*s, p)));
+                }
+            }
         }
+
+        let mut largest_files: Vec<(String, u64)> = top20
+            .into_sorted_vec()
+            .into_iter()
+            .map(|std::cmp::Reverse((s, p))| (p.to_string_lossy().into_owned(), s))
+            .collect();
+        largest_files.reverse();
 
         let category_breakdown: Vec<(String, u64, u64)> = cats
             .names()
