@@ -407,7 +407,7 @@ fn list_system_drives() -> Vec<disk_ops::DriveInfo> {
 
 #[tauri::command]
 fn check_app_updates() -> Result<update_ops::UpdateCheckResult, String> {
-    update_ops::check_for_updates("6.6.0")
+    update_ops::check_for_updates("6.7.0")
 }
 
 #[tauri::command]

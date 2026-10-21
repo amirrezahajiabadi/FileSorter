@@ -209,7 +209,7 @@ const SAMPLE_DEFAULT_CATEGORIES: Record<string, string[]> = {
 
 // Must track APP_VERSION in app/constants.py — this is only the browser
 // preview's stand-in for the version the Python core reports in get_state().
-const SAMPLE_VERSION = '6.6.0';
+const SAMPLE_VERSION = '6.7.0';
 
 const SAMPLE_STATE: AppState = {
   version: SAMPLE_VERSION,

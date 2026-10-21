@@ -658,7 +658,7 @@ export default function App() {
             {sidebarExpanded && (
               <div className="sidebar-title-group">
                 <span className="sidebar-title">{t.app_title}</span>
-                <span className="sidebar-badge">v6.6.0</span>
+                <span className="sidebar-badge">v6.7.0</span>
               </div>
             )}
           </div>

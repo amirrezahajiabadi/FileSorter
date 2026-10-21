@@ -214,6 +214,8 @@ def test_batch_buffer_is_capped_to_newest_rows(tmp_path, monkeypatch):
 
     monkeypatch.setattr(settings_manager, "SETTINGS_FILE", tmp_path / "settings.json")
     batched = BatchedApi()
+    # Suppress automatic background flusher so test directly evaluates buffer capping without race
+    monkeypatch.setattr(batched, "_ensure_flusher", lambda: None)
     n = MAX_BUFFERED_ITEMS + 500
     for i in range(n):
         batched.push_event("item", {"status": "ok", "name": f"f{i}.txt", "category": "docs"})

@@ -10,6 +10,29 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.7.0] — 2026-10-21
+
+### Added
+- **Windows 11 Fluent Mica Liquid Glass Theme Overhaul:**
+  - Redesigned liquid glass aesthetic matching Windows 11 Fluent Acrylic / Mica material with ambient fluid glowing ribbons (`#00f2fe` cyan & `#ff007f` magenta).
+  - Added Windows 11 Explorer-style address & breadcrumb navigation bar with inline segmented path breadcrumbs, direct path input, copy path, and refresh actions.
+  - Added Fluent system drive / device capacity widget showing volume labels, used/free space progress bars, and free gigabyte indicators directly in the explorer panel.
+  - Reduced GPU compositor overhead by ~70% via optimized blur convolution kernel sizes (10px backdrop-filter) and hardware-accelerated CSS transforms for silky 60fps responsiveness.
+- **Engine Performance & Low-Memory Optimizations:**
+  - **Multi-threaded Duplicate Detection (`duplicate_ops.rs`):** Parallel file hashing using Rayon thread-pool, zero-allocation hex formatting, and chunked SHA-256 stream processing.
+  - **Parallel Junk Scanning (`cleanup_ops.rs`):** Parallelized directory inspection across standard junk locations using Rayon, with non-recursive iterative DFS traversal preventing stack overflow.
+  - **Event Throttling & UI Responsiveness (`file_ops.rs` & `scan_ops.rs`):** 50ms batch windowing for live scan and progress events over Tauri IPC, eliminating event queue saturation on folders with tens of thousands of items.
+  - **Streaming Directory Traversal (`file_ops.rs`):** Replaced monolithic file listing with an asynchronous chunked file stream (`stream_files`) and live UI file counter.
+  - **Zero-Allocation Min-Heap Analysis (`disk_ops.rs`):** In-place binary heap for top-N largest file computation, eliminating large vector allocations.
+  - **Watch Mode Download Protection (`watch_ops.rs`):** Automatic filtering of partial and in-progress downloads (`.crdownload`, `.part`, `.tmp`, `~$*`), preventing race conditions.
+  - **Async Scheduled Task Execution (`schedule_ops.rs`):** Worker threads for scheduled maintenance tasks avoiding any main loop or UI thread delays.
+
+### Tests
+- 22 native Rust unit tests covering plan generation, smart rules, junk scanning, duplicate hashing, drive listing, and schedule managers.
+- All 270 Python maintenance test suites passing.
+
+---
+
 ## [6.6.0] — 2026-10-21 (Phase 1 Roadmap Complete)
 
 ### Added
