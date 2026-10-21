@@ -1003,7 +1003,7 @@ dependencies = [
 
 [[package]]
 name = "filesorter2"
-version = "6.7.1"
+version = "6.7.2"
 dependencies = [
  "ignore",
  "rayon",

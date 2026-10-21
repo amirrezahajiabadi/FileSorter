@@ -10,6 +10,21 @@ added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
 
 ---
 
+## [6.7.2] — 2026-10-22
+
+### Fixed
+- **Desktop window was blank and Browse did nothing (`main_web.py`):** pywebview 6 builds `window.pywebview.api` by walking every public attribute of the `js_api` object and descending into each non-callable one. The public `Api.window` made it walk the native WinForms window graph until the recursion limit ran out, so the bridge was never injected: `get_state()` threw, the UI rendered without categories, and the folder dialog could not be opened. The window handle is now private and the controller/managers are marked non-serializable.
+- **Every button was as tall as the window (`ui/src/index.css`):** `height: 100vh; overflow: hidden` sat on the shared `body, button, input, select, textarea` rule, so each button/input stretched to the full viewport height, pushing the folder picker and categories out of view and making the app look empty. The viewport height now applies to `body` only.
+- **Primary buttons were invisible (`ui/src/index.css`):** `App.css` still used the pre-6.3 token names (`--accent-primary`, `--status-*`, `--border-default`, `--font-mono`, …), and those 22 variables were undefined, leaving the Browse button with a transparent background and white text. The old names are aliased to the current palette (dark theme included) and the default button bevel is reset.
+- **Desktop page still claimed “Browser preview” (`ui/src/store.ts`):** `transport` was captured at module load, while the transport is resolved later in `init()`, so the mock footer and service badge always used the stale value. The resolved kind is stored once init completes.
+- **Failed init looked like an empty app (`ui/src/store.ts`, `ui/src/events.ts`):** an `init()` failure only swapped in the string mirror and left the page blank. It now also shows a notice with the error, and the desktop bridge is only considered ready once `get_state` is callable (pywebview creates the api object before it attaches methods).
+
+### Tests
+- `tests/test_web_api.py` gains a mirror of pywebview's bridge walk that asserts no public non-callable attribute is exposed and that every UI method reaches `window.pywebview.api` — the blank-window regression.
+- Full suite: 273 passed, 1 skipped; both frontends build clean.
+
+---
+
 ## [6.7.1] — 2026-10-21
 
 ### Fixed
