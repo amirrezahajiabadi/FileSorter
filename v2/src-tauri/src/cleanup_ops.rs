@@ -142,10 +142,18 @@ fn walk_dir_stats(path: &Path, is_thumb: bool) -> (u64, u64) {
             Err(_) => continue,
         };
         for entry in entries.flatten() {
+            // `file_type()` never follows a link or junction, unlike
+            // `Path::is_dir`. Following one here could walk (and later delete)
+            // a completely unrelated tree, or loop forever on a reparse-point
+            // cycle.
+            let Ok(ft) = entry.file_type() else { continue };
+            if ft.is_symlink() {
+                continue;
+            }
             let p = entry.path();
-            if p.is_dir() {
+            if ft.is_dir() {
                 stack.push(p);
-            } else if p.is_file() {
+            } else if ft.is_file() {
                 if is_thumb {
                     let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
                     if !name.starts_with("thumbcache_") {
@@ -201,11 +209,18 @@ fn delete_recursive(path: &Path, is_thumb: bool, rep: &mut CleanReport) {
         };
 
         for entry in entries.flatten() {
+            // Same rule as walk_dir_stats: never descend through a link or a
+            // junction — deleting the target's contents is not what "clean my
+            // temp folder" means.
+            let Ok(ft) = entry.file_type() else { continue };
+            if ft.is_symlink() {
+                continue;
+            }
             let p = entry.path();
-            if p.is_dir() {
+            if ft.is_dir() {
                 dirs_to_remove.push(p.clone());
                 stack.push(p);
-            } else if p.is_file() {
+            } else if ft.is_file() {
                 if is_thumb {
                     let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
                     if !name.starts_with("thumbcache_") {

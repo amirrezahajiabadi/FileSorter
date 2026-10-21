@@ -1,11 +1,11 @@
 //! Crash-safe undo journal.
 //!
-//! Each sort/quarantine run writes `undo/<op_id>-<timestamp>.json` into the
-//! app data dir. Entries are appended to disk only after their move succeeded
-//! (in-memory during the run, flushed once at the end), so a crash mid-run
-//! leaves the on-disk journal consistent: it contains exactly the moves that
-//! completed. `undo_last` replays the newest journal in reverse, renaming
-//! every file back to its original path.
+//! Each sort/quarantine run writes `undo/<op_id>-<timestamp>-<seq>.json` into
+//! the app data dir. Entries are appended to disk as the run progresses (every
+//! few hundred moves and once at the end), so a crash mid-run leaves a journal
+//! that still contains every completed move. `undo_last` replays the newest
+//! journal in reverse, renaming every file back to its original path; entries
+//! it could not restore stay in the journal for the next attempt.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,6 +35,9 @@ pub fn undo_dir() -> PathBuf {
     data_dir().join("undo")
 }
 
+/// Disambiguates journals created in the same millisecond.
+static OP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn next_op_id() -> u64 {
     fs::read_dir(undo_dir())
         .map(|entries| {
@@ -56,7 +59,17 @@ pub fn new_journal_path() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    undo_dir().join(format!("{:06}-{}.json", id, ts))
+    // Two operations can start in the same millisecond (a manual sort racing
+    // a scheduled one); without a unique suffix the second journal overwrote
+    // the first, permanently losing that operation's undo record.
+    for _ in 0..1000 {
+        let seq = OP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let candidate = undo_dir().join(format!("{:06}-{}-{:04}.json", id, ts, seq % 10_000));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    undo_dir().join(format!("{:06}-{}-x.json", id, ts))
 }
 
 impl UndoJournal {
@@ -129,10 +142,15 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
 
     let mut report = UndoReport { restored: 0, skipped: 0, skipped_examples: Vec::new(), op_id: journal.op_id };
     let total = journal.files.len() as u64;
+    // Entries that could not be restored stay in the journal, so a locked file
+    // or an occupied original can be retried once the user frees it — dropping
+    // the whole journal here would strand those copies in sorted/ forever.
+    let mut pending: Vec<MovedFile> = Vec::new();
     for f in journal.files.iter().rev() {
         if f.original.exists() {
             // Original spot taken (user replaced it): keep the moved copy.
             report.skipped += 1;
+            pending.push(f.clone());
             if report.skipped_examples.len() < 20 {
                 report.skipped_examples.push(format!("{} — destination occupied", f.original.display()));
             }
@@ -166,6 +184,7 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
             Ok(()) => report.restored += 1,
             Err(err) => {
                 report.skipped += 1;
+                pending.push(f.clone());
                 if report.skipped_examples.len() < 20 {
                     report.skipped_examples.push(format!("{} — {}", f.moved_to.display(), err));
                 }
@@ -173,9 +192,17 @@ pub fn undo_last(on_progress: &mut dyn FnMut(u64, u64)) -> Result<UndoReport, St
         }
         on_progress(report.restored, total);
     }
-    // The journal is considered replayed once undo finishes; rm it so a second
-    // call undoes the previous run, not this one.
-    let _ = fs::remove_file(&newest);
+    // The journal only disappears once every entry was restored. Otherwise it
+    // is rewritten with just the leftovers: the next undo retries them instead
+    // of silently skipping ahead to a previous run's journal.
+    if pending.is_empty() {
+        let _ = fs::remove_file(&newest);
+    } else {
+        pending.reverse(); // restore the journal's original (chronological) order
+        let mut remaining = UndoJournal::new(journal.output_dir.clone());
+        remaining.files = pending;
+        append(&newest, &remaining)?;
+    }
     Ok(report)
 }
 
@@ -245,6 +272,17 @@ mod tests {
         assert_eq!(report.skipped, 1);
         assert!(a.exists());
         assert!(moved.exists(), "moved copy must survive a blocked undo");
+        // The journal must survive so the restore can be retried once the
+        // user frees the original path.
+        assert_eq!(list_journals().len(), 1);
+
+        // Free the destination and retry: the same journal now restores it.
+        fs::remove_file(&a).unwrap();
+        let report = undo_last(&mut |_, _| {}).unwrap();
+        assert_eq!(report.restored, 1);
+        assert_eq!(report.skipped, 0);
+        assert!(a.exists());
+        assert!(!moved.exists());
         assert!(list_journals().is_empty());
     }
 

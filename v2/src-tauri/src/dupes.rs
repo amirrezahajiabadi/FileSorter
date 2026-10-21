@@ -85,6 +85,24 @@ impl HashCache {
     fn store(&mut self, path: PathBuf, mtime: i64, size: u64, head: String, full: Option<String>) {
         self.0.insert(path, CacheEntry { mtime, size, head, full });
     }
+
+    /// The full hash already known for exactly this (path, mtime, size, head),
+    /// if any. Recomputing the head must not throw away a full hash the
+    /// previous run stored, or every scan pays for a complete re-hash.
+    fn cached_full(&self, path: &Path, mtime: i64, size: u64, head: &str) -> Option<String> {
+        let entry = self.0.get(path)?;
+        if entry.mtime == mtime && entry.size == size && entry.head == head {
+            entry.full.clone()
+        } else {
+            None
+        }
+    }
+
+    /// Drop entries for files this scan did not see, so the cache does not
+    /// grow with every folder the user ever analysed.
+    fn retain_paths(&mut self, keep: &std::collections::HashSet<&Path>) {
+        self.0.retain(|path, _| keep.contains(path.as_path()));
+    }
 }
 
 fn mtime_millis(meta: &fs::Metadata) -> i64 {
@@ -182,7 +200,8 @@ where
             .collect();
 
         for r in results.into_iter().flatten() {
-            cache.store(r.0.clone(), r.2, r.1, r.3.clone(), None);
+            let full = cache.cached_full(&r.0, r.2, r.1, &r.3);
+            cache.store(r.0.clone(), r.2, r.1, r.3.clone(), full);
             heads.push(r);
         }
         done += chunk.len();
@@ -265,6 +284,11 @@ where
         })
         .collect();
     result.sort_by(|a, b| b.wasted.cmp(&a.wasted).then(b.size.cmp(&a.size)));
+
+    // Keep the cache scoped to what this scan actually looked at, so
+    // `hash-cache.json` cannot grow without bound across folders.
+    let scanned: std::collections::HashSet<&Path> = files.iter().map(|(p, _)| p.as_path()).collect();
+    cache.retain_paths(&scanned);
 
     cache.save(cache_path)?;
     Ok((result, cache))

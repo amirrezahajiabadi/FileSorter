@@ -9,6 +9,7 @@ These tests drive a recording subclass so delivery is observable
 without any real frontend.
 """
 
+import threading
 import time
 
 import pytest
@@ -236,3 +237,56 @@ def test_terminal_flush_still_ordered_with_batches(tmp_path, monkeypatch):
     batched.push_event("done", {"copied": 1, "skipped": 0, "errors": 0, "target_dir": "x"})
     kinds = [kind for kind, _ in batched.round_trips]
     assert kinds == ["item", "done"]
+
+
+# ══════════════════════════════════════════════════════════════════
+#  A flush already in flight must finish before a terminal event
+# ══════════════════════════════════════════════════════════════════
+# Regression: _flush_coalesced() used to drain the buffer, release the
+# coalesce lock and only then take the delivery lock. A "done" arriving in
+# that window flushed an empty buffer and shipped ahead of the rows the
+# flusher had already taken, so the UI printed log lines and counters after
+# the operation was reported finished.
+
+
+class _BlockingApi(BaseApi):
+    def __init__(self):
+        super().__init__()
+        self.delivered = []
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def _push(self, kind: str, payload) -> None:
+        if kind == "item":
+            self.entered.set()
+            assert self.release.wait(timeout=5.0), "test deadlock: flush never released"
+        self.delivered.append(kind)
+
+
+def test_terminal_event_waits_for_an_inflight_flush(tmp_path, monkeypatch):
+    import app.settings_manager as settings_manager
+
+    monkeypatch.setattr(settings_manager, "SETTINGS_FILE", tmp_path / "settings.json")
+    api = _BlockingApi()
+    monkeypatch.setattr(api, "_ensure_flusher", lambda: None)  # keep it deterministic
+
+    api.push_event("item", {"status": "ok", "name": "a.txt", "category": "docs"})
+    flusher = threading.Thread(target=api._flush_coalesced, daemon=True)
+    flusher.start()
+    assert api.entered.wait(5.0), "flusher never started delivering"
+
+    done = threading.Thread(
+        target=lambda: api.push_event(
+            "done", {"copied": 1, "skipped": 0, "errors": 0, "target_dir": "x"}
+        ),
+        daemon=True,
+    )
+    done.start()
+    time.sleep(0.1)
+    # The item row is still being delivered: "done" must not have landed yet.
+    assert api.delivered == []
+
+    api.release.set()
+    flusher.join(5.0)
+    done.join(5.0)
+    assert api.delivered == ["item", "done"]

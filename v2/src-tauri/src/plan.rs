@@ -108,12 +108,18 @@ pub fn build_plan_with_rules(
             (cats.name(idx).to_string(), None)
         };
 
+        // A category key is user input: `Path::join` throws the output dir
+        // away for an absolute name ("D:\\backup") and `..` climbs out of the
+        // tree. Never let a plan move a file outside root/sorted.
+        if !crate::paths::is_safe_component(&category) {
+            continue;
+        }
+
         let dest_dir = output_dir.join(&category);
         let file_name = match path.file_name() {
             Some(n) => n.to_os_string(),
             None => continue,
-        };
-        let candidate = dest_dir.join(&file_name);
+        };        let candidate = dest_dir.join(&file_name);
         // Loose file sitting exactly where it would be sorted: nothing to do.
         if path.parent() == Some(dest_dir.as_path()) {
             continue;

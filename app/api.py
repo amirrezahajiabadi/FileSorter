@@ -84,8 +84,9 @@ class BaseApi:
         # Serializes flushes: a timer flush and an inline terminal flush
         # (sort thread flushes pending rows before pushing "done") must
         # never deliver concurrently or ordering breaks and the desktop
-        # bridge gets overlapping evaluate_js calls.
-        self._delivery_lock = threading.Lock()
+        # bridge gets overlapping evaluate_js calls. Re-entrant because the
+        # terminal path holds it while calling _flush_coalesced().
+        self._delivery_lock = threading.RLock()
         self._scan_lock = threading.Lock()
         self._scan_cancel = None  # threading.Event for the active disk/dup scan
         self._scan_kind = None
@@ -137,8 +138,12 @@ class BaseApi:
         if kind in COALESCE_FLUSH_BEFORE:
             # Deliver any pending ticks first so ordering stays honest:
             # progress counters always land before the event that ends them.
-            self._flush_coalesced()
-            self._push(kind, payload)
+            # The delivery lock is held across both steps: without it a
+            # flusher thread that already drained the buffer could deliver its
+            # rows *after* this terminal event.
+            with self._delivery_lock:
+                self._flush_coalesced()
+                self._push(kind, payload)
             return
         if kind not in COALESCE_LAST_KINDS and kind not in COALESCE_BATCH_KINDS:
             self._push(kind, payload)
@@ -202,13 +207,19 @@ class BaseApi:
         was delivered. Runs on the flusher thread (and inline on terminal
         events); the queue/JS bridge must be thread-safe (both adapters'
         _push are).
+
+        The delivery lock is taken *before* the buffer is drained. Taking it
+        afterwards leaves a window where a terminal event flushes an already
+        empty buffer, pushes "done", and only then lets the flusher deliver
+        the rows it had drained — so log/progress rows would arrive after the
+        operation was reported finished.
         """
-        with self._coalesce_lock:
-            items = list(self._coalesced.items())
-            self._coalesced.clear()
-        if not items:
-            return False
         with self._delivery_lock:
+            with self._coalesce_lock:
+                items = list(self._coalesced.items())
+                self._coalesced.clear()
+            if not items:
+                return False
             for kind, payload in items:
                 try:
                     if kind in COALESCE_BATCH_KINDS:

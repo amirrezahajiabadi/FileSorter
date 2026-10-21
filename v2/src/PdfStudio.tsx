@@ -253,7 +253,10 @@ export default function PdfStudio() {
       const bytes = await invoke<number[]>("read_file_binary", { path });
       const u8 = new Uint8Array(bytes);
 
-      const loadingTask = pdfjsLib.getDocument({ data: u8 });
+      // pdf.js transfers whatever buffer it is handed to its worker, which
+      // detaches it. Keeping `u8` pristine means the true size is shown and
+      // "Extract Pages" can still read the document later.
+      const loadingTask = pdfjsLib.getDocument({ data: u8.slice() });
       const pdf = await loadingTask.promise;
 
       const name = path.replace(/\\/g, "/").split("/").pop() || "document.pdf";
@@ -292,7 +295,9 @@ export default function PdfStudio() {
 
     try {
       const targetDir = outputFolder || pdfMeta.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
-      const loadingTask = pdfjsLib.getDocument({ data: pdfMeta.bytes });
+      // Same transfer/detach rule as pickPdf: work on a copy so extracting
+      // twice (or re-extracting after changing the range) still works.
+      const loadingTask = pdfjsLib.getDocument({ data: pdfMeta.bytes.slice() });
       const pdf = await loadingTask.promise;
 
       // Parse page ranges (e.g. "all", or "1, 3-5")

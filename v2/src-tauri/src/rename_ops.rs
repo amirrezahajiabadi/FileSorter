@@ -9,6 +9,12 @@ use tauri_plugin_dialog::DialogExt;
 
 static LAST_RENAME_JOURNAL: Mutex<Vec<(PathBuf, PathBuf)>> = Mutex::new(Vec::new());
 
+/// Windows compares paths case-insensitively, so `File.txt` "already exists"
+/// when the real name is `file.txt`. That is still a legal case-only rename.
+fn same_path_ignoring_case(a: &std::path::Path, b: &std::path::Path) -> bool {
+    a.to_string_lossy().to_lowercase() == b.to_string_lossy().to_lowercase()
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct RenamePair {
     pub original_path: String,
@@ -56,7 +62,7 @@ pub fn pick_folder_for_rename(app: AppHandle) -> Result<Option<Vec<String>>, Str
     Ok(None)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn execute_batch_rename(pairs: Vec<RenamePair>) -> Result<BatchRenameReport, String> {
     let mut journal = LAST_RENAME_JOURNAL.lock().map_err(|e| e.to_string())?;
     journal.clear();
@@ -83,16 +89,25 @@ pub fn execute_batch_rename(pairs: Vec<RenamePair>) -> Result<BatchRenameReport,
             }
         };
 
-        let new_path = parent.join(&item.new_name);
+        // A new name is user input, not a path: `..\..\x` or `D:\x` would
+        // rename the file out of its own folder entirely.
+        let new_name = item.new_name.trim();
+        if !crate::paths::is_safe_component(new_name) {
+            failed += 1;
+            errors.push(format!("Invalid file name: {}", item.new_name));
+            continue;
+        }
+
+        let new_path = parent.join(new_name);
 
         if orig == new_path {
             // No name change needed
             continue;
         }
 
-        if new_path.exists() {
+        if new_path.exists() && !same_path_ignoring_case(&orig, &new_path) {
             failed += 1;
-            errors.push(format!("Target name already exists: {}", item.new_name));
+            errors.push(format!("Target name already exists: {}", new_name));
             continue;
         }
 
@@ -131,8 +146,13 @@ pub fn undo_last_rename() -> Result<UndoRenameReport, String> {
     let mut failed = 0;
     let mut errors = Vec::new();
 
-    // Replay in reverse
-    while let Some((current_path, orig_path)) = journal.pop() {
+    // Replay in reverse. Entries that could not be restored are put back into
+    // the journal: popping them (the old behaviour) threw the only record away,
+    // so a locked file could never be retried and the next undo silently
+    // reported "no recent renames".
+    let entries: Vec<(PathBuf, PathBuf)> = journal.drain(..).collect();
+    let mut keep: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for (current_path, orig_path) in entries.into_iter().rev() {
         if !current_path.exists() {
             failed += 1;
             errors.push(format!("File no longer exists: {}", current_path.display()));
@@ -141,6 +161,7 @@ pub fn undo_last_rename() -> Result<UndoRenameReport, String> {
         if orig_path.exists() {
             failed += 1;
             errors.push(format!("Original path is occupied: {}", orig_path.display()));
+            keep.push((current_path, orig_path));
             continue;
         }
         match fs::rename(&current_path, &orig_path) {
@@ -148,9 +169,12 @@ pub fn undo_last_rename() -> Result<UndoRenameReport, String> {
             Err(e) => {
                 failed += 1;
                 errors.push(format!("Error restoring {}: {}", orig_path.display(), e));
+                keep.push((current_path, orig_path));
             }
         }
     }
+    keep.reverse(); // back to chronological order
+    *journal = keep;
 
     Ok(UndoRenameReport {
         restored,

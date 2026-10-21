@@ -79,6 +79,9 @@ export interface I18nStrings {
   watch_no_folders: string;
   watch_live_log: string;
   watch_empty_log: string;
+  watch_event_moved: string;
+  watch_event_skipped: string;
+  watch_event_failed: string;
   sched_title: string;
   sched_desc: string;
   sched_add_task: string;
@@ -195,6 +198,9 @@ export const STRINGS: I18nStrings = {
   watch_no_folders: "No folders are currently being watched. Add one above.",
   watch_live_log: "Live Activity Stream:",
   watch_empty_log: "No file events yet. Watched folders will report here automatically.",
+  watch_event_moved: "Auto-sorted",
+  watch_event_skipped: "Skipped",
+  watch_event_failed: "Failed",
   sched_title: "Automated Task Scheduler",
   sched_desc: "Keep your system clean and organized on automated timers in the background.",
   sched_add_task: "+ Add Scheduled Task",

@@ -35,6 +35,7 @@ import type {
   WatchItem,
 } from './protocol';
 import { DEFAULT_CATEGORY_META, TERMINAL_EVENT_KINDS } from './protocol';
+import { STRINGS_MIRROR } from './generated/strings';
 import { bridge, initTransport, subscribeEvents, transportKind, isDesktop } from './transport';
 import type { TransportKind } from './transport';
 import type { SortEvent } from './transport';
@@ -59,7 +60,11 @@ export function taskKindKey(kind: TaskKind): string {
 }
 
 export function taskSummaryKey(kind: TaskKind): string {
-  return `task_summary_${kind}`;
+  // The wire values are `disk_scan` / `dup_scan` but the string table names
+  // those summaries `task_summary_disk` / `task_summary_dup`; interpolating
+  // the raw kind printed the key itself in the completion toast.
+  const suffix = kind === 'cleanup' ? 'cleanup' : kind === 'disk_scan' ? 'disk' : 'dup';
+  return `task_summary_${suffix}`;
 }
 
 export function taskSummaryArgs(p: TaskHistoryEntry): Record<string, string | number> {
@@ -179,7 +184,7 @@ const initial: UIState = {
   ready: false,
   desktop: false,
   transport: transportKind,
-  theme: 'dark',
+  theme: 'light',
   version: '',
   strings: {},
   folder: null,
@@ -308,7 +313,13 @@ function scheduleBatchFlush(): void {
 
 /** Apply every buffered item/watch update in a single store set(). */
 function flushBatch(): void {
-  pendingTimer = null;
+  // Cancel the timer that fired us (or one scheduled concurrently): leaving
+  // it pending meant a later idle timer re-flushed an empty batch and the
+  // 120 ms coalescing window could be defeated.
+  if (pendingTimer !== null) {
+    clearTimeout(pendingTimer);
+    pendingTimer = null;
+  }
   const logs = pendingLogs;
   const watchLogs = pendingWatchLogs;
   const catDeltas = pendingCat;
@@ -726,7 +737,9 @@ export async function init(): Promise<void> {
     });
   } catch (err) {
     console.error('init failed:', err);
-    set({ ready: true });
+    // Render with the generated mirror instead of an empty table: with no
+    // strings every label became its raw i18n key and the app looked broken.
+    set({ ready: true, strings: STRINGS_MIRROR });
   }
 }
 
@@ -743,11 +756,15 @@ export function setFolder(folder: string | null): void {
 }
 
 export async function browseFolder(): Promise<boolean> {
-  const path = await bridge.browse_folder();
-  if (path) {
-    setFolder(path);
-    pushLog('info', inline(fmt(t(state.strings, 'folder_selected_log'), { path })));
-    return true;
+  try {
+    const path = await bridge.browse_folder();
+    if (path) {
+      setFolder(path);
+      pushLog('info', inline(fmt(t(state.strings, 'folder_selected_log'), { path })));
+      return true;
+    }
+  } catch (err) {
+    showNotice('error', String(err));
   }
   return false;
 }
@@ -1027,9 +1044,13 @@ export async function restoreDefaults(): Promise<boolean> {
 }
 
 export async function toggleTheme(): Promise<void> {
-  const theme = await bridge.toggle_theme();
-  applyTheme(theme);
-  set({ theme });
+  try {
+    const theme = await bridge.toggle_theme();
+    applyTheme(theme);
+    set({ theme });
+  } catch (err) {
+    showNotice('error', String(err));
+  }
 }
 
 export function clearNotice(): void {
@@ -1126,6 +1147,11 @@ export function openDupPanel(): void {
 }
 
 export function closeDupPanel(): void {
+  // Closing the panel does not stop the backend scan, which keeps the single
+  // scan slot busy and makes the next scan refuse to start.
+  if (state.dupScanning) {
+    void bridge.cancel_scan().catch(() => {});
+  }
   set({
     dupOpen: false,
     dupScanning: false,
@@ -1146,7 +1172,14 @@ async function startDupScan(path: string): Promise<void> {
     dupCancelled: false,
   });
   try {
-    await bridge.find_duplicates(path);
+    const started = await bridge.find_duplicates(path);
+    if (!started) {
+      // The backend only runs one scan at a time and refuses a second one
+      // without emitting events. Leaving the flag set meant this panel spun
+      // forever with no cancel path.
+      set({ dupScanning: false, dupPhase: 'idle' });
+      showNotice('error', inline(t(state.strings, 'operation_busy')));
+    }
   } catch (err) {
     showNotice('error', String(err));
     set({ dupScanning: false });
@@ -1155,6 +1188,10 @@ async function startDupScan(path: string): Promise<void> {
 
 export async function dupScanCurrent(): Promise<void> {
   if (!state.folder) return;
+  if (state.diskScanning) {
+    showNotice('error', inline(t(state.strings, 'operation_busy')));
+    return;
+  }
   await startDupScan(state.folder);
 }
 
@@ -1227,7 +1264,7 @@ export async function deleteSelectedDupes(): Promise<void> {
     }
     const firstFail = res.failed[0];
     if (firstFail) {
-      const pathOnly = firstFail.path.split(/[\/]/).pop() ?? firstFail.path;
+      const pathOnly = firstFail.path.split(/[\\/]/).pop() ?? firstFail.path;
       showNotice(
         'error',
         inline(
@@ -1264,6 +1301,9 @@ export async function loadDrives(): Promise<void> {
 }
 
 export function closeDiskPanel(): void {
+  if (state.diskScanning) {
+    void bridge.cancel_scan().catch(() => {});
+  }
   set({
     diskOpen: false,
     diskScanning: false,
@@ -1283,7 +1323,11 @@ async function startDiskScan(path: string): Promise<void> {
     diskReport: null,
   });
   try {
-    await bridge.scan_disk(path);
+    const started = await bridge.scan_disk(path);
+    if (!started) {
+      set({ diskScanning: false });
+      showNotice('error', inline(t(state.strings, 'operation_busy')));
+    }
   } catch (err) {
     showNotice('error', String(err));
     set({ diskScanning: false });
@@ -1292,6 +1336,10 @@ async function startDiskScan(path: string): Promise<void> {
 
 export async function diskScanCurrent(): Promise<void> {
   if (!state.folder) return;
+  if (state.dupScanning) {
+    showNotice('error', inline(t(state.strings, 'operation_busy')));
+    return;
+  }
   await startDiskScan(state.folder);
 }
 
@@ -1463,6 +1511,7 @@ export async function emptyRecycleBin(): Promise<void> {
 }
 
 export async function runCleanScan(): Promise<void> {
+  if (state.cleanScanning) return;
   set({
     cleanScanning: true,
     cleanReport: null,
@@ -1470,7 +1519,11 @@ export async function runCleanScan(): Promise<void> {
     cleanArmed: false,
   });
   try {
-    await bridge.scan_cleanup();
+    const started = await bridge.scan_cleanup();
+    if (!started) {
+      set({ cleanScanning: false });
+      showNotice('error', inline(t(state.strings, 'operation_busy')));
+    }
   } catch (err) {
     showNotice('error', String(err));
     set({ cleanScanning: false });
@@ -1507,11 +1560,14 @@ export async function runCleanDelete(): Promise<void> {
     0,
   );
   try {
+    // Actually mark the delete in flight: the guard at the top of this
+    // function was dead code, so a second click fired a second concurrent
+    // delete while the first was still running.
+    set({ cleanDeleting: true });
     // Delete by location id: the backend (and the mock) remove only
     // what the last scan flagged under those locations.
     const res = await bridge.delete_cleanup(ids);
     const totalDeleted = res.deleted.length;
-    set({ cleanDeleting: false });
     if (totalDeleted > 0) {
       // Report what the backend says was actually freed, not the
       // pre-delete estimate — locked/failed files skew the estimate.
@@ -1533,6 +1589,7 @@ export async function runCleanDelete(): Promise<void> {
     await runCleanScan();
   } catch (err) {
     showNotice('error', String(err));
+  } finally {
     set({ cleanDeleting: false });
   }
 }

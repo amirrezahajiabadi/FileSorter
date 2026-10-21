@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useStoreFields } from '../store';
 import {
@@ -57,6 +57,14 @@ export default function DuplicatesPanel() {
   const [shownGroups, setShownGroups] = useState(GROUPS_PER_PAGE);
 
   const { dupGroups, dupScanning, dupPhase, dupProcessed, dupTotal } = store;
+
+  // A new scan replaces every group: stale per-group row caps and an old page
+  // depth would otherwise render a fresh (smaller) result set halfway down.
+  useEffect(() => {
+    setRowCaps({});
+    setShownGroups(GROUPS_PER_PAGE);
+    setArmed(false);
+  }, [store.dupScanFolder, dupScanning]);
 
   // Memoized: these walk every file of every group. They used to run on every
   // render — including the ~8 progress ticks a second a running scan emits.

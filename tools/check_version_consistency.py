@@ -71,6 +71,33 @@ def collect_mismatches(app_version: str = None, repo: Path = ROOT) -> list[str]:
     else:
         problems.append(f"installer.nsi: !define APP_VERSION not found ({nsi_path})")
 
+    # ── v2 (Tauri/Rust) copies ────────────────────────────────────
+    # The native edition carries its own package.json, Cargo.toml and
+    # tauri.conf.json; all three feed the installer, the updater and the
+    # Windows version resource, so drift here ships a mislabelled build.
+    v2_pkg_path = repo / "v2" / "package.json"
+    try:
+        compare("v2/package.json", json.loads(_read(v2_pkg_path))["version"], str(v2_pkg_path))
+    except Exception as exc:
+        problems.append(f"v2/package.json: unreadable ({exc})")
+
+    cargo_path = repo / "v2" / "src-tauri" / "Cargo.toml"
+    cargo_match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', _read(cargo_path))
+    if cargo_match:
+        compare("v2/src-tauri/Cargo.toml version", cargo_match.group(1), str(cargo_path))
+    else:
+        problems.append(f"v2/src-tauri/Cargo.toml: package version not found ({cargo_path})")
+
+    conf_path = repo / "v2" / "src-tauri" / "tauri.conf.json"
+    try:
+        compare(
+            "v2/src-tauri/tauri.conf.json version",
+            json.loads(_read(conf_path))["version"],
+            str(conf_path),
+        )
+    except Exception as exc:
+        problems.append(f"v2/src-tauri/tauri.conf.json: unreadable ({exc})")
+
     # ── generated string table (must be regenerated after a bump) ──
     strings_path = repo / "ui" / "src" / "generated" / "strings.ts"
     text = _read(strings_path)

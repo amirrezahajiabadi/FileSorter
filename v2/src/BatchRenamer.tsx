@@ -75,28 +75,35 @@ export default function BatchRenamer() {
   };
 
   const appendPaths = (paths: string[]) => {
-    const newItems: FileEntry[] = [];
-    for (const p of paths) {
-      if (files.some((f) => f.fullPath === p)) continue;
-      const normalized = p.replace(/\\/g, "/");
-      const parts = normalized.split("/");
-      const originalName = parts[parts.length - 1] || "file";
-      const parentDir = parts.slice(0, -1).join("/");
+    // De-duplicate inside the updater: reading the closed-over `files` state
+    // let two quick "add folder" clicks enqueue the same path twice, which
+    // then sent duplicate rename pairs to the backend.
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => f.fullPath));
+      const newItems: FileEntry[] = [];
+      for (const p of paths) {
+        if (seen.has(p)) continue;
+        seen.add(p);
+        const normalized = p.replace(/\\/g, "/");
+        const parts = normalized.split("/");
+        const originalName = parts[parts.length - 1] || "file";
+        const parentDir = parts.slice(0, -1).join("/");
 
-      const lastDot = originalName.lastIndexOf(".");
-      const stem = lastDot > 0 ? originalName.slice(0, lastDot) : originalName;
-      const ext = lastDot > 0 ? originalName.slice(lastDot + 1) : "";
+        const lastDot = originalName.lastIndexOf(".");
+        const stem = lastDot > 0 ? originalName.slice(0, lastDot) : originalName;
+        const ext = lastDot > 0 ? originalName.slice(lastDot + 1) : "";
 
-      newItems.push({
-        id: `${p}_${Date.now()}_${Math.random()}`,
-        fullPath: p,
-        originalName,
-        stem,
-        ext,
-        parentDir,
-      });
-    }
-    setFiles((prev) => [...prev, ...newItems]);
+        newItems.push({
+          id: `${p}_${Date.now()}_${Math.random()}`,
+          fullPath: p,
+          originalName,
+          stem,
+          ext,
+          parentDir,
+        });
+      }
+      return [...prev, ...newItems];
+    });
   };
 
   const removeFile = (id: string) => {
@@ -273,6 +280,10 @@ export default function BatchRenamer() {
       const rep = await invoke<UndoRenameReport>("undo_last_rename");
       setUndoReport(rep);
       setReport(null);
+      // The rows still hold the *renamed* paths while the disk now has the
+      // originals; the next Apply would fail with "Source not found". Start
+      // the list clean instead of leaving stale rows behind.
+      if (rep.restored > 0) setFiles([]);
     } catch (e) {
       setError(String(e));
     } finally {

@@ -100,7 +100,18 @@ pub fn settings_path() -> PathBuf {
 
 fn read_settings() -> SettingsFile {
     match fs::read_to_string(settings_path()) {
-        Ok(text) => serde_json::from_str::<SettingsFile>(&text).unwrap_or_default(),
+        Ok(text) => match serde_json::from_str::<SettingsFile>(&text) {
+            Ok(parsed) => parsed,
+            Err(err) => {
+                // Never let a corrupt file be silently replaced by defaults:
+                // every save_* is a read-modify-write, so the user's custom
+                // categories, rules, watch folders and tasks would be gone
+                // after the next action. Keep a copy for recovery first.
+                let _ = fs::copy(settings_path(), data_dir().join("settings.json.corrupt"));
+                eprintln!("settings.json is not valid ({err}); using defaults");
+                SettingsFile::default()
+            }
+        },
         Err(_) => SettingsFile::default(),
     }
 }
@@ -117,8 +128,15 @@ fn write_settings(settings: &SettingsFile) -> Result<(), String> {
 
 pub fn load_categories() -> CategoryMap {
     let file = read_settings();
-    if file.categories.contains_key("others") {
-        file.categories
+    // Drop names that could escape root/sorted (a settings file written by an
+    // older version or by hand must not be able to steer files anywhere).
+    let map: CategoryMap = file
+        .categories
+        .into_iter()
+        .filter(|(name, _)| crate::paths::is_safe_component(name))
+        .collect();
+    if map.contains_key("others") {
+        map
     } else {
         default_categories()
     }
@@ -127,6 +145,13 @@ pub fn load_categories() -> CategoryMap {
 pub fn save_categories(map: &CategoryMap) -> Result<(), String> {
     if !map.contains_key("others") {
         return Err("the 'others' category must exist".into());
+    }
+    for name in map.keys() {
+        if !crate::paths::is_safe_component(name) {
+            return Err(format!(
+                "invalid category name {name:?}: use a single folder name without \\ / : * ? \" < > |"
+            ));
+        }
     }
     let mut file = read_settings();
     file.categories = map.clone();

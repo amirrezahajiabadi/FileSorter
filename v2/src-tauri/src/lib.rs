@@ -12,6 +12,7 @@ pub mod disk_ops;
 pub mod dupes;
 pub mod execute;
 pub mod image_ops;
+pub mod paths;
 pub mod pdf_ops;
 pub mod plan;
 pub mod rename_ops;
@@ -194,15 +195,19 @@ fn plan_sort(app: AppHandle) -> Result<plan::SortPlan, String> {
 
 #[tauri::command]
 fn sort_execute(app: AppHandle) -> Result<(), String> {
-    let (plan, stop) = with_state(&app, |st| {
+    let plan = with_state(&app, |st| {
         if st.files.is_empty() {
             return Err("scan a folder first".into());
         }
         let root = st.root.clone().ok_or("scan root missing")?;
         let cats = Categories::from_map(&categories::load_categories());
         let rules = categories::load_rules();
-        Ok((plan::build_plan_with_rules(&root, &st.files, &cats, &rules), st.stop.clone()))
+        Ok(plan::build_plan_with_rules(&root, &st.files, &cats, &rules))
     })?;
+    // A fresh stop flag per sort: the scan's flag stays `true` after the user
+    // pressed Stop, and reusing it made the very next sort abort before its
+    // first file while still reporting success.
+    let stop = StopFlag::new();
     let handle = app.clone();
     std::thread::spawn(move || {
         let result = execute::execute(&plan, &stop, &|moved, total| {
@@ -210,11 +215,14 @@ fn sort_execute(app: AppHandle) -> Result<(), String> {
         });
         match result {
             Ok(report) => {
-                // The scanned snapshot is stale after a successful sort.
-                let _ = with_state(&handle, |st| {
-                    st.files.clear();
-                    Ok(())
-                });
+                // The scanned snapshot is stale only when something actually
+                // moved; a no-op run must not wipe the preview.
+                if report.moved > 0 {
+                    let _ = with_state(&handle, |st| {
+                        st.files.clear();
+                        Ok(())
+                    });
+                }
                 let _ = handle.emit("sort-done", serde_json::json!({ "report": report }));
             }
             Err(e) => {
@@ -325,12 +333,12 @@ fn save_smart_rules(rules: Vec<categories::SmartRule>) -> Result<(), String> {
     categories::save_rules(&rules)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn scan_junk() -> Result<Vec<cleanup_ops::JunkLocation>, String> {
     Ok(cleanup_ops::scan_junk_locations())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn clean_junk(selected_ids: Vec<String>) -> Result<cleanup_ops::CleanReport, String> {
     Ok(cleanup_ops::clean_junk_locations(&selected_ids))
 }
@@ -386,7 +394,7 @@ fn delete_scheduled_task(app: AppHandle, id: String) -> Result<(), String> {
     categories::save_tasks(&mgr.get_tasks())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn run_scheduled_task_now(app: AppHandle, id: String) -> Result<String, String> {
     let mgr = app.state::<Arc<schedule_ops::ScheduleManager>>();
     let tasks = mgr.get_tasks();
@@ -405,14 +413,24 @@ fn list_system_drives() -> Vec<disk_ops::DriveInfo> {
     disk_ops::list_drives()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn check_app_updates() -> Result<update_ops::UpdateCheckResult, String> {
-    update_ops::check_for_updates("6.7.0")
+    // Never hardcode the version here: a stale literal makes the updater
+    // compare GitHub's tag against the *previous* release and report "up to
+    // date" forever. Cargo.toml / tauri.conf.json carry the real version.
+    update_ops::check_for_updates(env!("CARGO_PKG_VERSION"))
 }
 
 #[tauri::command]
 fn open_external_url(app: AppHandle, url: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
+    // Only ever hand http(s) links to the shell. `open_url` ends up in
+    // ShellExecuteW, so a `file:///…exe` or `ms-settings:` string coming from
+    // a release note could otherwise launch a local program.
+    let lower = url.trim().to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        return Err("only http(s) links can be opened".into());
+    }
     app.opener().open_url(&url, None::<&str>).map_err(|e| e.to_string())
 }
 
@@ -455,12 +473,14 @@ fn get_disk_stats(app: AppHandle) -> Result<DiskStats, String> {
             }
         }
 
-        let mut largest_files: Vec<(String, u64)> = top20
+        // `into_sorted_vec` on a heap of `Reverse` already yields descending
+        // size — the list is rendered top-to-bottom as "largest files", so
+        // reversing it here put the smallest file first.
+        let largest_files: Vec<(String, u64)> = top20
             .into_sorted_vec()
             .into_iter()
             .map(|std::cmp::Reverse((s, p))| (p.to_string_lossy().into_owned(), s))
             .collect();
-        largest_files.reverse();
 
         let category_breakdown: Vec<(String, u64, u64)> = cats
             .names()

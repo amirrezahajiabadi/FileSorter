@@ -61,22 +61,29 @@ pub fn pick_output_folder(app: AppHandle) -> Result<Option<String>, String> {
     Ok(path.map(|p| p.to_string()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_file_binary(path: String) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|e| format!("Could not read {}: {}", path, e))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_file_binary(path: String, data: Vec<u8>) -> Result<u64, String> {
     let p = Path::new(&path);
     if let Some(parent) = p.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(p, &data).map_err(|e| e.to_string())?;
+    // Write-then-rename: a crash or a failed write must not leave the user's
+    // existing PDF truncated.
+    let tmp = p.with_extension("filesorter.tmp");
+    fs::write(&tmp, &data).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, p).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })?;
     Ok(data.len() as u64)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_extracted_images(target_dir: String, images: Vec<ExtractedImage>) -> Result<SaveImagesReport, String> {
     let target = Path::new(&target_dir);
     fs::create_dir_all(target).map_err(|e| format!("Failed to create folder {}: {}", target_dir, e))?;
@@ -86,7 +93,11 @@ pub fn save_extracted_images(target_dir: String, images: Vec<ExtractedImage>) ->
     let mut file_paths = Vec::new();
 
     for img in images {
-        let dest = target.join(&img.filename);
+        // The name comes from a PDF, not from this process: never let it
+        // escape `target` or overwrite an image extracted earlier.
+        let name = crate::paths::safe_file_name(&img.filename)
+            .ok_or_else(|| format!("Invalid image name: {}", img.filename))?;
+        let dest = crate::execute::take_unique_on_disk(target.join(name));
         fs::write(&dest, &img.data).map_err(|e| format!("Failed writing {}: {}", dest.display(), e))?;
         total_bytes += img.data.len() as u64;
         saved_count += 1;

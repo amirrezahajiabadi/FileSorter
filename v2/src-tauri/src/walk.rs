@@ -59,8 +59,19 @@ fn spawn_walk(root: PathBuf, exclude_dir: Option<PathBuf>, opts: &WalkOptions, s
     let (tx, rx) = channel::<WalkMsg>();
     let mut builder = WalkBuilder::new(&root);
     builder.follow_links(false);
-    builder.git_ignore(opts.respect_gitignore);
-    builder.hidden(opts.skip_hidden);
+    // `WalkBuilder` defaults every ignore source to on. Only `git_ignore` is
+    // exposed as an option, so the rest must be switched off explicitly —
+    // otherwise files are silently dropped from the walk (.ignore files, the
+    // user's global gitignore, `.git/info/exclude`) even when the caller asked
+    // for a complete scan, and the UI reports a "complete" scan that skipped
+    // them.
+    builder
+        .git_ignore(opts.respect_gitignore)
+        .git_global(false)
+        .git_exclude(false)
+        .ignore(false)
+        .parents(false)
+        .hidden(opts.skip_hidden);
     if let Some(exclude) = exclude_dir {
         builder.filter_entry(move |entry| entry.path() != exclude.as_path());
     }

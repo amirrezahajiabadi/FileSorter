@@ -32,7 +32,7 @@ export default function UndoModal() {
         category: catId,
         icon: row?.icon ?? '📁',
         name: row?.name ?? catId,
-        files: entries.map((e) => e.name || e.final_dest.split(/[\/]/).pop() || '?'),
+        files: entries.map((e) => e.name || e.final_dest.split(/[\\/]/).pop() || '?'),
       });
     }
     return out.sort((a, b) => a.category.localeCompare(b.category));

@@ -32,11 +32,11 @@ function FileGlyph(name: string): string {
 }
 
 function fileName(path: string): string {
-  return path.split(/[\/]/).pop() ?? path;
+  return path.split(/[\\/]/).pop() ?? path;
 }
 
 function dirName(path: string): string {
-  return path.split(/[\/]/).slice(0, -1).join('/');
+  return path.split(/[\\/]/).slice(0, -1).join('/');
 }
 
 export default function DiskPanel() {

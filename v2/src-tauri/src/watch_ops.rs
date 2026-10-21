@@ -15,6 +15,14 @@ use crate::plan;
 pub type Fingerprint = (u64, u64); // (mtime_secs, size_bytes)
 pub type DirSnapshot = HashMap<String, Fingerprint>;
 
+/// How long a file's mtime must be in the past before Watch Mode touches it.
+///
+/// A name that just appeared may still be open for writing (Office, a video
+/// exporter, a sync client). Moving it mid-write either fails the rename or,
+/// on the copy fallback, captures a truncated file — so wait one poll window
+/// for the writer to finish.
+const SETTLE_SECS: u64 = 2;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchEventPayload {
     pub folder: String,
@@ -196,11 +204,24 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
 
                 // Find newly added files
                 let mut moved_names = Vec::new();
+                // Names that must not enter the snapshot this round: still
+                // being written, or the move failed. Dropping them means the
+                // next poll sees them as new and retries, instead of silently
+                // blacklisting a locked file forever.
+                let mut retry_names = Vec::new();
+                let now_secs = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
                 for (name, fp) in &current_snap {
                     if is_transient_or_download(name) {
                         continue;
                     }
                     if !prev.contains_key(name) {
+                        if now_secs.saturating_sub(fp.0) < SETTLE_SECS {
+                            retry_names.push(name.clone());
+                            continue;
+                        }
                         // New file detected!
                         let source_file = folder_path.join(name);
                         let file_size = fp.1;
@@ -211,16 +232,31 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                             let mut action = "moved".to_string();
                             let mut err_msg = None;
 
-                            if let Some(parent) = mv.destination.parent() {
+                            let dest = crate::execute::take_unique_on_disk(mv.destination.clone());
+                            if let Some(parent) = dest.parent() {
                                 let _ = fs::create_dir_all(parent);
                             }
 
-                            if let Err(e) = fs::rename(&mv.source, &mv.destination) {
-                                // Try copy & remove
-                                match fs::copy(&mv.source, &mv.destination) {
+                            if let Err(e) = fs::rename(&mv.source, &dest) {
+                                // Try copy & remove — but only delete the source
+                                // once the copy is verified to be complete.
+                                match fs::copy(&mv.source, &dest) {
                                     Ok(_) => {
-                                        let _ = fs::remove_file(&mv.source);
-                                        moved_names.push(name.clone());
+                                        let src_len = fs::metadata(&mv.source).map(|m| m.len()).ok();
+                                        let dst_len = fs::metadata(&dest).map(|m| m.len()).ok();
+                                        if src_len.is_some() && src_len == dst_len {
+                                            match fs::remove_file(&mv.source) {
+                                                Ok(_) => moved_names.push(name.clone()),
+                                                Err(rm_err) => {
+                                                    action = "failed".to_string();
+                                                    err_msg = Some(format!("delete after copy: {}", rm_err));
+                                                }
+                                            }
+                                        } else {
+                                            let _ = fs::remove_file(&dest);
+                                            action = "failed".to_string();
+                                            err_msg = Some("incomplete copy — source kept".to_string());
+                                        }
                                     }
                                     Err(copy_err) => {
                                         action = "failed".to_string();
@@ -235,7 +271,7 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                                 folder: folder_str.clone(),
                                 filename: name.clone(),
                                 category: mv.category.clone(),
-                                action,
+                                action: action.clone(),
                                 timestamp: SystemTime::now()
                                     .duration_since(SystemTime::UNIX_EPOCH)
                                     .map(|d| d.as_secs())
@@ -245,12 +281,20 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
 
                             manager.record_event(event.clone());
                             let _ = app.emit("watch-event", event);
+                            if action != "moved" {
+                                retry_names.push(name.clone());
+                            }
                         }
                     }
                 }
 
-                // Remove moved files from snapshot and reuse without extra disk read
+                // Remove handled files from the snapshot (they are gone from
+                // disk now) and retry candidates (so the next poll re-detects
+                // them) before storing it.
                 for name in moved_names {
+                    current_snap.remove(&name);
+                }
+                for name in retry_names {
                     current_snap.remove(&name);
                 }
 

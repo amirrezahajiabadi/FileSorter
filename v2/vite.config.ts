@@ -2,11 +2,22 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
+import { readFileSync } from "node:fs";
 const host = process.env.TAURI_DEV_HOST;
+
+// The badge in the sidebar must never carry a hand-written version: it used to
+// go stale on every release. package.json is bumped together with the Rust
+// crate, so it is the value the bundle gets at build time.
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
+) as { version: string };
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

@@ -36,7 +36,15 @@ def test_ci_command_passes_on_this_repo():
 def test_drift_is_reported_for_every_copy():
     """A wrong APP_VERSION must name every file that needs editing."""
     joined = "\n".join(tool.collect_mismatches("9.9.9"))
-    for expected in ("ui/package.json", "transport.ts", "installer.nsi", "strings.ts"):
+    for expected in (
+        "ui/package.json",
+        "transport.ts",
+        "installer.nsi",
+        "strings.ts",
+        "v2/package.json",
+        "v2/src-tauri/Cargo.toml",
+        "v2/src-tauri/tauri.conf.json",
+    ):
         assert expected in joined, f"{expected} not reported as drifted"
 
 

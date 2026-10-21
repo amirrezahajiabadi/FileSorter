@@ -35,7 +35,7 @@ pub fn pick_images_for_studio(app: AppHandle) -> Result<Option<Vec<String>>, Str
     Ok(paths.map(|list| list.into_iter().map(|p| p.to_string()).collect()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_optimized_images(
     target_dir: String,
     images: Vec<ProcessedImagePayload>,
@@ -52,7 +52,12 @@ pub fn save_optimized_images(
             original_total_bytes += meta.len();
         }
 
-        let dest = target.join(&item.output_filename);
+        // Two sources can map to the same output name (a/photo.jpg and
+        // b/photo.jpg both → photo_optimized.jpg): never overwrite, and never
+        // let a crafted name escape the chosen folder.
+        let name = crate::paths::safe_file_name(&item.output_filename)
+            .ok_or_else(|| format!("Invalid output name: {}", item.output_filename))?;
+        let dest = crate::execute::take_unique_on_disk(target.join(name));
         fs::write(&dest, &item.data)
             .map_err(|e| format!("Failed to save {}: {}", dest.display(), e))?;
 

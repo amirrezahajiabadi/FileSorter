@@ -249,9 +249,20 @@ export default function App() {
   useEffect(() => {
     let scanRafId: number | null = null;
     let latestScan: ScanProgress | null = null;
+    let cancelled = false;
 
     const setupListeners = async () => {
-      const u1 = await listen<ScanProgress>("scan-progress", (ev) => {
+      const registered: Array<() => void> = [];
+      // Registration is async; if the component unmounts before the last
+      // `listen` resolves, the old code stored the handles into an array the
+      // cleanup had already cleared, leaking every listener (duplicate events
+      // in StrictMode, events doubling after a remount).
+      const keep = (unlisten: () => void) => {
+        if (cancelled) unlisten();
+        else registered.push(unlisten);
+      };
+
+      keep(await listen<ScanProgress>("scan-progress", (ev) => {
         latestScan = ev.payload;
         if (scanRafId === null) {
           scanRafId = requestAnimationFrame(() => {
@@ -259,8 +270,8 @@ export default function App() {
             scanRafId = null;
           });
         }
-      });
-      const u2 = await listen<{ stopped?: boolean; error?: string }>("scan-done", (ev) => {
+      }));
+      keep(await listen<{ stopped?: boolean; error?: string }>("scan-done", (ev) => {
         if (scanRafId !== null) {
           cancelAnimationFrame(scanRafId);
           scanRafId = null;
@@ -273,24 +284,28 @@ export default function App() {
         } else {
           setPhase("ready");
         }
-      });
-      const u3 = await listen<{ groups?: DuplicateGroup[]; error?: string }>("dupes-done", (ev) => {
+      }));
+      keep(await listen<{ groups?: DuplicateGroup[]; error?: string }>("dupes-done", (ev) => {
         setDupeBusy(false);
         if (ev.payload.error) {
           setError(ev.payload.error);
         } else if (ev.payload.groups) {
           setDupes(ev.payload.groups);
         }
-      });
-      const u4 = await listen<{ report?: ExecReport; error?: string }>("sort-done", (ev) => {
-        setPhase("done");
+      }));
+      keep(await listen<{ report?: ExecReport; error?: string }>("sort-done", (ev) => {
         if (ev.payload.error) {
           setError(ev.payload.error);
+          // Keep the plan on screen: marking the run "done" without a report
+          // hid both the review list and the results card, leaving no way to
+          // retry after a failed sort.
+          setPhase("ready");
         } else if (ev.payload.report) {
           setReport(ev.payload.report);
+          setPhase("done");
         }
-      });
-      const u5 = await listen<{ report?: ExecReport; error?: string }>("quarantine-done", (ev) => {
+      }));
+      keep(await listen<{ report?: ExecReport; error?: string }>("quarantine-done", (ev) => {
         setDupeBusy(false);
         if (ev.payload.error) {
           setError(ev.payload.error);
@@ -298,31 +313,32 @@ export default function App() {
           setQuarantineReport(ev.payload.report);
           setDupes([]);
         }
-      });
-      const u6 = await listen<{ report?: UndoReport; error?: string }>("undo-done", (ev) => {
+      }));
+      keep(await listen<{ report?: UndoReport; error?: string }>("undo-done", (ev) => {
         if (ev.payload.error) {
           setError(ev.payload.error);
         } else if (ev.payload.report) {
           setUndoReport(ev.payload.report);
         }
-      });
-      const u7 = await listen<WatchEventPayload>("watch-event", (ev) => {
+      }));
+      keep(await listen<WatchEventPayload>("watch-event", (ev) => {
         setWatchEvents((prev) => [ev.payload, ...prev].slice(0, 100));
-      });
-      const u8 = await listen<TaskRunResult>("scheduled-task-done", (ev) => {
+      }));
+      keep(await listen<TaskRunResult>("scheduled-task-done", (ev) => {
         setTaskHistory((prev) => [ev.payload, ...prev].slice(0, 50));
         // refresh tasks to show updated last_run
         invoke<ScheduledTask[]>("get_scheduled_tasks")
           .then(setTasks)
           .catch(() => {});
-      });
+      }));
 
-      unlisteners.current = [u1, u2, u3, u4, u5, u6, u7, u8];
+      if (!cancelled) unlisteners.current = registered;
     };
 
     setupListeners();
 
     return () => {
+      cancelled = true;
       if (scanRafId !== null) cancelAnimationFrame(scanRafId);
       unlisteners.current.forEach((u) => u());
       unlisteners.current = [];
@@ -439,14 +455,20 @@ export default function App() {
   };
 
   // Junk Cleaner handlers
+  // Refreshes the location list without touching the busy flag or the result
+  // card, so a post-cleanup refresh cannot wipe the summary the user just got.
+  const refreshJunk = async () => {
+    const locs = await invoke<JunkLocation[]>("scan_junk");
+    setJunkLocs(locs);
+    setSelectedJunk(new Set(locs.map((l) => l.id)));
+  };
+
   const handleScanJunk = async () => {
     setJunkBusy(true);
     setError("");
     setCleanReport(null);
     try {
-      const locs = await invoke<JunkLocation[]>("scan_junk");
-      setJunkLocs(locs);
-      setSelectedJunk(new Set(locs.map((l) => l.id)));
+      await refreshJunk();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -463,7 +485,7 @@ export default function App() {
         selectedIds: Array.from(selectedJunk),
       });
       setCleanReport(rep);
-      handleScanJunk();
+      await refreshJunk();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -658,7 +680,7 @@ export default function App() {
             {sidebarExpanded && (
               <div className="sidebar-title-group">
                 <span className="sidebar-title">{t.app_title}</span>
-                <span className="sidebar-badge">v6.7.0</span>
+                <span className="sidebar-badge">v{__APP_VERSION__}</span>
               </div>
             )}
           </div>
@@ -1133,7 +1155,12 @@ export default function App() {
                       <div className="dupe-files">
                         {g.files.map((f, fi) => (
                           <div key={fi} className="dupe-file-row mono ellipsis">
-                            <span>{f.is_keeper ? "★ [Keep]" : "✕ [Move]"} {f.path}</span>
+                            <span>
+                              {fi === (dupeKeep === "oldest" ? 0 : g.files.length - 1)
+                                ? "★ [Keep]"
+                                : "✕ [Move]"}{" "}
+                              {f.path}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -1301,14 +1328,30 @@ export default function App() {
               <b>{t.watch_live_log}</b>
               <div className="feed-box">
                 {watchEvents.length > 0 ? (
-                  watchEvents.map((ev, i) => (
-                    <div key={i} className="feed-row">
-                      <span>✓ Auto-sorted: <b>{ev.filename}</b> → <i>{ev.category}</i></span>
-                      <span className="muted mono" style={{ fontSize: "11px" }}>
-                        {new Date(ev.timestamp * 1000).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  ))
+                  watchEvents.map((ev, i) => {
+                    const failed = ev.action === "failed";
+                    const skipped = ev.action === "skipped";
+                    const label = failed
+                      ? t.watch_event_failed
+                      : skipped
+                        ? t.watch_event_skipped
+                        : t.watch_event_moved;
+                    return (
+                      <div key={i} className="feed-row">
+                        <span>
+                          {failed ? "✕" : skipped ? "↷" : "✓"} {label}:{" "}
+                          <b>{ev.filename}</b>
+                          {ev.category ? <> → <i>{ev.category}</i></> : null}
+                          {failed && ev.error ? (
+                            <span className="muted"> — {ev.error}</span>
+                          ) : null}
+                        </span>
+                        <span className="muted mono" style={{ fontSize: "11px" }}>
+                          {new Date(ev.timestamp * 1000).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    );
+                  })
                 ) : (
                   <p className="muted" style={{ padding: "24px 0", textAlign: "center" }}>{t.watch_empty_log}</p>
                 )}
