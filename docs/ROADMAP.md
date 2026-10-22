@@ -1,191 +1,68 @@
 # 🗺 Roadmap
 
-This is a living document for FileSorter's long-term direction — not a promise of
-what ships next, just a place to write down ideas so they don't get lost between
-sessions. Nothing here is scheduled; it gets pulled into an actual version only
-when there's time and a clear design for it.
+A living document for FileSorter's direction — not a promise of what ships
+next, just a place to write down ideas so they don't get lost.
 
 **Guiding principle:** slow and structured beats fast and messy. Every addition
-should go through the same discipline the project already follows — one focused
-concern per version, feature branch → PR → tests → merge. Looking "professional"
-is a side effect of good structure, not a goal on its own.
+goes through the same discipline — one focused concern per version, feature
+branch → PR → tests → merge.
 
 ---
 
 ## Where things stand
 
-FileSorter is currently a solid, well-tested desktop file organizer: an
-English UI, dark/light themes, a proper package structure, automated tests + CI, and
-automated `.exe` releases on tag push. See [CHANGELOG.md](CHANGELOG.md)
-for the full version history.
+FileSorter is a native Tauri 2 desktop app (Rust backend, React frontend) with
+feature parity across sorting, junk cleanup, duplicate detection, disk analysis,
+watch mode, scheduling, batch renaming, image/PDF tools and journaled undo. See
+[CHANGELOG.md](CHANGELOG.md) for the version history and
+[ARCHITECTURE.md](ARCHITECTURE.md) for the module map.
 
-The ideas below are about what comes *after* that foundation is fully settled.
+## 0. Phase 1 — Native Tauri transition & parity — ✅ complete
 
----
+Shipped as v6.6.0:
 
-## 0. Phase 1 — Native Tauri v2 Transition & Parity Completion
+- Tauri 2 + Rust declared as the only edition; the legacy Python core was
+  retired.
+- Core parity delivered: smart keyword rules, junk & cache cleaner, 3-stage
+  duplicate finder, disk analyzer, background watch mode, task scheduler.
+- Auto-update engine, four-theme Liquid Glass design system, first-run
+  onboarding.
 
-**Status:** ✅ complete — shipped as v6.6.0.
+## 1. AI-powered photo analysis — 💡 idea stage
 
-- **Architecture Stabilization:** FileSorter v2 (`v2/` directory, Tauri 2 + Rust) officially declared as the primary flagship product. The legacy Python v1 engine transitioned to Maintenance Mode (LTS).
-- **Core Parity Delivered:** Smart Keyword Rules, Junk & Cache Cleaner, 3-stage Duplicate Finder, Disk Space Analyzer with drive monitoring, Background Watch Mode, and Automated Task Scheduler.
-- **Auto-Update Engine:** Built-in release check against GitHub Releases API with one-click installer downloads.
-- **Liquid Glass Design System:** Unified tokens, 4 themes, and accessible keyboard focus states (`:focus-visible`).
-- **First-Run Onboarding:** Guided 4-step walkthrough for theme selection and feature onboarding.
+Automatically group photos by face/content, similar to phone galleries.
 
----
+- **Local/offline:** ONNX Runtime or `ort` bindings running a small face
+  embedding model — no network, no per-call cost.
+- **Cloud API:** Azure Face, Google Vision, AWS Rekognition — more accurate, but
+  needs internet and has a cost.
+- Design around two things before starting: it meaningfully grows the bundled
+  binary, and face data is biometric, so it needs an explicit privacy note and
+  an opt-in, module-style boundary.
 
-## 1. UI/UX Overhaul
+## 2. Deeper utility coverage
 
-**Status:** ✅ complete — shipped as v5.0.0.
+Candidate features, roughly in order of fit:
 
-The interface moved from raw Tkinter to a React front end driven through
-**PyWebView** — Python still drives the logic, but the UI itself is a real web
-interface (much easier to make modern, animated, and genuinely good-looking).
-The old Tkinter UI and the vanilla HTML/JS prototype were both removed once the
-React rebuild (`ui/`) reached parity.
-
-This choice wasn't isolated — it's also the stepping stone toward the FastAPI
-stage: now that the UI talks to Python over a local JSON protocol
-(`app/protocol.py`), putting that same logic behind a real FastAPI service is a
-small step.
-
-### Planned path: v3.7 → v5.0
-
-Same discipline as always — one focused piece per version, nothing skipped ahead.
-Version numbers below are for organization only and can shift. See
-[CHANGELOG.md](CHANGELOG.md) for exact details on completed versions.
-
-**Phase 1 — UX polish (still on Tkinter)** ✅ complete
-- ✅ **v3.7.0** — Drag & drop folder selection, plus a recent-folders list
-- ✅ **v3.7.1** — Fixed the Analysis window overflowing off-screen with enough
-  content (found during Phase 1 testing, not originally planned, but blocked
-  everything else until fixed)
-- ✅ **v3.8.0** — A real progress bar (percentage + file count) instead of the
-  indeterminate one
-
-**Phase 2 — Architecture prep (before any new UI code gets written)** ✅ complete
-- ✅ **v3.9.0** — *The most important step.* Extracted `app/controller.py`
-  (`AppController`): everything `main_window.py` used to do directly (start
-  sort, undo, analyze, settings) now lives behind a clean class/API with zero
-  Tkinter imports. This is what lets a future web UI drive the exact same
-  logic without a rewrite of the app's brain.
-- ✅ **v4.0.0** — Added a throwaway PyWebView proof of concept wired to the
-  real `AppController`, running *alongside* the existing Tkinter UI (not
-  replacing it). Confirmed the Python ⟷ JS bridge works and can drive real
-  controller calls. (Removed in v5.0.0, superseded by `main_web.py`.)
-- ✅ **v4.1.0 / v4.1.1** — Added the `web/` folder structure and finalized
-  the visual identity: **"Sorting Line"** — a distinct design grounded in
-  what the app does (files moving into labeled bins on a sorting line),
-  not a port of the Tkinter look. Category colors, a warm safety-orange
-  accent, Space Grotesk/Inter/JetBrains Mono typography (self-hosted, no
-  CDN dependency), and a signature animated progress element. The design
-  lives on in the React UI (`ui/`); the vanilla `web/` implementation was
-  retired once the React migration reached parity.
-
-**Phase 3 — New UI, screen by screen** ✅ complete
-- ✅ **v4.2** — Main screen (folder picker, Sort button, log) in HTML/CSS/JS,
-  wired to `AppController`. Runs via `python main_web.py`, parallel to the
-  Tkinter app. Includes: folder picker, categories grid, sort (copy/move),
-  duplicate handling (skip/rename/overwrite), analysis modal with charts,
-  undo, settings (categories editor), recent folders, theme toggle,
-  self-hosted fonts, toast notifications, sorting animations.
-- ✅ **v4.3** — Settings screen (categories) — fully implemented in v4.2
-- ✅ **v4.4** — Analysis screen + Dry Run + Move/duplicate-mode selection — fully implemented in v4.2
-- ✅ **v4.5** — Undo and dark/light — fully implemented in v4.2
-- ✅ **v4.6** — Final polish: animations, visual details, full theme
-  testing — completed with toast notifications and self-hosted fonts
-- ✅ **v5.0** — 🎉 Old Tkinter UI removed entirely; the React UI (`ui/`) is
-  the only interface. Official major release.
-
-Phase 1 is fully independent and was completed without blocking phases 2/3.
-Phases 2 and 3 are sequential — skipping v3.9 would have meant pulling the
-app's logic out of the middle of new UI code later instead of once, cleanly,
-up front.
-
-## 2. AI-Powered Photo Analysis
-
-**Status:** idea stage.
-
-Automatically group photos by face/content — similar to what phone galleries do
-("group by person"). Not something to train from scratch; existing tools cover
-this well:
-
-- **Local/offline:** `face_recognition` (dlib-based) or `deepface`
-- **Cloud API:** Azure Face API, Google Vision, AWS Rekognition — more accurate,
-  but needs internet and has a cost
-
-**Things to design around before starting, not after:**
-- This meaningfully changes what FileSorter *is* — no longer a dependency-free
-  stdlib-only app. The packaged `.exe` size and build complexity both jump.
-- Face data is biometric data. Even fully offline and local, this deserves an
-  explicit note in the app (and eventually a privacy note) once it's real —
-  worth designing in from the start rather than bolting on later.
-- Best fit as an **optional module**, not a default-on feature — likely the
-  first real justification for splitting heavy logic behind a local service
-  (see item 1/FastAPI) rather than bundling it directly into the main exe.
-
-## 3. From File Sorter to Desktop Utility
-
-**Status:** long-term direction, agreed but needs careful scoping.
-
-The bigger vision: evolve from a single-purpose file organizer into a genuinely
-useful, frequently-run Windows utility — closer to something like CCleaner or
-PowerToys. Candidate features, roughly in order of how naturally they fit:
-
-**Shipped so far:**
-- ✅ **v6.1.0** — System-wide cleanup: the Clean panel gains a **System-wide** section (Windows Temp through the same whitelist flow, unreadable dirs skipped, elevation-needed deletions reported) and a **Recycle Bin** block — real size via `SHQueryRecycleBinW`, empty behind the two-step armed confirm via `SHEmptyRecycleBinW` (`app/cleanup.py`, zero new dependencies). Live-verified against a real 27-item / 2.1 GB bin (query only). 9 tests.
-- ✅ **v6.0.0** — Always-on background mode: `--headless --tray` runs the service under a native WinForms tray icon (open in browser / start with Windows / quit — pythonnet, so no new dependencies) and `--autostart on|off|status` manages the silent HKCU Run-at-login entry (`app/tray.py` + `app/autostart.py`; pythonw from source, the exe when frozen). Verified live: real registry round-trip + full tray pump serving HTTP. 25 tests.
-- ✅ **v5.9.0** — Scheduled tasks on the headless service: a daemon tick loop (`app/tasks.py`) runs due tasks — junk check, disk-space scan, duplicate scan — on per-task intervals (30 min to weekly), persisted in the settings file, with pause/delete, **Run now**, and a session **Recent runs** history streamed over SSE (`sched_event`). Verified live: a daily cleanup task ran a real 11,537-file / 2.3 GB junk scan. 11 tests.
-- ✅ **v5.8.0** — Drive-wide duplicate scanning: the Duplicates panel lists your drives and scans a whole drive for identical content — two-phase hashing with a cancel button that stops at the next file boundary and reports partial results (`app/duplicates.py` `cancel_event`, shared with the disk scan). 4 tests.
-- ✅ **v5.7.0** — Drive-wide disk analysis: the Storage panel lists your real drives (letter + free/total + usage bar) and scans a whole drive, not just a folder — unreadable system dirs skipped, progress streamed, and a Cancel button stops the walk at the next file and shows partial results (`app/disk_scan.py` `list_drives()` + `cancel_event`; `BaseApi.cancel_scan`). Verified live on a real 221.8 GB drive. 7 tests.
-- ✅ **v5.6.0** — Headless Service: the whole app runs with no window — `python main_web.py --headless` serves the React UI plus the exact same JSON vocabulary over a loopback HTTP server (JSON-RPC `POST /api` + Server-Sent Events `/events`), auth-gated by a per-run token (`app/service.py`; windowed app is now a thin subclass of the shared `app/api.py`). The browser preview now drives the real backend. This is the foundation drive-wide scans, scheduled runs, always-on watch and the AI module build on; zero new dependencies, 13 tests.
-- ✅ **v5.5.0** — Smart Rules: sort by filename, not just extension — ordered keyword→category rules beat the extension fallback (`invoice` → an "Invoices" folder), whole-word unicode matching, rules flow through analyze/plan/sort/watch and live in a Settings tab (`app/sorter.py` helpers, 22 tests). This is the seam a future content classifier will sit in.
-- ✅ **v5.4.0** — Junk Cleaner: scans well-known user-scope junk locations (user temp, crash dumps, browser caches, thumbnail cache) and deletes what the user confirms — whitelisted to the scan's own results, two-step armed confirm, in-use files reported and kept (`app/cleanup.py`, 12 tests). Also fixed a desktop bug where dup/disk scans never emitted their done event.
-- ✅ **v5.3.0** — Disk space analysis: walks a chosen folder and shows what's actually eating the disk — per-category totals with a bar breakdown and the largest files — streamed over the JSON protocol (`app/disk_scan.py`, 8 tests). Drive-wide scanning is the headless-service follow-up.
-- ✅ **v5.2.0** — Duplicate Finder (per-folder): scans a chosen folder for content-identical files with two-phase hashing, groups them keeping one copy each, and deletes the selected copies behind a two-step confirm — deletion is whitelisted to the scan's own results (`app/duplicates.py`, 10 tests). Whole-drive scanning and scheduled cleanups are the headless-service follow-up.
-- ✅ **v5.1.0** — Watch / auto-sort folders: pick folders and, while the app is open, newly arrived files are moved into their category folders automatically (stdlib polling, streamed over the JSON protocol; the always-on headless version shipped in v6.0.0).
-
-- ~~**Drive-wide duplicate scanning**~~ ✅ shipped in v5.8.0
-- ~~**Drive-wide disk analysis**~~ ✅ shipped in v5.7.0
-- ~~**System-wide cleanup**~~ ✅ shipped in v6.1.0 (Windows Temp + Recycle Bin; deeper admin-scope locations like the Windows Update cache remain future work)
-- **Startup app management** — much less related to file sorting; lowest priority,
-  most likely to dilute the app's identity if added too early
+- **Startup app management** — least related to file sorting; only if the app's
+  identity expands deliberately.
+- **Deeper system cleanup** — admin-scope locations such as the Windows Update
+  cache, behind an explicit elevation prompt.
 
 **Scope-creep guardrail:** before adding anything from this list, ask "does this
-naturally extend what someone already expects from a file-sorting tool?" Duplicate
-finding and disk analysis pass that test easily. Startup management does not — it's
-a different category of tool wearing the same UI.
+naturally extend what someone already expects from a file-sorting tool?"
 
-## 4. Smaller ideas worth keeping around
+## 3. Smaller ideas worth keeping around
 
-- **Content-based smart rules** — sort by more than extension, e.g. a PDF with
-  "invoice" in the filename goes to a dedicated folder. A useful
-  middle ground between plain extension rules and full AI analysis — much
-  simpler to build, still genuinely smart.
-- **Watch / Scheduled mode** (already noted earlier in planning) — monitor a
-  folder and sort new files automatically in the background, using something
-  like `watchdog`. This is arguably what turns the app from "something I open
-  sometimes" into "something that's just always running and useful."
-
-> ✅ **Done** — shipped in v5.9.0 (scheduled scans) and v6.0.0 (tray + autostart).
-> **UI responsiveness under heavy scans** was the remaining known item:
-> v6.1.1 coalesced per-file events and bounded the log list (20k-file sort:
-> 40 s main-thread stalls → 90 ms max), and v6.1.2 removed the remaining
-> freeze — duplicate results no longer render O(n²)/unbounded rows
-> (25k-row group: minutes of lock-up → instant, paged), undo previews are
-> bounded, item events are batched client-side, and folder selection works
-> without a native dialog.
-- **Sort history in SQLite** instead of a plain text log — a natural bridge to
-  the SQL stage of the personal learning roadmap, and it enables a real
-  "view past sorts" feature.
+- **Sort history in SQLite** — replace the plain-text log with a queryable
+  history and a "past sorts" view.
+- **Watch mode refinements** — per-folder category overrides and quiet hours.
+- **Update channel preference** — let users opt into pre-releases.
 
 ---
 
 ## Explicitly not decided yet
 
-- Whether AI features ship in the main app or as a separate optional add-on/plugin
-- Whether the desktop-utility features live in FileSorter itself or become a
-  separate, related project
-- Timeline — intentionally none. This file gets revisited when there's actual
-  bandwidth to design the next piece properly, not on a schedule.
+- Whether AI features ship in the main app or as a separate optional module
+- Whether utility features live in FileSorter itself or become a related project
+- Timeline — intentionally none.

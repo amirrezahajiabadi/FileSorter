@@ -11,10 +11,9 @@ Briefly describe the changes introduced in this pull request and why they are ne
 
 ## Verification & Testing
 Describe the tests you ran to verify your changes:
-- [ ] Python unit tests pass (`pytest -v`)
-- [ ] Rust tests pass if applicable (`cargo test`)
+- [ ] Rust tests pass (`cd src-tauri && cargo test`)
 - [ ] TypeScript / UI builds without errors (`npm run build`)
-- [ ] Manual test in Windows environment
+- [ ] Manual test in the Windows app (`npm run tauri dev`)
 
 ## Related Issues
 Closes #(issue)

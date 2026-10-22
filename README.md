@@ -1,73 +1,85 @@
-# 📁 File Sorter
+# 📁 FileSorter
 
-> **Fast, modern native desktop file organizer & smart disk cleanup utility for Windows.**
+> **Fast, native Windows file organizer & smart disk cleanup utility.** Built with Tauri 2, Rust and React 19 — a ~6 MB binary with sub-second startup.
 
 [![Release](https://img.shields.io/github/v/release/amirrezahajiabadi/FileSorter?color=blue)](https://github.com/amirrezahajiabadi/FileSorter/releases/latest)
-[![Tests](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml/badge.svg)](https://github.com/amirrezahajiabadi/FileSorter/actions)
+[![Tests](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml/badge.svg)](https://github.com/amirrezahajiabadi/FileSorter/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
-## 🌟 Flagship Edition: FileSorter v2 (Tauri 2 + Rust)
+## ✨ Features
 
-As of **v6.6.0 (Phase 1 Roadmap)**, the **Tauri 2 + Rust native application** located in `v2/` is the **primary, canonical flagship edition** of FileSorter.
-
-- **Ultra-lightweight:** ~6 MB standalone binary (down from 27 MB+ Python bundles).
-- **Sub-second startup:** Native zero-runtime initialization.
-- **Pure Native Concurrency:** Scans, duplicate analysis, and file moves run asynchronously in Rust worker threads with zero UI blocking.
-- **Liquid Glass Design System:** 4 crafted themes (Midnight Dark, Crystal Light, Cyber Aurora, Ruby Sunset), custom Manrope typography, and fluid spring animations.
-- **First-run Onboarding:** Interactive welcome tour for seamless onboarding.
-- **Auto-Update Engine:** In-app release checking and one-click upgrades.
-
-> **Note on Python Edition (v1):** The legacy Python + PyWebView core has officially transitioned to **Maintenance Mode (LTS)**. It remains in the repository for backwards compatibility, but all new feature development occurs exclusively on the Tauri/Rust v2 codebase.
-
----
-
-## ⚡ Core Feature Parity
-
-- **📁 Smart File Organizer & Smart Rules:** Categorize loose files into clean folders by extension or custom filename keyword rules with dry-run preview and atomic journaled undo.
-- **🗑️ Junk & Cache Cleaner:** Safely scan and purge temporary caches, crash dumps, and Explorer thumbnail databases without administrative prompts.
-- **🔍 3-Stage Duplicate Finder:** Multi-threaded SHA-256 chunked hashing (file size → prefix hash → full content hash) with persistent cache and safe quarantine.
-- **📊 Disk Space Analyzer:** Real-time volume statistics across system drives (C:, D:, etc.) with per-category breakdowns and top largest files.
-- **👁️ Background Watch Mode:** Automatically monitor directories (e.g. `Downloads`, `Desktop`) and organize newly arriving files immediately.
-- **⏰ Automated Scheduler:** Run routine junk cleanups or folder organizing tasks on configurable timer intervals.
-- **✏️ Smart Batch Renamer:** Powerful multi-file renaming with regex, find & replace, prefixes/suffixes, and sequential numbering.
-- **🖼️ Image Studio:** Bulk image optimization and format conversion (WebP, JPEG, PNG) with live size savings metrics.
-- **📑 PDF Studio:** Compile image collections into PDF documents or extract all pages as high-resolution images.
-- **↩ Complete Journaled Undo:** Atomic undo journal ensures any sorting, duplicate quarantine, or batch renaming operation can be rolled back instantly.
+- **📁 Smart File Organizer** — categorize loose files into clean folders by extension or custom filename keyword rules, with dry-run preview and atomic journaled undo.
+- **🗑️ Junk & Cache Cleaner** — safely scan and purge temporary caches, browser caches, crash dumps and Explorer thumbnail databases without administrative prompts.
+- **🔍 3-Stage Duplicate Finder** — size matching → 64 KB prefix hash → full chunked SHA-256, with a persistent hash cache and safe quarantine.
+- **📊 Disk Space Analyzer** — real-time volume statistics across system drives with per-category breakdowns and the largest files.
+- **👁️ Background Watch Mode** — monitor folders (e.g. `Downloads`, `Desktop`) and organize newly arriving files immediately.
+- **⏰ Automated Scheduler** — run routine junk cleanups or folder sorts on configurable intervals.
+- **✏️ Smart Batch Renamer** — regex find & replace, prefixes/suffixes, sequential numbering and case normalization.
+- **🖼️ Image Studio** — bulk image optimization and format conversion (WebP, JPEG, PNG) with live size savings.
+- **📑 PDF Studio** — compile images into PDFs or extract pages as high-resolution images.
+- **↩️ Complete Journaled Undo** — every sort, quarantine and rename can be rolled back instantly.
+- **🎨 Liquid Glass Design System** — four themes (Midnight Dark, Crystal Light, Cyber Aurora, Ruby Sunset), accessible focus states and self-hosted Manrope typography.
+- **🔄 Integrated Auto-Update** — in-app release check against GitHub with one-click upgrade.
 
 ---
 
-## 🚀 Download & Install
+## 🚀 Download
 
-Download the latest native Windows installer or standalone portable executable from [**GitHub Releases**](https://github.com/amirrezahajiabadi/FileSorter/releases/latest):
-- `FileSorter_Setup.exe` (NSIS Installer)
-- `FileSorter_Portable.exe` (Standalone Portable Exe)
+Grab the latest installer or standalone executable from [**GitHub Releases**](https://github.com/amirrezahajiabadi/FileSorter/releases/latest):
+
+- `FileSorter_Setup.exe` — NSIS installer (per-user)
+- `FileSorter_Portable.exe` — standalone portable executable
 
 ---
 
 ## 🛠️ Development
 
-### Native Tauri 2 App (Primary)
+Requirements: **Node.js 22+**, **Rust (stable)**, and the [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/) for Windows (WebView2 + MSVC build tools).
+
 ```bash
-cd v2
 npm install
-npm run tauri dev      # Run in development mode
-npm run tauri build    # Build release binaries
+npm run tauri dev      # run the desktop app with live reload
+npm run tauri build    # release build + NSIS installer
 ```
 
-### Run Tests
+Build outputs:
+
+- `src-tauri/target/release/filesorter2.exe` — portable executable
+- `src-tauri/target/release/bundle/nsis/FileSorter_<version>_x64-setup.exe` — installer
+
+### Tests
+
 ```bash
-# Rust backend unit tests (22 tests)
-cd v2/src-tauri && cargo test
-
-# Python maintenance tests (270 tests)
-pytest
+cd src-tauri && cargo test     # Rust backend unit tests
+npm run build                  # TypeScript typecheck + frontend build
 ```
+
+---
+
+## 🏗️ Project Structure
+
+```
+.
+├── src/                 React + TypeScript frontend (Vite)
+│   ├── App.tsx          screens, layout and command wiring
+│   ├── i18n.ts          UI strings
+│   ├── types.ts         shared wire types
+│   └── assets/fonts/    self-hosted Manrope
+├── src-tauri/           Rust backend (Tauri 2)
+│   ├── src/             one module per feature area
+│   ├── capabilities/    window permissions
+│   └── icons/           app icons
+├── docs/                architecture, build guide, roadmap, changelog
+└── .github/workflows/   CI (frontend build + cargo test) and tagged releases
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map and [docs/BUILD.md](docs/BUILD.md) for the full build and release guide.
 
 ---
 
 ## 📄 License
 
-Distributed under the [MIT License](LICENSE).  
+Distributed under the [MIT License](LICENSE).
 Developed with ❤️ by [HajAmir](https://github.com/amirrezahajiabadi).

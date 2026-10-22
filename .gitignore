@@ -2,91 +2,31 @@
 #  FileSorter — Repository .gitignore
 # ==============================================================================
 
-# ── Python ────────────────────────────────────────────────────────────────────
-__pycache__/
-*.py[cod]
-*$py.class
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-*.egg
-build/
-dist/
-eggs/
-.eggs/
-parts/
-var/
-sdist/
-develop-eggs/
-.installed.cfg
-*.manifest
-*.spec.bak
-
-# PyInstaller / Build outputs
-dist/
-build/
-Output/
-Release/
-*.exe
-*.dll
-*.so
-*.dylib
-# Keep icon assets
-!assets/*.ico
-!assets/*.png
-!v2/src-tauri/icons/*
-
-# ── Testing & Quality ─────────────────────────────────────────────────────────
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-
-# ── Virtual Environments ──────────────────────────────────────────────────────
-venv/
-env/
-.venv/
-ENV/
-env.bak/
-venv.bak/
-
 # ── Node / Vite / TypeScript ──────────────────────────────────────────────────
 node_modules/
-**/node_modules/
-**/dist/
-**/dist-ssr/
+dist/
+dist-ssr/
+*.local
 *.tsbuildinfo
-
-# Node logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Environment & Local overrides
+# ── Rust / Cargo / Tauri ──────────────────────────────────────────────────────
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+**/*.rs.bk
+
+# ── Environment & local overrides ─────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
 *.env
 
-# ── Rust / Cargo / Tauri ──────────────────────────────────────────────────────
-**/target/
-target/
-src-tauri/target/
-**/src-tauri/target/
-src-tauri/gen/schemas/
-**/src-tauri/gen/schemas/
-**/*.rs.bk
-
-# ── Application Runtime & User Data ───────────────────────────────────────────
+# ── Application runtime data ──────────────────────────────────────────────────
 .filesorter_settings.json
 *.log
 logs/
@@ -94,11 +34,17 @@ logs/
 *.bak
 *.swp
 *.swo
-crash_dumps/
-.freebuff/
 
-# ── Operating System Artifacts ────────────────────────────────────────────────
-# Windows
+# ── Build & packaging output ──────────────────────────────────────────────────
+Release/
+*.exe
+*.msi
+*.dll
+*.so
+*.dylib
+!src-tauri/icons/*
+
+# ── Operating system artifacts ────────────────────────────────────────────────
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
@@ -106,8 +52,6 @@ ehthumbs_vista.db
 [Dd]esktop.ini
 $RECYCLE.BIN/
 *.stackdump
-
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
@@ -117,12 +61,10 @@ $RECYCLE.BIN/
 .Spotlight-V100
 .TemporaryItems
 .Trashes
-
-# Linux
 *~
 .directory
 
-# ── IDEs & Editors ────────────────────────────────────────────────────────────
+# ── IDEs & editors ────────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json

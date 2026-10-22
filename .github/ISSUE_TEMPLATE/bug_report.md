@@ -25,7 +25,7 @@ If applicable, add screenshots or console/service logs to help explain your prob
 **Environment (please complete the following information):**
 - OS: [e.g. Windows 11, Windows 10]
 - Version: [e.g. v6.2.0]
-- Mode: [Desktop GUI / Headless / Tauri v2]
+- Install type: [NSIS installer / portable exe]
 
 **Additional context**
 Add any other context about the problem here.

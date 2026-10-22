@@ -4,9 +4,26 @@ All notable changes to **FileSorter** are documented here, newest first.
 
 The format follows the spirit of [Keep a Changelog](https://keepachangelog.com/)
 — versions are listed by release, and every entry names the modules, tests and
-verification behind it. No dependencies beyond the Python standard library were
-added in any version since v3.7.0 (`tkinterdnd2`, optional) and v5.0.0
-(`pywebview`, the only runtime dependency).
+verification behind it. FileSorter is a Tauri 2 + Rust application; entries
+older than v6.6.0 describe the retired Python edition and are kept as a
+historical record only.
+
+---
+
+## [Unreleased]
+
+### Changed
+- **Repository consolidation:** the Python edition (`app/`, `ui/`, `tests/`,
+  `tools/`, PyInstaller spec, NSIS installer, `main_web.py`) was removed. The
+  Tauri 2 app formerly in `v2/` now lives at the repository root (`src/`,
+  `src-tauri/`).
+- **CI is Tauri-only:** `tests.yml` builds and typechecks the frontend and runs
+  `cargo test`; `release.yml` verifies version/tag consistency across
+  `package.json`, `tauri.conf.json` and `Cargo.toml`, then builds the installer
+  and portable executable.
+- **Docs restructured:** new [ARCHITECTURE.md](ARCHITECTURE.md) and
+  [BUILD.md](BUILD.md); the README and roadmap now describe the single native
+  edition.
 
 ---
 

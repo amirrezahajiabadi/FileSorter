@@ -7,31 +7,42 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  frontend:
+    name: Frontend (typecheck + build)
     runs-on: windows-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Set up Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: npm
 
-      - name: Build UI
-        run: |
-          cd ui
-          npm ci || npm install
-          npm run build
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Install test dependencies
-        run: pip install pytest
+      - name: Typecheck and build
+        run: npm run build
+
+  rust:
+    name: Rust backend tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
 
       - name: Run tests
-        run: pytest -v
+        working-directory: src-tauri
+        run: cargo test

@@ -6,7 +6,6 @@
 * text=auto eol=lf
 
 # Explicit text files
-*.py            text diff=python
 *.rs            text diff=rust
 *.ts            text
 *.tsx           text
@@ -19,9 +18,8 @@
 *.yml           text
 *.yaml          text
 *.toml          text
-*.ini           text
-*.spec          text
-*.nsi           text eol=crlf
+
+# Windows-only scripts keep CRLF
 *.bat           text eol=crlf
 *.ps1           text
 
@@ -39,7 +37,5 @@
 *.dll           binary
 
 # GitHub Linguist customizations
-ui/src/generated/*      linguist-generated=true
-ui/package-lock.json    linguist-generated=true
-v2/package-lock.json    linguist-generated=true
-v2/src-tauri/Cargo.lock linguist-generated=true
+package-lock.json       linguist-generated=true
+src-tauri/Cargo.lock    linguist-generated=true
