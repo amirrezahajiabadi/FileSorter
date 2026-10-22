@@ -24,6 +24,10 @@ historical record only.
 - **Docs restructured:** new [ARCHITECTURE.md](ARCHITECTURE.md) and
   [BUILD.md](BUILD.md); the README and roadmap now describe the single native
   edition.
+- **Naming:** with only one edition left, the window title, sidebar version
+  line, onboarding heading, footer text and CSS header no longer say “v2”. The
+  crate name (`filesorter2`) and the `%APPDATA%\FileSorterV2` data folder are
+  unchanged so existing settings and undo journals still load.
 
 ---
 
