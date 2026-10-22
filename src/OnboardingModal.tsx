@@ -64,7 +64,7 @@ export default function OnboardingModal({
         {step === 1 && (
           <div className="onboarding-body animate-fade-in">
             <div className="onboarding-icon">⚡</div>
-            <h2 id="onboarding-modal-title">Welcome to FileSorter v2</h2>
+            <h2 id="onboarding-modal-title">Welcome to FileSorter</h2>
             <p className="lead-text">
               Rebuilt from the ground up on <strong>Tauri 2 &amp; Rust</strong>: a sub-second startup,
               lightweight native binary with zero UI freeze and instant desktop responsiveness.

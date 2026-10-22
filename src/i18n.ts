@@ -118,7 +118,7 @@ export interface I18nStrings {
 }
 
 export const STRINGS: I18nStrings = {
-  app_title: "FileSorter v2",
+  app_title: "FileSorter",
   app_subtitle: "Ultra-fast file organizer powered by Rust & Tauri",
   reset_folder: "↺ New Folder",
   theme_dark: "Switch to dark theme",
@@ -232,7 +232,7 @@ export const STRINGS: I18nStrings = {
   settings_add_placeholder: "New extension (e.g. .webp)",
   settings_add_btn: "+",
   settings_formats_count: "formats",
-  footer_text: "FileSorter v2 · Fast, non-blocking native architecture with Rust & Tauri · Journal:",
+  footer_text: "FileSorter · Fast, non-blocking native architecture with Rust & Tauri · Journal:",
   footer_journal: "%APPDATA%\\FileSorterV2\\undo",
 };
 
