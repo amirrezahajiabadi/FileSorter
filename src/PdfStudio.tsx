@@ -390,7 +390,7 @@ export default function PdfStudio() {
       <section className="glass" style={{ padding: "18px 24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>📑 PDF Studio</h2>
+            <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>PDF Studio</h2>
             <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
               Convert images into PDF documents or extract all pages as high-resolution image files.
             </p>
@@ -458,7 +458,7 @@ export default function PdfStudio() {
 
               {images.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "0.9rem" }}>
-                  <span className="badge" style={{ padding: "6px 12px", borderRadius: "100px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)" }}>
+                  <span className="badge">
                     {images.length} {images.length === 1 ? "page" : "pages"}
                   </span>
                   <span className="muted">
@@ -477,7 +477,7 @@ export default function PdfStudio() {
                     className="select-input"
                     value={pageSize}
                     onChange={(e) => setPageSize(e.target.value as any)}
-                    style={{ background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "6px 12px", outline: "none" }}
+                    
                   >
                     <option value="fit">Fit to Image Size</option>
                     <option value="a4-portrait">Standard A4 Portrait</option>
@@ -491,7 +491,7 @@ export default function PdfStudio() {
                     className="select-input"
                     value={margin}
                     onChange={(e) => setMargin(Number(e.target.value))}
-                    style={{ background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "6px 12px", outline: "none" }}
+                    
                   >
                     <option value={0}>None (Full Bleed)</option>
                     <option value={15}>Small (15 pt)</option>
@@ -506,9 +506,7 @@ export default function PdfStudio() {
                     onClick={convertImagesToPdf}
                     disabled={generatingPdf}
                     style={{
-                      background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                      color: "#fff",
-                      boxShadow: "0 4px 16px rgba(99,102,241,0.4)",
+                      
                       padding: "10px 24px",
                       fontWeight: 600,
                     }}
@@ -839,9 +837,7 @@ export default function PdfStudio() {
                   onClick={extractPdfPages}
                   disabled={extracting}
                   style={{
-                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                    color: "#fff",
-                    boxShadow: "0 4px 16px rgba(16,185,129,0.35)",
+                    
                     padding: "11px 26px",
                     fontWeight: 600,
                   }}

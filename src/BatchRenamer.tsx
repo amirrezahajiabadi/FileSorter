@@ -300,7 +300,7 @@ export default function BatchRenamer() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div>
             <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
-              ✏️ Smart Batch Renamer
+              Smart Batch Renamer
             </h2>
             <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
               Rename multiple files and folders at once using search & replace, affixes, numbering, and case formatting.
@@ -522,8 +522,8 @@ export default function BatchRenamer() {
                   onClick={() => setCaseType(ct)}
                   style={{
                     padding: "8px 16px",
-                    background: caseType === ct ? "rgba(99,102,241,0.25)" : undefined,
-                    border: caseType === ct ? "1px solid #818cf8" : undefined,
+                    background: caseType === ct ? "rgba(255,255,255,0.12)" : undefined,
+                    border: caseType === ct ? "1px solid var(--line-strong)" : undefined,
                   }}
                 >
                   {ct === "lower" && "lowercase (my file.txt)"}
@@ -648,8 +648,7 @@ export default function BatchRenamer() {
               onClick={executeRename}
               disabled={busy || changedCount === 0 || conflicts.size > 0}
               style={{
-                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                padding: "10px 24px",
+                
                 fontWeight: 600,
                 opacity: changedCount === 0 || conflicts.size > 0 ? 0.4 : 1,
               }}

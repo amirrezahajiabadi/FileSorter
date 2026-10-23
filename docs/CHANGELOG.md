@@ -10,6 +10,44 @@ historical record only.
 
 ---
 
+## [6.8.0] — 2026-10-23
+
+### Changed
+- **Liquid Glass visual overhaul (`index.css`, `App.tsx`, studio components):**
+  replaced the saturated cyan/magenta mesh and neon halos with a restrained
+  smoked-glass palette, a single neutral accent, hairline specular rims and
+  layered shadow depth inspired by contemporary Liquid Glass references.
+- **Floating window composition:** the main canvas and sidebar are now separate
+  rounded glass slabs with a compact floating header, replacing the
+  edge-to-edge Explorer chrome. Content spacing, card radii and typography were
+  retuned for a quieter editorial hierarchy.
+- **Unified icon language:** colorful emoji navigation and section markers were
+  replaced by inline stroke icons and monochrome theme glyphs, with emoji
+  prefixes removed from action labels.
+- **Studio surfaces completed:** PDF Studio, Image Studio and Batch Renamer
+  gained the shared glass shells, input, tab, badge and primary-button styles
+  that were previously missing, and their hard-coded violet/green gradients now
+  follow the theme tokens.
+- **Theme palette refresh:** the five themes are now Liquid Smoke, Obsidian,
+  Crystal Frost, Liquid Prism and Rose Quartz, all built from the same
+  translucent material system; the light theme receives full light-specific
+  surface, border and shadow tokens.
+
+### Fixed
+- **Theme token collisions:** light-theme keys could be overridden by the dark
+  base selector depending on stylesheet order; dark tokens now explicitly
+  exclude the light theme and the sidebar’s legacy per-theme backgrounds are
+  overridden consistently.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite).
+- `cargo test` passes: 25 tests.
+- Browser check at 1440×960, 1280×800 and 1100×760: no horizontal overflow;
+  Settings, Image Studio, PDF Studio and Batch Renamer render with no console
+  layout errors.
+
+---
+
 ## [Unreleased]
 
 ### Changed

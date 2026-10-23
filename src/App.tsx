@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -41,40 +41,74 @@ export interface ThemeMeta {
 export const THEMES: ThemeMeta[] = [
   {
     id: "fluent",
-    name: "Fluent Mica",
-    icon: "💎",
-    desc: "Windows 11 Mica acrylic liquid glass with vibrant cyan & sapphire ribbons",
-    swatch: ["#060b18", "#00f0ff", "#e024c3"],
+    name: "Liquid Smoke",
+    icon: "◐",
+    desc: "Smoked crystal glass with a soft prismatic edge and deep ambient depth",
+    swatch: ["#0b0b0d", "#2b2b31", "#d8d8df"],
   },
   {
     id: "dark",
-    name: "Midnight Dark",
-    icon: "🌑",
-    desc: "Deep obsidian liquid glass with pure contrast and specular lines",
-    swatch: ["#07090e", "#161b26", "#ffffff"],
+    name: "Obsidian",
+    icon: "●",
+    desc: "Near-black glass with restrained highlights and crisp white type",
+    swatch: ["#070709", "#18181b", "#f4f4f5"],
   },
   {
     id: "light",
-    name: "Crystal Light",
+    name: "Crystal Frost",
     icon: "☀️",
-    desc: "Bright frosted ice crystal glass with pristine clarity",
-    swatch: ["#eef2f7", "#ffffff", "#0f172a"],
+    desc: "Bright frosted glass with paper-white surfaces and quiet contrast",
+    swatch: ["#f4f4f5", "#ffffff", "#18181b"],
   },
   {
     id: "aurora",
-    name: "Cyber Aurora",
-    icon: "🌌",
-    desc: "Iridescent glass infused with vivid cyan, violet & emerald refraction",
-    swatch: ["#050814", "#06b6d4", "#a855f7"],
+    name: "Liquid Prism",
+    icon: "◇",
+    desc: "Iridescent glass with subtle cool and warm refraction at the edges",
+    swatch: ["#0a0b10", "#8ea8c9", "#d8b8c8"],
   },
   {
     id: "sunset",
-    name: "Ruby Sunset",
-    icon: "🌅",
-    desc: "Warm crimson velvet glass glowing with magenta & amber refraction",
-    swatch: ["#0f0614", "#f43f5e", "#f97316"],
+    name: "Rose Quartz",
+    icon: "◈",
+    desc: "Warm pearl glass with a faint rose and amber shimmer",
+    swatch: ["#120d0f", "#d8b8b8", "#c8a890"],
   },
 ];
+
+type IconName =
+  | "drop" | "folder" | "broom" | "search" | "chart" | "eye" | "clock"
+  | "pen" | "image" | "pdf" | "settings" | "spark" | "home" | "refresh"
+  | "palette" | "chevronLeft" | "chevronRight" | "info" | "bolt";
+
+function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, ReactNode> = {
+    drop: <path d="M12 3.2c3.3 4 5.6 6.8 5.6 9.7A5.6 5.6 0 0 1 12 18.5a5.6 5.6 0 0 1-5.6-5.6c0-2.9 2.3-5.7 5.6-9.7Z" />,
+    folder: <><path d="M3.5 7.2h5l1.6 2h10.4v8.1a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2V7.2Z" /><path d="M3.5 7.2V6a2 2 0 0 1 2-2h3.2l1.7 2h8.1a2 2 0 0 1 2 2v1.2" /></>,
+    broom: <><path d="m14.5 4.5 5 5" /><path d="m12.8 6.2 5 5-3.3 3.3-5-5 3.3-3.3Z" /><path d="M9.5 9.5 5 17.8c-.4.8.4 1.6 1.2 1.2l8.3-4.5" /></>,
+    search: <><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></>,
+    chart: <><path d="M4 19V5" /><path d="M4 19h16" /><path d="M7.5 15.5v-4" /><path d="M11.8 15.5V8.8" /><path d="M16.1 15.5v-6" /></>,
+    eye: <><path d="M2.8 12s3.3-5.6 9.2-5.6 9.2 5.6 9.2 5.6-3.3 5.6-9.2 5.6S2.8 12 2.8 12Z" /><circle cx="12" cy="12" r="2.5" /></>,
+    clock: <><circle cx="12" cy="12" r="8.4" /><path d="M12 7.4V12l3 1.8" /></>,
+    pen: <><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" /><path d="m14.2 6.8 3 3" /></>,
+    image: <><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" /><circle cx="8.5" cy="9" r="1.4" /><path d="m4.5 17 5.2-5.2 3.4 3.4 2.3-2.3 4.1 4.1" /></>,
+    pdf: <><path d="M6 3.5h7l5 5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" /><path d="M13 3.5v5h5" /><path d="M8.5 16.5v-3h1.2a1.4 1.4 0 0 1 0 2.8H8.5" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></>,
+    spark: <path d="M12 2.8c.5 4.7 2.5 6.7 7.2 7.2-4.7.5-6.7 2.5-7.2 7.2-.5-4.7-2.5-6.7-7.2-7.2 4.7-.5 6.7-2.5 7.2-7.2Z" />,
+    home: <><path d="m3.5 11 8.5-7 8.5 7" /><path d="M5.5 9.7V20h13V9.7" /><path d="M9.7 20v-5.5h4.6V20" /></>,
+    refresh: <><path d="M19.5 8.5A8 8 0 1 0 20 13" /><path d="M19.5 3.8v4.7h-4.7" /></>,
+    palette: <><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 1.9-1 1.9-2 0-.7.5-1.2 1.2-1.2h1.1a4.3 4.3 0 0 0 4.3-4.3A8.5 8.5 0 0 0 12 3.5Z" /><circle cx="7.5" cy="10" r=".8" /><circle cx="10" cy="7.2" r=".8" /><circle cx="14" cy="7.2" r=".8" /><circle cx="16.4" cy="10" r=".8" /></>,
+    chevronLeft: <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />,
+    chevronRight: <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />,
+    info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 10.5v5" /><path d="M12 7.7h.01" /></>,
+    bolt: <path d="m13.2 2.8-7 10.4h5.2l-.6 8 7-10.4h-5.2l.6-8Z" />,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {paths[name]}
+    </svg>
+  );
+}
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
 type ActiveTab = "sort" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "renamer" | "images" | "pdf" | "settings";
@@ -676,7 +710,7 @@ export default function App() {
       <aside className="sidebar-glass" aria-label="Main Navigation">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <span className="sidebar-brand-icon">📁</span>
+            <span className="sidebar-brand-icon"><Icon name="drop" size={19} /></span>
             {sidebarExpanded && (
               <div className="sidebar-title-group">
                 <span className="sidebar-title">{t.app_title}</span>
@@ -703,7 +737,7 @@ export default function App() {
             onClick={() => setActiveTab("sort")}
             title={t.tab_sort}
           >
-            <span className="sidebar-tab-icon">📁</span>
+            <span className="sidebar-tab-icon"><Icon name="folder" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_sort}</span>}
           </button>
           <button
@@ -712,7 +746,7 @@ export default function App() {
             onClick={() => setActiveTab("junk")}
             title={t.tab_junk}
           >
-            <span className="sidebar-tab-icon">🗑️</span>
+            <span className="sidebar-tab-icon"><Icon name="broom" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_junk}</span>}
           </button>
           <button
@@ -721,7 +755,7 @@ export default function App() {
             onClick={() => setActiveTab("dupes")}
             title={t.tab_dupes}
           >
-            <span className="sidebar-tab-icon">🔍</span>
+            <span className="sidebar-tab-icon"><Icon name="search" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_dupes}</span>}
             {dupes.length > 0 && <span className="sidebar-tab-badge">{dupes.length}</span>}
           </button>
@@ -731,7 +765,7 @@ export default function App() {
             onClick={() => setActiveTab("disk")}
             title={t.tab_disk}
           >
-            <span className="sidebar-tab-icon">📊</span>
+            <span className="sidebar-tab-icon"><Icon name="chart" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_disk}</span>}
           </button>
           <button
@@ -740,9 +774,9 @@ export default function App() {
             onClick={() => setActiveTab("watch")}
             title={t.tab_watch}
           >
-            <span className="sidebar-tab-icon">👁️</span>
+            <span className="sidebar-tab-icon"><Icon name="eye" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_watch}</span>}
-            {watchActive && <span className="sidebar-tab-badge" style={{ backgroundColor: "#10b981" }}>ON</span>}
+            {watchActive && <span className="sidebar-tab-badge">ON</span>}
           </button>
           <button
             type="button"
@@ -750,7 +784,7 @@ export default function App() {
             onClick={() => setActiveTab("schedule")}
             title={t.tab_schedule}
           >
-            <span className="sidebar-tab-icon">⏰</span>
+            <span className="sidebar-tab-icon"><Icon name="clock" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_schedule}</span>}
             {tasks.length > 0 && <span className="sidebar-tab-badge">{tasks.length}</span>}
           </button>
@@ -760,7 +794,7 @@ export default function App() {
             onClick={() => setActiveTab("renamer")}
             title={t.tab_renamer}
           >
-            <span className="sidebar-tab-icon">✏️</span>
+            <span className="sidebar-tab-icon"><Icon name="pen" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_renamer}</span>}
           </button>
           <button
@@ -769,7 +803,7 @@ export default function App() {
             onClick={() => setActiveTab("images")}
             title={t.tab_images}
           >
-            <span className="sidebar-tab-icon">🖼️</span>
+            <span className="sidebar-tab-icon"><Icon name="image" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_images}</span>}
           </button>
           <button
@@ -778,7 +812,7 @@ export default function App() {
             onClick={() => setActiveTab("pdf")}
             title={t.tab_pdf}
           >
-            <span className="sidebar-tab-icon">📑</span>
+            <span className="sidebar-tab-icon"><Icon name="pdf" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_pdf}</span>}
           </button>
           <button
@@ -787,7 +821,7 @@ export default function App() {
             onClick={() => setActiveTab("settings")}
             title={t.tab_settings}
           >
-            <span className="sidebar-tab-icon">⚙️</span>
+            <span className="sidebar-tab-icon"><Icon name="settings" /></span>
             {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_settings}</span>}
           </button>
         </nav>
@@ -796,14 +830,14 @@ export default function App() {
         <div className="sidebar-footer">
           {folder && (
             <button type="button" className="sidebar-action-btn" onClick={reset} title={t.reset_folder}>
-              <span className="sidebar-tab-icon">↺</span>
+              <span className="sidebar-tab-icon"><Icon name="refresh" /></span>
               {sidebarExpanded && <span className="sidebar-tab-label">{t.reset_folder}</span>}
             </button>
           )}
           {sidebarExpanded ? (
             <div className="theme-switcher-box">
               <div className="theme-switcher-header">
-                <span className="theme-switcher-title">🎨 {t.theme_title}</span>
+                <span className="theme-switcher-title">{t.theme_title}</span>
                 <span className="theme-switcher-active-badge">
                   {THEMES.find((x) => x.id === theme)?.name}
                 </span>
@@ -835,7 +869,7 @@ export default function App() {
               title={`Theme: ${THEMES.find((x) => x.id === theme)?.name}`}
               aria-label="Cycle theme"
             >
-              <span className="sidebar-tab-icon">{THEMES.find((x) => x.id === theme)?.icon}</span>
+              <span className="sidebar-tab-icon"><Icon name="palette" /></span>
             </button>
           )}
         </div>
@@ -855,11 +889,11 @@ export default function App() {
                   title={t.tab_sort}
                   aria-label="Home"
                 >
-                  🏠
+                  <Icon name="home" size={16} />
                 </button>
               </div>
               <div className="fluent-breadcrumb-pill">
-                <span className="fluent-crumb-icon">📂</span>
+                <span className="fluent-crumb-icon"><Icon name="drop" size={14} /></span>
                 <span className="fluent-crumb-root">FileSorter</span>
                 <span className="fluent-crumb-sep">›</span>
                 <span className="fluent-crumb-current">
@@ -890,7 +924,7 @@ export default function App() {
               style={{ fontSize: "12px", padding: "5px 12px" }}
               onClick={() => setOnboardingOpen(true)}
             >
-              🧭 {t.onboarding_btn_tour}
+              <Icon name="info" size={14} /> {t.onboarding_btn_tour}
             </button>
             <button
               type="button"
@@ -899,7 +933,8 @@ export default function App() {
               onClick={() => checkForUpdates(true)}
               disabled={checkingUpdate}
             >
-              {checkingUpdate ? t.update_checking : updateData?.has_update ? `🚀 ${t.update_available}` : `⚡ ${t.update_check_btn}`}
+              <Icon name="spark" size={14} />{" "}
+              {checkingUpdate ? t.update_checking : updateData?.has_update ? t.update_available : t.update_check_btn}
             </button>
           </div>
         </div>
@@ -923,13 +958,13 @@ export default function App() {
 
               {folder ? (
                 <div className="folder-chip">
-                  <span className="folder-icon">📁</span>
+                  <span className="folder-icon"><Icon name="folder" size={16} /></span>
                   <span className="mono folder-path" title={folder}>{folder}</span>
                   <button className="btn btn-ghost" onClick={pickFolder}>Change</button>
                 </div>
               ) : (
                 <div className="dropzone-liquid" onClick={pickFolder}>
-                  <div className="dropzone-icon">📁</div>
+                  <div className="dropzone-icon"><Icon name="drop" size={30} /></div>
                   <button className="btn btn-primary btn-large">{t.hero_drop_btn}</button>
                   <p className="muted dropzone-hint">Click anywhere inside this liquid card to select folder</p>
                 </div>
@@ -1003,7 +1038,7 @@ export default function App() {
                               <span className="cat-cell">{m.category}</span>
                               {m.matched_rule && (
                                 <span className="badge-tag" style={{ marginLeft: "6px" }} title="Matched via Smart Rule">
-                                  🎯 {m.matched_rule}
+                                  Target: {m.matched_rule}
                                 </span>
                               )}
                             </td>
@@ -1186,7 +1221,7 @@ export default function App() {
               </div>
               {folder && (
                 <button className="btn btn-ghost" onClick={loadDiskStats} disabled={loadingDisk}>
-                  {loadingDisk ? t.disk_loading : `🔄 ${t.btn_rescan}`}
+                  {loadingDisk ? t.disk_loading : <><Icon name="refresh" size={13} /> {t.btn_rescan}</>}
                 </button>
               )}
             </div>
@@ -1200,7 +1235,7 @@ export default function App() {
                     const usagePct = pct(d.used_bytes, d.total_bytes);
                     return (
                       <div key={d.letter} className="glass fluent-drive-card">
-                        <div className="fluent-drive-icon">💽</div>
+                        <div className="fluent-drive-icon"><Icon name="chart" size={18} /></div>
                         <div className="fluent-drive-info">
                           <div className="fluent-drive-header">
                             <span className="fluent-drive-name">Local Disk ({d.letter}:)</span>
@@ -1314,7 +1349,7 @@ export default function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                   {watchFolders.map((wf) => (
                     <div key={wf} className="feed-row">
-                      <span className="mono ellipsis">📁 {wf}</span>
+                      <span className="mono ellipsis"><Icon name="folder" size={12} /> {wf}</span>
                       <button className="btn btn-ghost btn-sm" onClick={() => handleRemoveWatchFolder(wf)}>Remove</button>
                     </div>
                   ))}
@@ -1524,7 +1559,7 @@ export default function App() {
             <section className="glass" style={{ padding: "20px 24px" }}>
               <div style={{ marginBottom: "16px" }}>
                 <h3 style={{ margin: "0 0 6px 0", fontSize: "16px", fontWeight: 700 }}>
-                  🎯 {t.rules_title}
+                  {t.rules_title}
                 </h3>
                 <p className="muted" style={{ margin: 0, fontSize: "13px" }}>
                   {t.rules_desc}

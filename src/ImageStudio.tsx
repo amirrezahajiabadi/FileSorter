@@ -265,9 +265,9 @@ export default function ImageStudio() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
-                🖼️ Image Studio
+                Image Studio
               </h2>
-              <span className="capsule-badge" style={{ background: "rgba(99, 102, 241, 0.2)", color: "#818cf8" }}>
+              <span className="capsule-badge">
                 Lossless & Lossy Web Compressor
               </span>
             </div>
@@ -410,7 +410,7 @@ export default function ImageStudio() {
           <div style={{ opacity: format === "png" ? 0.45 : 1, pointerEvents: format === "png" ? "none" : "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>2. Compression Quality</h3>
-              <span className="mono" style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--accent, #6366f1)" }}>
+              <span className="mono" style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text)" }}>
                 {Math.round(quality * 100)}%
               </span>
             </div>
@@ -424,7 +424,7 @@ export default function ImageStudio() {
               step="0.05"
               value={quality}
               onChange={(e) => setQuality(parseFloat(e.target.value))}
-              style={{ width: "100%", accentColor: "var(--accent, #6366f1)", cursor: "pointer" }}
+              style={{ width: "100%", accentColor: "var(--theme-accent)", cursor: "pointer" }}
             />
           </div>
 
@@ -450,8 +450,8 @@ export default function ImageStudio() {
                   style={{
                     padding: "5px 10px",
                     fontSize: "0.78rem",
-                    border: maxDimension === opt.val ? "1px solid var(--accent, #6366f1)" : undefined,
-                    background: maxDimension === opt.val ? "rgba(99,102,241,0.2)" : undefined,
+                    border: maxDimension === opt.val ? "1px solid var(--line-strong)" : undefined,
+                    background: maxDimension === opt.val ? "rgba(255,255,255,0.12)" : undefined,
                   }}
                 >
                   {opt.label}
@@ -526,8 +526,7 @@ export default function ImageStudio() {
               style={{
                 width: "100%",
                 justifyContent: "center",
-                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                boxShadow: "0 4px 18px rgba(99,102,241,0.4)",
+                
                 padding: "12px",
                 fontSize: "0.95rem",
                 fontWeight: 600,
@@ -587,7 +586,7 @@ export default function ImageStudio() {
                 </div>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                   <span className="muted" style={{ fontSize: "0.8rem" }}>
-                    Target: <b style={{ color: "var(--accent, #6366f1)" }}>.{format === "jpeg" ? "jpg" : format}</b>
+                    Target: <b style={{ color: "var(--text)" }}>.{format === "jpeg" ? "jpg" : format}</b>
                   </span>
                 </div>
               </div>
@@ -705,7 +704,7 @@ export default function ImageStudio() {
                         }}
                       >
                         <span className="muted">To: </span>
-                        <span className="mono" style={{ color: "#818cf8" }} title={targetName}>
+                        <span className="mono" style={{ color: "var(--text-muted)" }} title={targetName}>
                           {targetName}
                         </span>
                       </div>
