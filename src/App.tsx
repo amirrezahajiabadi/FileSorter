@@ -20,7 +20,14 @@ import {
   type WatchEventPayload,
   type WatchStatus,
 } from "./types";
-import { STRINGS, CATEGORY_LABELS } from "./i18n";
+import {
+  detectInitialLocale,
+  fmt,
+  getCategoryLabel,
+  getStrings,
+  type I18nStrings,
+  type Locale,
+} from "./i18n";
 import OnboardingModal from "./OnboardingModal";
 import UpdateModal from "./UpdateModal";
 
@@ -32,49 +39,49 @@ export type Theme = "fluent" | "dark" | "light" | "aurora" | "sunset";
 
 export interface ThemeMeta {
   id: Theme;
-  name: string;
   icon: string;
-  desc: string;
   swatch: string[];
 }
 
 export const THEMES: ThemeMeta[] = [
   {
     id: "fluent",
-    name: "Liquid Smoke",
     icon: "◐",
-    desc: "Smoked crystal glass with a soft prismatic edge and deep ambient depth",
     swatch: ["#0b0b0d", "#2b2b31", "#d8d8df"],
   },
   {
     id: "dark",
-    name: "Obsidian",
     icon: "●",
-    desc: "Near-black glass with restrained highlights and crisp white type",
     swatch: ["#070709", "#18181b", "#f4f4f5"],
   },
   {
     id: "light",
-    name: "Crystal Frost",
     icon: "☀️",
-    desc: "Bright frosted glass with paper-white surfaces and quiet contrast",
     swatch: ["#f4f4f5", "#ffffff", "#18181b"],
   },
   {
     id: "aurora",
-    name: "Liquid Prism",
     icon: "◇",
-    desc: "Iridescent glass with subtle cool and warm refraction at the edges",
     swatch: ["#0a0b10", "#8ea8c9", "#d8b8c8"],
   },
   {
     id: "sunset",
-    name: "Rose Quartz",
     icon: "◈",
-    desc: "Warm pearl glass with a faint rose and amber shimmer",
     swatch: ["#120d0f", "#d8b8b8", "#c8a890"],
   },
 ];
+
+/** Theme display copy resolved from the active locale's string table. */
+export function themeMeta(t: I18nStrings, id: Theme): { name: string; desc: string } {
+  const map: Record<Theme, { name: string; desc: string }> = {
+    fluent: { name: t.theme_name_fluent, desc: t.theme_desc_fluent },
+    dark: { name: t.theme_name_dark, desc: t.theme_desc_dark },
+    light: { name: t.theme_name_light, desc: t.theme_desc_light },
+    aurora: { name: t.theme_name_aurora, desc: t.theme_desc_aurora },
+    sunset: { name: t.theme_name_sunset, desc: t.theme_desc_sunset },
+  };
+  return map[id];
+}
 
 type IconName =
   | "drop" | "folder" | "broom" | "search" | "chart" | "eye" | "clock"
@@ -137,6 +144,10 @@ export default function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(() => {
     return localStorage.getItem("fs_sidebar_expanded") !== "false";
   });
+
+  const [lang, setLang] = useState<Locale>(() => detectInitialLocale());
+  const t = getStrings(lang);
+  const isRtl = lang === "fa";
 
   const toggleSidebar = () => {
     setSidebarExpanded((prev) => {
@@ -209,9 +220,8 @@ export default function App() {
   const [error, setError] = useState<string>("");
   const unlisteners = useRef<UnlistenFn[]>([]);
 
-  const t = STRINGS;
-  const fmtNum = (n: number) => n.toLocaleString("en-US");
-  const getCatLabel = (cat: string) => CATEGORY_LABELS[cat] ?? cat;
+  const fmtNum = (n: number) => n.toLocaleString(isRtl ? "fa-IR" : "en-US");
+  const getCatLabel = (cat: string) => getCategoryLabel(lang, cat);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -219,10 +229,11 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("lang", "en");
-    document.documentElement.setAttribute("dir", "ltr");
-    document.documentElement.setAttribute("data-lang", "en");
-  }, []);
+    document.documentElement.setAttribute("lang", lang);
+    document.documentElement.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    document.documentElement.setAttribute("data-lang", lang);
+    localStorage.setItem("fs_lang", lang);
+  }, [lang, isRtl]);
 
   const closeOnboarding = () => {
     localStorage.setItem("filesorter_onboarded", "true");
@@ -247,7 +258,7 @@ export default function App() {
     } finally {
       setCheckingUpdate(false);
     }
-  }, [t.update_latest]);
+  }, [t]);
 
   useEffect(() => {
     checkForUpdates(false);
@@ -602,7 +613,7 @@ export default function App() {
   const handleRunTaskNow = async (id: string) => {
     try {
       const res = await invoke<string>("run_scheduled_task_now", { id });
-      alert(`Task executed: ${res}`);
+      alert(fmt(t.sched_task_executed, { summary: res }));
     } catch (e) {
       setError(String(e));
     }
@@ -627,7 +638,7 @@ export default function App() {
       setSmartRules(updated);
       setNewRuleName("");
       setNewRuleKeywords("");
-      setSettingsNotice("Smart rule added successfully");
+      setSettingsNotice(t.notice_rule_added);
       setTimeout(() => setSettingsNotice(""), 3000);
     } catch (e) {
       setError(String(e));
@@ -635,11 +646,11 @@ export default function App() {
   };
 
   const handleDeleteSmartRule = async (id: string) => {
-    const updated = smartRules.filter((r) => r.id !== id);
+      const updated = smartRules.filter((r) => r.id !== id);
     try {
       await invoke("save_smart_rules", { rules: updated });
       setSmartRules(updated);
-      setSettingsNotice("Smart rule deleted");
+      setSettingsNotice(t.notice_rule_deleted);
       setTimeout(() => setSettingsNotice(""), 3000);
     } catch (e) {
       setError(String(e));
@@ -697,6 +708,7 @@ export default function App() {
         currentTheme={theme}
         onSelectTheme={setTheme}
         onPickFolder={pickFolder}
+        lang={lang}
       />
 
       {/* Auto-Update Modal */}
@@ -704,10 +716,11 @@ export default function App() {
         isOpen={updateModalOpen}
         onClose={() => setUpdateModalOpen(false)}
         updateData={updateData}
+        lang={lang}
       />
 
       {/* Left Collapsible Glass Sidebar */}
-      <aside className="sidebar-glass" aria-label="Main Navigation">
+      <aside className="sidebar-glass" aria-label={t.nav_aria}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <span className="sidebar-brand-icon"><Icon name="drop" size={19} /></span>
@@ -722,8 +735,8 @@ export default function App() {
             type="button"
             className="sidebar-toggle-btn"
             onClick={toggleSidebar}
-            title={sidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-            aria-label={sidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+            title={sidebarExpanded ? t.sidebar_collapse : t.sidebar_expand}
+            aria-label={sidebarExpanded ? t.sidebar_collapse : t.sidebar_expand}
           >
             {sidebarExpanded ? "◀" : "▶"}
           </button>
@@ -839,23 +852,26 @@ export default function App() {
               <div className="theme-switcher-header">
                 <span className="theme-switcher-title">{t.theme_title}</span>
                 <span className="theme-switcher-active-badge">
-                  {THEMES.find((x) => x.id === theme)?.name}
+                  {themeMeta(t, theme).name}
                 </span>
               </div>
               <div className="theme-grid-selector">
-                {THEMES.map((th) => (
-                  <button
-                    key={th.id}
-                    type="button"
-                    className={`theme-selector-btn ${theme === th.id ? "active" : ""}`}
-                    onClick={() => setTheme(th.id)}
-                    title={th.desc}
-                    aria-label={`Switch to ${th.name}`}
-                  >
-                    <span className="theme-selector-icon">{th.icon}</span>
-                    <span className="theme-selector-label">{th.name.split(" ")[0]}</span>
-                  </button>
-                ))}
+                {THEMES.map((th) => {
+                  const meta = themeMeta(t, th.id);
+                  return (
+                    <button
+                      key={th.id}
+                      type="button"
+                      className={`theme-selector-btn ${theme === th.id ? "active" : ""}`}
+                      onClick={() => setTheme(th.id)}
+                      title={meta.desc}
+                      aria-label={meta.name}
+                    >
+                      <span className="theme-selector-icon">{th.icon}</span>
+                      <span className="theme-selector-label">{meta.name.split(" ")[0]}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -866,8 +882,8 @@ export default function App() {
                 const idx = THEMES.findIndex((x) => x.id === theme);
                 setTheme(THEMES[(idx + 1) % THEMES.length].id);
               }}
-              title={`Theme: ${THEMES.find((x) => x.id === theme)?.name}`}
-              aria-label="Cycle theme"
+              title={themeMeta(t, theme).name}
+              aria-label={t.theme_title}
             >
               <span className="sidebar-tab-icon"><Icon name="palette" /></span>
             </button>
@@ -887,7 +903,7 @@ export default function App() {
                   className="fluent-arrow-btn"
                   onClick={() => setActiveTab("sort")}
                   title={t.tab_sort}
-                  aria-label="Home"
+                  aria-label={t.home_aria}
                 >
                   <Icon name="home" size={16} />
                 </button>
@@ -915,9 +931,19 @@ export default function App() {
                 )}
               </div>
             </div>
-            <span className="badge-tag fluent-badge">Tauri 2 + Rust</span>
+            <span className="badge-tag fluent-badge">{t.banner_tech}</span>
           </div>
           <div className="banner-right">
+            <button
+              type="button"
+              className="btn btn-ghost fluent-banner-btn"
+              style={{ fontSize: "12px", padding: "5px 12px" }}
+              onClick={() => setLang(isRtl ? "en" : "fa")}
+              title={t.lang_switch_title}
+              aria-label={t.lang_switch_title}
+            >
+              {t.lang_switch_label}
+            </button>
             <button
               type="button"
               className="btn btn-ghost fluent-banner-btn"
@@ -960,13 +986,13 @@ export default function App() {
                 <div className="folder-chip">
                   <span className="folder-icon"><Icon name="folder" size={16} /></span>
                   <span className="mono folder-path" title={folder}>{folder}</span>
-                  <button className="btn btn-ghost" onClick={pickFolder}>Change</button>
+                  <button className="btn btn-ghost" onClick={pickFolder}>{t.common_change}</button>
                 </div>
               ) : (
                 <div className="dropzone-liquid" onClick={pickFolder}>
                   <div className="dropzone-icon"><Icon name="drop" size={30} /></div>
                   <button className="btn btn-primary btn-large">{t.hero_drop_btn}</button>
-                  <p className="muted dropzone-hint">Click anywhere inside this liquid card to select folder</p>
+                  <p className="muted dropzone-hint">{t.dropzone_hint}</p>
                 </div>
               )}
 
@@ -1017,16 +1043,19 @@ export default function App() {
                   <div className="table-container" style={{ marginTop: "16px" }}>
                     {plan.total_moves && plan.total_moves > plan.moves.length && (
                       <p className="muted" style={{ fontSize: "12px", margin: "0 0 10px 4px" }}>
-                        ⚡ Showing preview of first {plan.moves.length} of {fmtNum(plan.total_moves)} planned moves. All files will be processed on sort.
+                        {fmt(t.preview_note, {
+                          shown: fmtNum(plan.moves.length),
+                          total: fmtNum(plan.total_moves),
+                        })}
                       </p>
                     )}
                     <table>
                       <thead>
                         <tr>
-                          <th>Source File</th>
-                          <th>Destination</th>
-                          <th>Category</th>
-                          <th>Size</th>
+                          <th>{t.col_source}</th>
+                          <th>{t.col_destination}</th>
+                          <th>{t.col_category}</th>
+                          <th>{t.col_size}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1037,8 +1066,8 @@ export default function App() {
                             <td>
                               <span className="cat-cell">{m.category}</span>
                               {m.matched_rule && (
-                                <span className="badge-tag" style={{ marginLeft: "6px" }} title="Matched via Smart Rule">
-                                  Target: {m.matched_rule}
+                                <span className="badge-tag" style={{ marginLeft: "6px" }} title={t.matched_rule_title}>
+                                  {fmt(t.matched_rule_badge, { rule: m.matched_rule })}
                                 </span>
                               )}
                             </td>
@@ -1096,8 +1125,13 @@ export default function App() {
             {cleanReport && (
               <div className="glass alert alert-success" style={{ margin: "16px 0" }}>
                 <span>
-                  ✓ {t.junk_cleaned_summary} Purged <b>{fmtNum(cleanReport.files_deleted)}</b> files (<b>{formatBytes(cleanReport.bytes_freed)}</b> freed).
-                  {cleanReport.files_failed > 0 && ` (${cleanReport.files_failed} in-use files safely skipped)`}
+                  ✓ {t.junk_cleaned_summary}{" "}
+                  {fmt(t.junk_purged_detail, {
+                    files: fmtNum(cleanReport.files_deleted),
+                    size: formatBytes(cleanReport.bytes_freed),
+                  })}
+                  {cleanReport.files_failed > 0 &&
+                    " " + fmt(t.junk_in_use_skipped, { count: fmtNum(cleanReport.files_failed) })}
                 </span>
               </div>
             )}
@@ -1124,7 +1158,7 @@ export default function App() {
                         <strong>{loc.name}</strong>
                         <p>{loc.description}</p>
                         <div className="junk-card-meta">
-                          <span>{fmtNum(loc.file_count)} files</span>
+                          <span>{fmt(t.junk_files_count, { count: fmtNum(loc.file_count) })}</span>
                           <b>{formatBytes(loc.total_bytes)}</b>
                         </div>
                       </div>
@@ -1134,7 +1168,7 @@ export default function App() {
               </>
             ) : (
               <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-                Click &quot;Scan Junk Locations&quot; above to discover temporary files and caches.
+                {t.junk_empty_hint}
               </p>
             )}
           </section>
@@ -1184,16 +1218,23 @@ export default function App() {
                   {dupes.slice(0, 50).map((g, i) => (
                     <div key={i} className="glass dupe-group">
                       <div className="dupe-group-header">
-                        <span className="mono">{formatBytes(g.size)} per file ({g.files.length} copies)</span>
-                        <span className="badge-tag">Waste: {formatBytes(g.wasted)}</span>
+                        <span className="mono">
+                          {fmt(t.dupes_per_file, {
+                            size: formatBytes(g.size),
+                            count: fmtNum(g.files.length),
+                          })}
+                        </span>
+                        <span className="badge-tag">
+                          {fmt(t.dupes_waste, { size: formatBytes(g.wasted) })}
+                        </span>
                       </div>
                       <div className="dupe-files">
                         {g.files.map((f, fi) => (
                           <div key={fi} className="dupe-file-row mono ellipsis">
                             <span>
                               {fi === (dupeKeep === "oldest" ? 0 : g.files.length - 1)
-                                ? "★ [Keep]"
-                                : "✕ [Move]"}{" "}
+                                ? t.dupes_keep_tag
+                                : t.dupes_move_tag}{" "}
                               {f.path}
                             </span>
                           </div>
@@ -1205,7 +1246,7 @@ export default function App() {
               </div>
             ) : (
               <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-                {folder ? t.dupes_empty : "Select a folder first to analyze duplicates."}
+                {folder ? t.dupes_empty : t.dupes_select_folder}
               </p>
             )}
           </section>
@@ -1238,14 +1279,23 @@ export default function App() {
                         <div className="fluent-drive-icon"><Icon name="chart" size={18} /></div>
                         <div className="fluent-drive-info">
                           <div className="fluent-drive-header">
-                            <span className="fluent-drive-name">Local Disk ({d.letter}:)</span>
-                            <span className="mono fluent-drive-free">{formatBytes(d.free_bytes)} free</span>
+                            <span className="fluent-drive-name">
+                              {fmt(t.disk_drive_name, { letter: d.letter })}
+                            </span>
+                            <span className="mono fluent-drive-free">
+                              {fmt(t.disk_free_short, { size: formatBytes(d.free_bytes) })}
+                            </span>
                           </div>
                           <div className="meter fluent-drive-meter">
                             <div className="meter-fill" style={{ width: `${usagePct}%` }} />
                           </div>
                           <div className="fluent-drive-meta">
-                            <span>{formatBytes(d.free_bytes)} free of {formatBytes(d.total_bytes)}</span>
+                            <span>
+                              {fmt(t.disk_free_of, {
+                                free: formatBytes(d.free_bytes),
+                                total: formatBytes(d.total_bytes),
+                              })}
+                            </span>
                             <span className="mono">{usagePct}%</span>
                           </div>
                         </div>
@@ -1336,21 +1386,24 @@ export default function App() {
                 <span className="watch-slider" />
               </label>
               <div>
-                <b>{t.watch_toggle_active}: {watchActive ? "ACTIVE" : "PAUSED"}</b>
+                <b>
+                  {t.watch_toggle_active}:{" "}
+                  {watchActive ? t.watch_state_active : t.watch_state_paused}
+                </b>
                 <p className="muted" style={{ margin: 0, fontSize: "12px" }}>
-                  When active, newly appearing files in watched directories are automatically organized into categories.
+                  {t.watch_active_hint}
                 </p>
               </div>
             </div>
 
             <div style={{ marginTop: "16px" }}>
-              <b>Monitored Folders ({watchFolders.length}):</b>
+              <b>{fmt(t.watch_monitored_folders, { count: fmtNum(watchFolders.length) })}:</b>
               {watchFolders.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                   {watchFolders.map((wf) => (
                     <div key={wf} className="feed-row">
                       <span className="mono ellipsis"><Icon name="folder" size={12} /> {wf}</span>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleRemoveWatchFolder(wf)}>Remove</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleRemoveWatchFolder(wf)}>{t.common_remove}</button>
                     </div>
                   ))}
                 </div>
@@ -1410,11 +1463,11 @@ export default function App() {
 
             {showAddTask && (
               <div className="glass" style={{ padding: "16px", margin: "16px 0", border: "1px solid var(--line-strong)" }}>
-                <b>New Scheduled Task</b>
+                <b>{t.sched_new_task}</b>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
                   <input
                     type="text"
-                    placeholder="Task Name (e.g. Daily Cleanup)"
+                    placeholder={t.sched_task_name_ph}
                     value={newTaskName}
                     onChange={(e) => setNewTaskName(e.target.value)}
                   />
@@ -1423,15 +1476,15 @@ export default function App() {
                     value={newTaskKind}
                     onChange={(e) => setNewTaskKind(e.target.value as "junk" | "sort")}
                   >
-                    <option value="junk">Junk &amp; Temp Cleanup</option>
-                    <option value="sort">Auto-Sort Folder</option>
+                    <option value="junk">{t.sched_kind_junk}</option>
+                    <option value="sort">{t.sched_kind_sort}</option>
                   </select>
                 </div>
                 {newTaskKind === "sort" && (
                   <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                     <input
                       type="text"
-                      placeholder="Folder Path"
+                      placeholder={t.sched_folder_ph}
                       value={newTaskFolder}
                       onChange={(e) => setNewTaskFolder(e.target.value)}
                       style={{ flex: 1 }}
@@ -1444,12 +1497,12 @@ export default function App() {
                         if (p) setNewTaskFolder(p);
                       }}
                     >
-                      Browse
+                      {t.common_browse}
                     </button>
                   </div>
                 )}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-                  <span>Interval (minutes):</span>
+                  <span>{t.sched_interval_label}</span>
                   <input
                     type="number"
                     min="1"
@@ -1458,8 +1511,8 @@ export default function App() {
                     style={{ width: "100px" }}
                   />
                   <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-                    <button className="btn btn-ghost" onClick={() => setShowAddTask(false)}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSaveTask}>Save Task</button>
+                    <button className="btn btn-ghost" onClick={() => setShowAddTask(false)}>{t.common_cancel}</button>
+                    <button className="btn btn-primary" onClick={handleSaveTask}>{t.sched_save}</button>
                   </div>
                 </div>
               </div>
@@ -1471,11 +1524,11 @@ export default function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Task Name</th>
-                        <th>Type</th>
-                        <th>Interval</th>
-                        <th>Last Run</th>
-                        <th>Actions</th>
+                        <th>{t.sched_col_task}</th>
+                        <th>{t.sched_col_type}</th>
+                        <th>{t.sched_col_interval}</th>
+                        <th>{t.sched_col_last_run}</th>
+                        <th>{t.sched_col_actions}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1483,9 +1536,9 @@ export default function App() {
                         <tr key={tk.id}>
                           <td><b>{tk.name}</b> {tk.folder && <small className="muted mono">({tk.folder})</small>}</td>
                           <td><span className="badge-tag">{tk.kind.toUpperCase()}</span></td>
-                          <td>{tk.interval_minutes} min</td>
+                          <td>{fmt(t.sched_minutes, { count: fmtNum(tk.interval_minutes) })}</td>
                           <td className="muted mono">
-                            {tk.last_run ? new Date(tk.last_run * 1000).toLocaleString() : "Never"}
+                            {tk.last_run ? new Date(tk.last_run * 1000).toLocaleString() : t.sched_never}
                           </td>
                           <td>
                             <div style={{ display: "flex", gap: "6px" }}>
@@ -1509,7 +1562,7 @@ export default function App() {
 
             {taskHistory.length > 0 && (
               <div style={{ marginTop: "24px" }}>
-                <b>Recent Automated Runs:</b>
+                <b>{t.sched_recent_runs}</b>
                 <div className="feed-box">
                   {taskHistory.map((h, i) => (
                     <div key={i} className="feed-row">
@@ -1527,22 +1580,22 @@ export default function App() {
 
         {/* TAB 7: Smart Batch Renamer */}
         {activeTab === "renamer" && (
-          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Batch Renamer…</p></div>}>
-            <BatchRenamer />
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_renamer}</p></div>}>
+            <BatchRenamer lang={lang} />
           </Suspense>
         )}
 
         {/* TAB 8: Image Studio */}
         {activeTab === "images" && (
-          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading Image Studio…</p></div>}>
-            <ImageStudio />
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_images}</p></div>}>
+            <ImageStudio lang={lang} />
           </Suspense>
         )}
 
         {/* TAB 9: PDF Studio */}
         {activeTab === "pdf" && (
-          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">Loading PDF Studio…</p></div>}>
-            <PdfStudio />
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_pdf}</p></div>}>
+            <PdfStudio lang={lang} />
           </Suspense>
         )}
 
@@ -1571,10 +1624,10 @@ export default function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Rule Name</th>
-                        <th>Target Category</th>
-                        <th>Matched Keywords</th>
-                        <th>Action</th>
+                        <th>{t.rules_col_name}</th>
+                        <th>{t.rules_col_category}</th>
+                        <th>{t.rules_col_keywords}</th>
+                        <th>{t.rules_col_action}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1605,7 +1658,7 @@ export default function App() {
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                 <input
                   type="text"
-                  placeholder="Rule Name (e.g. Financial Invoices)"
+                  placeholder={t.rules_name_ph}
                   value={newRuleName}
                   onChange={(e) => setNewRuleName(e.target.value)}
                   style={{ flex: 1, minWidth: "160px" }}
@@ -1621,7 +1674,7 @@ export default function App() {
                 </select>
                 <input
                   type="text"
-                  placeholder="Keywords (e.g. invoice, bill, receipt)"
+                  placeholder={t.rules_keywords_ph}
                   value={newRuleKeywords}
                   onChange={(e) => setNewRuleKeywords(e.target.value)}
                   style={{ flex: 1.5, minWidth: "200px" }}
@@ -1658,7 +1711,7 @@ export default function App() {
                       {exts.map((e) => (
                         <span key={e} className="tag mono">
                           {e}
-                          <button onClick={() => removeExtension(cat, e)} title="Remove">✕</button>
+                          <button onClick={() => removeExtension(cat, e)} title={t.ext_remove}>✕</button>
                         </span>
                       ))}
                     </div>

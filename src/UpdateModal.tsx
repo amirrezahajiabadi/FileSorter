@@ -1,14 +1,17 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { type UpdateCheckResult } from "./types";
+import { getStrings, type Locale } from "./i18n";
 
 interface UpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
   updateData: UpdateCheckResult | null;
+  lang: Locale;
 }
 
-export default function UpdateModal({ isOpen, onClose, updateData }: UpdateModalProps) {
+export default function UpdateModal({ isOpen, onClose, updateData, lang }: UpdateModalProps) {
+  const t = getStrings(lang);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -46,26 +49,26 @@ export default function UpdateModal({ isOpen, onClose, updateData }: UpdateModal
         <div className="update-modal-header">
           <div className="update-icon-circle">🚀</div>
           <div>
-            <h3 id="update-modal-title">New Update Available!</h3>
+            <h3 id="update-modal-title">{t.um_title}</h3>
             <p className="muted" style={{ margin: "2px 0 0" }}>
-              A new version of FileSorter is ready to download.
+              {t.um_desc}
             </p>
           </div>
         </div>
 
         <div className="update-versions-badge">
           <span className="badge-version current">
-            Current: <b>v{updateData.current_version}</b>
+            {t.um_current} <b>v{updateData.current_version}</b>
           </span>
           <span className="badge-arrow">→</span>
           <span className="badge-version latest">
-            Latest: <b>{updateData.latest_version}</b>
+            {t.um_latest} <b>{updateData.latest_version}</b>
           </span>
         </div>
 
         {updateData.release_notes && (
           <div className="update-notes-container">
-            <b>Release Highlights:</b>
+            <b>{t.um_highlights}</b>
             <div className="update-notes-box mono">
               {updateData.release_notes}
             </div>
@@ -74,7 +77,7 @@ export default function UpdateModal({ isOpen, onClose, updateData }: UpdateModal
 
         <div className="modal-actions" style={{ marginTop: "24px" }}>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Remind Me Later
+            {t.um_later}
           </button>
           <button
             type="button"
@@ -82,7 +85,7 @@ export default function UpdateModal({ isOpen, onClose, updateData }: UpdateModal
             onClick={handleDownload}
             autoFocus
           >
-            ⚡ Download &amp; Install Update
+            {t.um_download}
           </button>
         </div>
       </div>

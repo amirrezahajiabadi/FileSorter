@@ -48,7 +48,7 @@ cache and the undo journal).
 | `PdfStudio.tsx` | PDF tools panel |
 | `OnboardingModal.tsx` | First-run guided tour |
 | `UpdateModal.tsx` | Update check and download UI |
-| `i18n.ts` | UI string table |
+| `i18n.ts` | Bilingual UI string table (English + Persian) with locale helpers |
 | `types.ts` | Wire types shared with the backend |
 | `index.css` | Design tokens, themes and layout |
 

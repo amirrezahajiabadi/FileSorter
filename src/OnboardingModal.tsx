@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { type Theme, THEMES } from "./App";
+import { type Theme, THEMES, themeMeta } from "./App";
+import { fmt, getStrings, type Locale } from "./i18n";
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -7,6 +8,7 @@ interface OnboardingModalProps {
   currentTheme: Theme;
   onSelectTheme: (theme: Theme) => void;
   onPickFolder?: () => void;
+  lang: Locale;
 }
 
 export default function OnboardingModal({
@@ -15,8 +17,10 @@ export default function OnboardingModal({
   currentTheme,
   onSelectTheme,
   onPickFolder,
+  lang,
 }: OnboardingModalProps) {
   const [step, setStep] = useState<number>(1);
+  const t = getStrings(lang);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -47,14 +51,14 @@ export default function OnboardingModal({
     >
       <div className="glass modal-card onboarding-card" onClick={(e) => e.stopPropagation()}>
         {/* Step Indicator */}
-        <div className="onboarding-progress" role="navigation" aria-label="Onboarding steps">
+        <div className="onboarding-progress" role="navigation" aria-label={t.ob_steps_aria}>
           {[1, 2, 3, 4].map((i) => (
             <button
               key={i}
               type="button"
               className={`progress-pill ${step === i ? "active" : step > i ? "completed" : ""}`}
               onClick={() => setStep(i)}
-              aria-label={`Go to step ${i}`}
+              aria-label={fmt(t.ob_goto_step, { n: i })}
               aria-current={step === i ? "step" : undefined}
             />
           ))}
@@ -64,24 +68,25 @@ export default function OnboardingModal({
         {step === 1 && (
           <div className="onboarding-body animate-fade-in">
             <div className="onboarding-icon">⚡</div>
-            <h2 id="onboarding-modal-title">Welcome to FileSorter</h2>
+            <h2 id="onboarding-modal-title">{t.ob_welcome_title}</h2>
             <p className="lead-text">
-              Rebuilt from the ground up on <strong>Tauri 2 &amp; Rust</strong>: a sub-second startup,
-              lightweight native binary with zero UI freeze and instant desktop responsiveness.
+              {t.ob_welcome_lead_a}
+              <strong>{t.banner_tech}</strong>
+              {t.ob_welcome_lead_b}
             </p>
             <div className="features-grid-mini">
               <div className="feature-item">
                 <span className="feature-icon">🦀</span>
                 <div>
-                  <strong>Native Rust Engine</strong>
-                  <p>Parallel disk scans, SHA-256 chunked duplicate hashing, and atomic journaled undo.</p>
+                  <strong>{t.ob_feature_engine_title}</strong>
+                  <p>{t.ob_feature_engine_desc}</p>
                 </div>
               </div>
               <div className="feature-item">
                 <span className="feature-icon">🛡️</span>
                 <div>
-                  <strong>Never Overwrites</strong>
-                  <p>Smart collision resolver automatically renames conflicts (e.g. <code>file (2).pdf</code>).</p>
+                  <strong>{t.ob_feature_safe_title}</strong>
+                  <p>{t.ob_feature_safe_desc}</p>
                 </div>
               </div>
             </div>
@@ -92,18 +97,19 @@ export default function OnboardingModal({
         {step === 2 && (
           <div className="onboarding-body animate-fade-in">
             <div className="onboarding-icon">✨</div>
-            <h2>Choose Your Liquid Glass Aesthetic</h2>
+            <h2>{t.ob_theme_title}</h2>
             <p className="lead-text">
-              FileSorter features an ultra-refined Liquid Glass Design System. Select your preferred look:
-            </p>
+              {t.ob_theme_lead}</p>
             <div className="theme-grid-picker">
-              {THEMES.map((th) => (
+              {THEMES.map((th) => {
+                const meta = themeMeta(t, th.id);
+                return (
                 <button
                   key={th.id}
                   type="button"
                   className={`theme-pick-card ${currentTheme === th.id ? "selected" : ""}`}
                   onClick={() => onSelectTheme(th.id)}
-                  aria-label={`Select ${th.name}`}
+                  aria-label={fmt(t.ob_theme_select_aria, { name: meta.name })}
                   aria-pressed={currentTheme === th.id}
                 >
                   <div className="theme-pick-swatch">
@@ -113,11 +119,12 @@ export default function OnboardingModal({
                   </div>
                   <div className="theme-pick-info">
                     <span className="theme-pick-icon">{th.icon}</span>
-                    <strong>{th.name}</strong>
-                    <small>{th.desc}</small>
+                    <strong>{meta.name}</strong>
+                    <small>{meta.desc}</small>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -126,30 +133,30 @@ export default function OnboardingModal({
         {step === 3 && (
           <div className="onboarding-body animate-fade-in">
             <div className="onboarding-icon">🚀</div>
-            <h2>All-In-One Desktop Utility</h2>
+            <h2>{t.ob_caps_title}</h2>
             <p className="lead-text">
-              More than a simple sorter: everything you need to keep your workspace pristine and optimized.
+              {t.ob_caps_lead}
             </p>
             <div className="capabilities-list">
               <div className="cap-row">
-                <span className="cap-badge">📁 Smart Organize &amp; Rules</span>
-                <p>Categorize by extensions or create keyword rules matching filename tokens.</p>
+                <span className="cap-badge">📁 {t.ob_cap1_title}</span>
+                <p>{t.ob_cap1_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">🗑️ Junk &amp; Cache Cleaner</span>
-                <p>Purge temporary files, browser caches, crash dumps, and thumbnail DBs safely.</p>
+                <span className="cap-badge">🗑️ {t.ob_cap2_title}</span>
+                <p>{t.ob_cap2_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">👥 Duplicates &amp; Disk Analyzer</span>
-                <p>Find identical files with 3-stage SHA-256 pipeline and reclaim gigabytes.</p>
+                <span className="cap-badge">👥 {t.ob_cap3_title}</span>
+                <p>{t.ob_cap3_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">👁️ Watch Mode &amp; Scheduler</span>
-                <p>Auto-sort Downloads or Desktop on file arrival, or run background cleanup tasks.</p>
+                <span className="cap-badge">👁️ {t.ob_cap4_title}</span>
+                <p>{t.ob_cap4_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">🎨 Creative Studios</span>
-                <p>Batch Renamer, Image Studio (WebP/JPEG conversion), and PDF Studio included.</p>
+                <span className="cap-badge">🎨 {t.ob_cap5_title}</span>
+                <p>{t.ob_cap5_desc}</p>
               </div>
             </div>
           </div>
@@ -159,11 +166,9 @@ export default function OnboardingModal({
         {step === 4 && (
           <div className="onboarding-body animate-fade-in">
             <div className="onboarding-icon">🎉</div>
-            <h2>You&apos;re All Set!</h2>
+            <h2>{t.ob_ready_title}</h2>
             <p className="lead-text">
-              Pick a messy directory (like your <strong>Downloads</strong> or <strong>Desktop</strong>) and let
-              FileSorter work its magic safely with full undo.
-            </p>
+              {t.ob_ready_lead_a}<strong>{t.ob_downloads}</strong>{t.ob_ready_lead_b}<strong>{t.ob_desktop}</strong>{t.ob_ready_lead_c}</p>
             <div className="onboarding-actions-center">
               {onPickFolder && (
                 <button
@@ -175,7 +180,7 @@ export default function OnboardingModal({
                   }}
                   autoFocus
                 >
-                  📁 Select a Folder to Organize
+                  {t.ob_pick_folder_btn}
                 </button>
               )}
               <button
@@ -183,7 +188,7 @@ export default function OnboardingModal({
                 className="btn btn-ghost"
                 onClick={onClose}
               >
-                Go to Workspace
+                {t.ob_go_workspace}
               </button>
             </div>
           </div>
@@ -195,9 +200,9 @@ export default function OnboardingModal({
             type="button"
             className="btn btn-ghost"
             onClick={onClose}
-            aria-label="Skip onboarding tour"
+            aria-label={t.ob_skip_aria}
           >
-            Skip
+            {t.ob_skip}
           </button>
           <div className="footer-nav-buttons">
             {step > 1 && (
@@ -205,9 +210,9 @@ export default function OnboardingModal({
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => setStep((s) => s - 1)}
-                aria-label="Previous step"
+                aria-label={t.ob_back_aria}
               >
-                ← Back
+                {t.ob_back}
               </button>
             )}
             {step < 4 ? (
@@ -215,18 +220,18 @@ export default function OnboardingModal({
                 type="button"
                 className="btn btn-primary"
                 onClick={() => setStep((s) => s + 1)}
-                aria-label="Next step"
+                aria-label={t.ob_continue_aria}
               >
-                Continue →
+                {t.ob_continue}
               </button>
             ) : (
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={onClose}
-                aria-label="Get started"
+                aria-label={t.ob_get_started_aria}
               >
-                Get Started ✓
+                {t.ob_get_started}
               </button>
             )}
           </div>

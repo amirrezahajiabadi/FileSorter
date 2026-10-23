@@ -57,6 +57,24 @@
   font-display: swap;
 }
 
+/* Vazirmatn — Persian/Arabic script companion to Manrope.
+   Manrope has no Arabic glyphs, so Persian text falls back to this family
+   (see the `[lang="fa"]` typography rules further down). */
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("./assets/fonts/Vazirmatn-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("./assets/fonts/Vazirmatn-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Pure Liquid Glass Tokens (Windows 11 Fluent Acrylic / Mica Overhaul) ── */
 
 :root, [data-theme="fluent"] {
@@ -439,11 +457,47 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Left-to-right (English) Typography & Direction */
+/* Typography & Direction
+   The `dir` attribute on <html> is driven by the active locale (ltr for
+   English, rtl for Persian), so the cascade must inherit direction rather than
+   force ltr — the previous hard-coded rule made RTL layouts impossible. */
 html,
 html * {
-  direction: ltr;
   font-family: "Manrope", system-ui, -apple-system, sans-serif;
+}
+
+/* Persian typography: Vazirmatn first (Manrope lacks Arabic-script glyphs),
+   with Manrope kept in the stack for Latin fragments and code. */
+html[lang="fa"],
+html[lang="fa"] button,
+html[lang="fa"] input,
+html[lang="fa"] optgroup,
+html[lang="fa"] select,
+html[lang="fa"] textarea,
+html[lang="fa"] h1,
+html[lang="fa"] h2,
+html[lang="fa"] h3,
+html[lang="fa"] h4,
+html[lang="fa"] h5,
+html[lang="fa"] h6,
+html[lang="fa"] p,
+html[lang="fa"] span,
+html[lang="fa"] a,
+html[lang="fa"] b,
+html[lang="fa"] strong,
+html[lang="fa"] th,
+html[lang="fa"] td,
+html[lang="fa"] label {
+  font-family: "Vazirmatn", "Manrope", system-ui, -apple-system, sans-serif;
+}
+
+/* Persian tends to be less airy than Latin at the same size. Several headings
+   carry inline Latin letter-spacing values (-0.02em) that would cramp the
+   Arabic script, so tracking is neutralised for the Persian UI only. */
+html[lang="fa"] *,
+html[lang="fa"] *::before,
+html[lang="fa"] *::after {
+  letter-spacing: normal !important;
 }
 
 /* Monospace Code Typography */
@@ -3963,4 +4017,54 @@ code {
   .hero {
     padding: 30px 18px;
   }
+}
+
+/* â”€â”€ Right-to-Left (Persian) Layout Overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   Flex/grid containers mirror automatically from `dir="rtl"` on <html>; only
+   the physical-side properties that were written on the LTR assumption need
+   to be flipped back explicitly. Mono/code spans intentionally keep their own
+   `direction: ltr` (see the Monospace Code Typography block above). */
+
+html[dir="rtl"] .sidebar-glass {
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: -4px 0 35px -5px rgba(0, 0, 0, 0.45),
+              inset 1px 0 1px 0 rgba(255, 255, 255, 0.12),
+              inset -1px 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html[dir="rtl"][data-theme="fluent"] .sidebar-glass {
+  border-right: none;
+  border-left: 1px solid rgba(56, 189, 248, 0.24);
+}
+
+html[dir="rtl"][data-theme="light"] .sidebar-glass {
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+html[dir="rtl"] .sidebar-tab,
+html[dir="rtl"] table,
+html[dir="rtl"] th,
+html[dir="rtl"] td {
+  text-align: right;
+}
+
+/* Chevrons and arrow glyphs point the other way in RTL. */
+html[dir="rtl"] .fluent-nav-arrows,
+html[dir="rtl"] .capsule-btn-icon {
+  transform: scaleX(-1);
+}
+
+/* Keep the version badge and short Latin labels unmirrored. */
+html[dir="rtl"] .sidebar-badge,
+html[dir="rtl"] .fluent-badge,
+html[dir="rtl"] .mono {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .sidebar-badge,
+html[dir="rtl"] .fluent-badge {
+  unicode-bidi: plaintext;
 }

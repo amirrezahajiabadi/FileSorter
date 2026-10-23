@@ -138,19 +138,8 @@ export interface DiskStats {
 
 export type CategoryMap = Record<string, string[]>;
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  images: "Images",
-  documents: "Documents",
-  videos: "Videos",
-  audio: "Audio",
-  archives: "Archives",
-  code: "Source Code",
-  data: "Data Files",
-  ebooks: "E-Books",
-  executables: "Executables",
-  fonts: "Fonts",
-  others: "Other Files",
-};
+// Category display names are locale-dependent and live in `i18n.ts`
+// (`CATEGORY_LABELS` / `getCategoryLabel`) so both languages stay in one place.
 
 export const CATEGORY_ICONS: Record<string, string> = {
   images: "◧",
@@ -209,5 +198,4 @@ export interface ImageOptimizationReport {
   new_total_bytes: number;
   saved_bytes: number;
 }
-
 

@@ -10,6 +10,31 @@ historical record only.
 
 ---
 
+## [6.9.0] — 2026-10-23
+
+### Added
+- **Full Persian (فارسی) localization (`i18n.ts`, all screens):** the UI now
+  ships an English + Persian string table with a live language switch in the
+  top banner. Every user-facing label, button, table header, placeholder,
+  notification and ARIA string was extracted from `App.tsx`, `OnboardingModal`,
+  `UpdateModal`, `BatchRenamer`, `ImageStudio` and `PdfStudio` into the shared
+  `I18nStrings` contract, and category names gained per-locale labels.
+- **Right-to-left layout support (`index.css`):** `<html dir>` follows the
+  active locale, so the sidebar, tables and flow containers mirror correctly;
+  the sidebar border/shadow, tab and table alignment, and chevron icons flip for
+  RTL while monospace paths and the version badge stay LTR.
+- **Persian typography (`Vazirmatn`):** bundled self-hosted Vazirmatn
+  Regular/Bold (SIL OFL) as the Arabic-script companion to Manrope, applied via
+  `html[lang="fa"]`, with Latin letter-spacing neutralised for the Persian UI.
+- **Locale detection & persistence:** the first run picks English or Persian
+  from the OS/browser language and the choice is remembered in
+  `localStorage["fs_lang"]`.
+
+### Changed
+- **Numbers** render with `fa-IR` grouping in Persian and `en-US` in English.
+
+---
+
 ## [6.8.0] — 2026-10-23
 
 ### Changed

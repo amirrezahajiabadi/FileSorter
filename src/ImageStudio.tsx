@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ProcessedImagePayload, ImageOptimizationReport } from "./types";
+import { fmt, getStrings, type Locale } from "./i18n";
 
 interface StudioImageItem {
   id: string;
@@ -28,7 +29,8 @@ function formatBytes(n: number): string {
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`;
 }
 
-export default function ImageStudio() {
+export default function ImageStudio({ lang }: { lang: Locale }) {
+  const t = getStrings(lang);
   const [images, setImages] = useState<StudioImageItem[]>([]);
   const [format, setFormat] = useState<TargetFormat>("webp");
   const [quality, setQuality] = useState<number>(0.82); // 82% sweet spot for WebP/JPEG
@@ -265,14 +267,14 @@ export default function ImageStudio() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
-                Image Studio
+                {t.is_title}
               </h2>
               <span className="capsule-badge">
-                Lossless & Lossy Web Compressor
+                {t.is_badge}
               </span>
             </div>
             <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
-              Convert images to modern WebP, JPEG, or PNG formats with live size compression and aspect-ratio preservation.
+              {t.is_desc}
             </p>
           </div>
 
@@ -284,7 +286,7 @@ export default function ImageStudio() {
               disabled={processing}
               style={{ padding: "8px 18px", fontSize: "0.9rem" }}
             >
-              <span>+ Add Images</span>
+              <span>{t.is_add_images}</span>
             </button>
             {images.length > 0 && (
               <button
@@ -294,7 +296,7 @@ export default function ImageStudio() {
                 disabled={processing}
                 style={{ padding: "8px 14px", fontSize: "0.85rem" }}
               >
-                Clear All
+                {t.is_clear_all}
               </button>
             )}
           </div>
@@ -324,26 +326,26 @@ export default function ImageStudio() {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "1.4rem" }}>✨</span>
-                <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.1rem" }}>Batch Optimization Finished!</h4>
+                <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.1rem" }}>{t.is_success_title}</h4>
               </div>
               <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.88rem" }}>
-                Successfully optimized and saved <b>{report.saved_count} images</b> into:{" "}
+                {fmt(t.is_saved_success, { count: report.saved_count })}
                 <code style={{ color: "inherit", fontWeight: 600 }}>{report.target_dir}</code>
               </p>
               <div style={{ display: "flex", gap: "20px", marginTop: "12px" }}>
                 <div>
-                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>Original: </span>
+                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>{t.is_original} </span>
                   <b>{formatBytes(report.original_total_bytes)}</b>
                 </div>
                 <div>
-                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>Optimized: </span>
+                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>{t.is_optimized} </span>
                   <b style={{ color: "#4ade80" }}>{formatBytes(report.new_total_bytes)}</b>
                 </div>
                 <div>
-                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>Saved Space: </span>
+                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>{t.is_saved_space} </span>
                   <b style={{ color: report.saved_bytes > 0 ? "#4ade80" : "inherit" }}>
                     {report.saved_bytes > 0
-                      ? `-${formatBytes(report.saved_bytes)} (${Math.round((report.saved_bytes / report.original_total_bytes) * 100)}% reduction)`
+                      ? `-${formatBytes(report.saved_bytes)} ${fmt(t.is_reduction, { pct: Math.round((report.saved_bytes / report.original_total_bytes) * 100) })}`
                       : "+0 B"}
                   </b>
                 </div>
@@ -357,7 +359,7 @@ export default function ImageStudio() {
                 onClick={() => openPath(report.target_dir)}
                 style={{ padding: "10px 18px", fontSize: "0.9rem" }}
               >
-                <span>📁 Open Destination Folder</span>
+                <span>{t.is_open_folder}</span>
               </button>
             </div>
           </div>
@@ -369,9 +371,9 @@ export default function ImageStudio() {
         {/* ── Controls & Settings Panel ───────────────────────────── */}
         <section className="glass" style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
           <div>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>1. Target Format</h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>{t.is_step1}</h3>
             <p className="muted" style={{ margin: 0, fontSize: "0.8rem" }}>
-              Select target format for conversion
+              {t.is_step1_desc}
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginTop: "10px" }}>
               <button
@@ -400,22 +402,22 @@ export default function ImageStudio() {
               </button>
             </div>
             <div style={{ marginTop: "6px", fontSize: "0.78rem" }} className="muted">
-              {format === "webp" && "🔥 WebP: Next-gen format, incredible compression with zero visible loss."}
-              {format === "jpeg" && "🌐 JPEG: Maximum cross-platform and device photo compatibility."}
-              {format === "png" && "💎 PNG: Lossless quality with full transparency support."}
+              {format === "webp" && t.is_fmt_webp_desc}
+              {format === "jpeg" && t.is_fmt_jpeg_desc}
+              {format === "png" && t.is_fmt_png_desc}
             </div>
           </div>
 
           {/* Quality Slider (for lossy WebP and JPEG) */}
           <div style={{ opacity: format === "png" ? 0.45 : 1, pointerEvents: format === "png" ? "none" : "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>2. Compression Quality</h3>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>{t.is_step2}</h3>
               <span className="mono" style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text)" }}>
                 {Math.round(quality * 100)}%
               </span>
             </div>
             <p className="muted" style={{ margin: "2px 0 10px", fontSize: "0.8rem" }}>
-              {quality >= 0.85 ? "Pristine visual fidelity" : quality >= 0.7 ? "Balanced high quality (Recommended)" : "Aggressive compression"}
+              {quality >= 0.85 ? t.is_quality_pristine : quality >= 0.7 ? t.is_quality_balanced : t.is_quality_aggressive}
             </p>
             <input
               type="range"
@@ -430,13 +432,13 @@ export default function ImageStudio() {
 
           {/* Max Dimension Clamping */}
           <div>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>3. Max Dimension Clamping</h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>{t.is_step3}</h3>
             <p className="muted" style={{ margin: "0 0 10px", fontSize: "0.8rem" }}>
-              Limit maximum width or height preserving aspect ratio
+              {t.is_step3_desc}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
               {[
-                { label: "Original", val: 0 },
+                { label: t.is_dim_original, val: 0 },
                 { label: "4K (3840px)", val: 3840 },
                 { label: "FHD (1920px)", val: 1920 },
                 { label: "HD (1280px)", val: 1280 },
@@ -462,15 +464,15 @@ export default function ImageStudio() {
 
           {/* Filename Suffix */}
           <div>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>4. Filename Suffix</h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>{t.is_step4}</h3>
             <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.8rem" }}>
-              Appended to name (leave blank to keep name)
+              {t.is_step4_desc}
             </p>
             <input
               type="text"
               value={suffix}
               onChange={(e) => setSuffix(e.target.value)}
-              placeholder="e.g. _optimized or leave empty"
+              placeholder={t.is_step4_ph}
               style={{
                 width: "100%",
                 padding: "8px 12px",
@@ -486,13 +488,13 @@ export default function ImageStudio() {
 
           {/* Output Destination Folder */}
           <div>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>5. Destination Folder</h3>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>{t.is_step5}</h3>
             <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
               <input
                 type="text"
                 value={outputDir}
                 readOnly
-                placeholder="Click to choose folder..."
+                placeholder={t.is_choose_folder_ph}
                 onClick={pickOutputFolder}
                 style={{
                   flex: 1,
@@ -511,7 +513,7 @@ export default function ImageStudio() {
                 onClick={pickOutputFolder}
                 style={{ padding: "8px 12px", fontSize: "0.85rem" }}
               >
-                📁 Browse
+                {t.common_browse}
               </button>
             </div>
           </div>
@@ -534,8 +536,8 @@ export default function ImageStudio() {
               }}
             >
               {processing
-                ? `⏳ Optimizing (${progress ? `${progress.current}/${progress.total}` : "..."})`
-                : `⚡ Optimize & Export ${images.length > 0 ? `(${images.length})` : ""}`}
+                ? `${t.is_optimizing} (${progress ? `${progress.current}/${progress.total}` : "..."})`
+                : `${t.is_optimize}${images.length > 0 ? ` (${images.length})` : ""}`}
             </button>
           </div>
         </section>
@@ -555,9 +557,9 @@ export default function ImageStudio() {
               }}
             >
               <div style={{ fontSize: "3rem", marginBottom: "12px" }}>📸</div>
-              <h3 style={{ margin: "0 0 6px", fontSize: "1.2rem", fontWeight: 600 }}>No Images Added Yet</h3>
+              <h3 style={{ margin: "0 0 6px", fontSize: "1.2rem", fontWeight: 600 }}>{t.is_empty_title}</h3>
               <p className="muted" style={{ margin: "0 0 16px", fontSize: "0.9rem" }}>
-                Click here or use "Add Images" above to select photos or graphics for batch compression.
+                {t.is_empty_desc}
               </p>
               <button type="button" className="hero-browse-btn" style={{ padding: "8px 20px" }}>
                 Browse Images...
@@ -647,7 +649,7 @@ export default function ImageStudio() {
                         <button
                           type="button"
                           onClick={() => removeImage(item.id)}
-                          title="Remove from queue"
+                          title={t.is_remove_queue}
                           style={{
                             position: "absolute",
                             top: "6px",
@@ -703,7 +705,7 @@ export default function ImageStudio() {
                           fontSize: "0.75rem",
                         }}
                       >
-                        <span className="muted">To: </span>
+                        <span className="muted">{t.is_to} </span>
                         <span className="mono" style={{ color: "var(--text-muted)" }} title={targetName}>
                           {targetName}
                         </span>

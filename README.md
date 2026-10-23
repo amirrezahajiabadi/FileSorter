@@ -20,7 +20,8 @@
 - **🖼️ Image Studio** — bulk image optimization and format conversion (WebP, JPEG, PNG) with live size savings.
 - **📑 PDF Studio** — compile images into PDFs or extract pages as high-resolution images.
 - **↩️ Complete Journaled Undo** — every sort, quarantine and rename can be rolled back instantly.
-- **🎨 Liquid Glass Design System** — four themes (Midnight Dark, Crystal Light, Cyber Aurora, Ruby Sunset), accessible focus states and self-hosted Manrope typography.
+- **🎨 Liquid Glass Design System** — five liquid-glass themes (Liquid Smoke, Obsidian, Crystal Frost, Liquid Prism, Rose Quartz), accessible focus states and self-hosted typography.
+- **🌐 English & فارسی** — full bilingual UI with a live language switch, right-to-left layout and self-hosted Vazirmatn for Persian (auto-detected from the OS on first run).
 - **🔄 Integrated Auto-Update** — in-app release check against GitHub with one-click upgrade.
 
 ---
@@ -64,9 +65,9 @@ npm run build                  # TypeScript typecheck + frontend build
 .
 ├── src/                 React + TypeScript frontend (Vite)
 │   ├── App.tsx          screens, layout and command wiring
-│   ├── i18n.ts          UI strings
+│   ├── i18n.ts          UI strings (English + Persian)
 │   ├── types.ts         shared wire types
-│   └── assets/fonts/    self-hosted Manrope
+│   └── assets/fonts/    self-hosted Manrope + Vazirmatn
 ├── src-tauri/           Rust backend (Tauri 2)
 │   ├── src/             one module per feature area
 │   ├── capabilities/    window permissions

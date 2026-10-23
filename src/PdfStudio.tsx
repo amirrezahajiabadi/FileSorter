@@ -4,6 +4,7 @@ import { PDFDocument, PageSizes } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import type { SaveImagesReport } from "./types";
+import { fmt, getStrings, type Locale } from "./i18n";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -35,7 +36,8 @@ function formatBytes(n: number): string {
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`;
 }
 
-export default function PdfStudio() {
+export default function PdfStudio({ lang }: { lang: Locale }) {
+  const t = getStrings(lang);
   const [mode, setMode] = useState<"img2pdf" | "pdf2img">("img2pdf");
 
   // ── Images to PDF State ───────────────────────────────────────────
@@ -390,9 +392,9 @@ export default function PdfStudio() {
       <section className="glass" style={{ padding: "18px 24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>PDF Studio</h2>
+            <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>{t.ps_title}</h2>
             <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
-              Convert images into PDF documents or extract all pages as high-resolution image files.
+              {t.ps_desc}
             </p>
           </div>
 
@@ -404,7 +406,7 @@ export default function PdfStudio() {
               style={{ padding: "8px 18px", borderRadius: "100px" }}
             >
               <span className="tab-icon">🖼️</span>
-              <span className="tab-label">Images to PDF</span>
+              <span className="tab-label">{t.ps_mode_img2pdf}</span>
             </button>
             <button
               type="button"
@@ -413,7 +415,7 @@ export default function PdfStudio() {
               style={{ padding: "8px 18px", borderRadius: "100px" }}
             >
               <span className="tab-icon">📄</span>
-              <span className="tab-label">PDF to Images</span>
+              <span className="tab-label">{t.ps_mode_pdf2img}</span>
             </button>
           </div>
         </div>
@@ -442,7 +444,7 @@ export default function PdfStudio() {
                   style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px" }}
                 >
                   <span>➕</span>
-                  <span>Add Images</span>
+                  <span>{t.ps_add_images}</span>
                 </button>
                 {images.length > 0 && (
                   <button
@@ -451,7 +453,7 @@ export default function PdfStudio() {
                     onClick={clearAllImages}
                     style={{ padding: "8px 14px" }}
                   >
-                    <span>🗑️ Clear All</span>
+                    <span>{t.ps_clear_all}</span>
                   </button>
                 )}
               </div>
@@ -459,10 +461,10 @@ export default function PdfStudio() {
               {images.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", fontSize: "0.9rem" }}>
                   <span className="badge">
-                    {images.length} {images.length === 1 ? "page" : "pages"}
+                    {images.length} {images.length === 1 ? t.ps_page_singular : t.ps_page_plural}
                   </span>
                   <span className="muted">
-                    Total: {formatBytes(images.reduce((acc, i) => acc + i.size, 0))}
+                    {t.ps_total} {formatBytes(images.reduce((acc, i) => acc + i.size, 0))}
                   </span>
                 </div>
               )}
@@ -472,30 +474,30 @@ export default function PdfStudio() {
             {images.length > 0 && (
               <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>Page Size:</span>
+                  <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>{t.ps_page_size}</span>
                   <select
                     className="select-input"
                     value={pageSize}
                     onChange={(e) => setPageSize(e.target.value as any)}
                     
                   >
-                    <option value="fit">Fit to Image Size</option>
-                    <option value="a4-portrait">Standard A4 Portrait</option>
-                    <option value="a4-landscape">Standard A4 Landscape</option>
+                    <option value="fit">{t.ps_page_fit}</option>
+                    <option value="a4-portrait">{t.ps_page_a4p}</option>
+                    <option value="a4-landscape">{t.ps_page_a4l}</option>
                   </select>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>Margins:</span>
+                  <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>{t.ps_margins}</span>
                   <select
                     className="select-input"
                     value={margin}
                     onChange={(e) => setMargin(Number(e.target.value))}
                     
                   >
-                    <option value={0}>None (Full Bleed)</option>
-                    <option value={15}>Small (15 pt)</option>
-                    <option value={30}>Normal (30 pt)</option>
+                    <option value={0}>{t.ps_margin_none}</option>
+                    <option value={15}>{t.ps_margin_small}</option>
+                    <option value={30}>{t.ps_margin_normal}</option>
                   </select>
                 </div>
 
@@ -511,7 +513,7 @@ export default function PdfStudio() {
                       fontWeight: 600,
                     }}
                   >
-                    {generatingPdf ? "⏳ Building PDF…" : "⚡ Export to PDF"}
+                    {generatingPdf ? t.ps_building : t.ps_export}
                   </button>
                 </div>
               </div>
@@ -523,9 +525,9 @@ export default function PdfStudio() {
             <section className="glass" style={{ padding: "18px 24px", border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.08)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
                 <div>
-                  <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.05rem" }}>✓ PDF Successfully Created!</h4>
+                  <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.05rem" }}>{t.ps_created}</h4>
                   <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.85rem", wordBreak: "break-all" }}>
-                    Saved to: <code style={{ color: "inherit" }}>{pdfSuccess.path}</code> ({formatBytes(pdfSuccess.size)})
+                    {t.ps_saved_to} <code style={{ color: "inherit" }}>{pdfSuccess.path}</code> ({formatBytes(pdfSuccess.size)})
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: "10px" }}>
@@ -535,7 +537,7 @@ export default function PdfStudio() {
                     onClick={() => openPath(pdfSuccess.path)}
                     style={{ padding: "8px 16px" }}
                   >
-                    <span>👁️ Open PDF</span>
+                    <span>{t.ps_open_pdf}</span>
                   </button>
                   <button
                     type="button"
@@ -543,7 +545,7 @@ export default function PdfStudio() {
                     onClick={() => openPath(pdfSuccess.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/"))}
                     style={{ padding: "8px 16px" }}
                   >
-                    <span>📁 Reveal in Folder</span>
+                    <span>{t.ps_reveal}</span>
                   </button>
                 </div>
               </div>
@@ -564,12 +566,12 @@ export default function PdfStudio() {
               }}
             >
               <div style={{ fontSize: "3rem", marginBottom: "12px", opacity: 0.8 }}>🖼️</div>
-              <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 600 }}>No images added yet</h3>
+              <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 600 }}>{t.ps_no_images_title}</h3>
               <p className="muted" style={{ margin: "6px auto 16px", maxWidth: "420px", fontSize: "0.88rem" }}>
-                Click to browse JPG, PNG, WebP or BMP images to compile into a single PDF document.
+                {t.ps_no_images_desc}
               </p>
               <button type="button" className="hero-browse-btn" style={{ padding: "10px 22px" }}>
-                Add Images
+                {t.ps_add_images}
               </button>
             </section>
           ) : (
@@ -650,7 +652,7 @@ export default function PdfStudio() {
                             className="capsule-btn-icon"
                             onClick={() => moveImage(idx, "up")}
                             disabled={idx === 0}
-                            title="Move Earlier"
+                            title={t.ps_move_earlier}
                             style={{ width: "26px", height: "26px", fontSize: "0.75rem", opacity: idx === 0 ? 0.3 : 1 }}
                           >
                             ◀
@@ -660,7 +662,7 @@ export default function PdfStudio() {
                             className="capsule-btn-icon"
                             onClick={() => moveImage(idx, "down")}
                             disabled={idx === images.length - 1}
-                            title="Move Later"
+                            title={t.ps_move_later}
                             style={{ width: "26px", height: "26px", fontSize: "0.75rem", opacity: idx === images.length - 1 ? 0.3 : 1 }}
                           >
                             ▶
@@ -671,7 +673,7 @@ export default function PdfStudio() {
                           type="button"
                           className="capsule-btn-icon"
                           onClick={() => removeImage(img.id)}
-                          title="Remove Image"
+                          title={t.ps_remove_image}
                           style={{ width: "26px", height: "26px", fontSize: "0.8rem", color: "#f87171" }}
                         >
                           ✕
@@ -695,9 +697,9 @@ export default function PdfStudio() {
           <section className="glass" style={{ padding: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>Select PDF Document</h3>
+                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{t.ps_select_pdf}</h3>
                 <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.85rem" }}>
-                  Choose any PDF to render and extract each page as high-res PNG or JPEG image.
+                  {t.ps_select_pdf_desc}
                 </p>
               </div>
 
@@ -707,7 +709,7 @@ export default function PdfStudio() {
                 onClick={pickPdf}
                 style={{ padding: "10px 22px" }}
               >
-                <span>📂 Choose PDF</span>
+                <span>{t.ps_choose_pdf}</span>
               </button>
             </div>
 
@@ -732,7 +734,7 @@ export default function PdfStudio() {
                   <div>
                     <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{pdfMeta.name}</div>
                     <div style={{ fontSize: "0.8rem", opacity: 0.7, marginTop: "2px" }}>
-                      {pdfMeta.numPages} {pdfMeta.numPages === 1 ? "page" : "pages"} · {formatBytes(pdfMeta.size)}
+                      {pdfMeta.numPages} {pdfMeta.numPages === 1 ? t.ps_page_singular : t.ps_page_plural} · {formatBytes(pdfMeta.size)}
                     </div>
                   </div>
                 </div>
@@ -742,10 +744,10 @@ export default function PdfStudio() {
                     type="button"
                     className="capsule-btn-pill"
                     onClick={() => openPath(pdfMeta.path)}
-                    title="Open PDF Document"
+                    title={t.ps_open_pdf_doc}
                     style={{ padding: "6px 14px", fontSize: "0.82rem" }}
                   >
-                    <span>👁️ Preview</span>
+                    <span>{t.ps_preview}</span>
                   </button>
                 </div>
               </div>
@@ -755,13 +757,13 @@ export default function PdfStudio() {
           {/* Extraction Settings */}
           {pdfMeta && (
             <section className="glass" style={{ padding: "24px" }}>
-              <h4 style={{ margin: "0 0 16px", fontSize: "1rem", fontWeight: 600 }}>Extraction Settings</h4>
+              <h4 style={{ margin: "0 0 16px", fontSize: "1rem", fontWeight: 600 }}>{t.ps_extract_settings}</h4>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
                 {/* Format selection */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", opacity: 0.8, marginBottom: "8px" }}>
-                    Image Format:
+                    {t.ps_image_format}
                   </label>
                   <select
                     className="select-input"
@@ -769,15 +771,15 @@ export default function PdfStudio() {
                     onChange={(e) => setFormat(e.target.value as any)}
                     style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
-                    <option value="png">PNG (Lossless High Quality)</option>
-                    <option value="jpeg">JPEG (Compact File Size)</option>
+                    <option value="png">{t.ps_fmt_png}</option>
+                    <option value="jpeg">{t.ps_fmt_jpeg}</option>
                   </select>
                 </div>
 
                 {/* Resolution / DPI */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", opacity: 0.8, marginBottom: "8px" }}>
-                    Resolution Scale:
+                    {t.ps_res_scale}
                   </label>
                   <select
                     className="select-input"
@@ -785,16 +787,16 @@ export default function PdfStudio() {
                     onChange={(e) => setScale(Number(e.target.value))}
                     style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
-                    <option value={1.5}>Standard Quality (150 DPI)</option>
-                    <option value={2.0}>High Quality (200 DPI - Recommended)</option>
-                    <option value={3.0}>Ultra Crisp (300 DPI - Print Ready)</option>
+                    <option value={1.5}>{t.ps_res_150}</option>
+                    <option value={2.0}>{t.ps_res_200}</option>
+                    <option value={3.0}>{t.ps_res_300}</option>
                   </select>
                 </div>
 
                 {/* Page range */}
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", opacity: 0.8, marginBottom: "8px" }}>
-                    Page Range (e.g. <code>all</code> or <code>1-3, 5</code>):
+                    {t.ps_page_range_label}
                   </label>
                   <input
                     type="text"
@@ -809,7 +811,7 @@ export default function PdfStudio() {
               {/* Destination folder */}
               <div style={{ marginTop: "20px" }}>
                 <label style={{ display: "block", fontSize: "0.85rem", opacity: 0.8, marginBottom: "8px" }}>
-                  Destination Folder:
+                  {t.ps_dest_folder}
                 </label>
                 <div style={{ display: "flex", gap: "10px" }}>
                   <input
@@ -824,7 +826,7 @@ export default function PdfStudio() {
                     onClick={pickFolder}
                     style={{ padding: "8px 16px" }}
                   >
-                    📁 Change
+                    {t.common_change}
                   </button>
                 </div>
               </div>
@@ -843,8 +845,8 @@ export default function PdfStudio() {
                   }}
                 >
                   {extracting
-                    ? `⏳ Extracting ${extractProgress ? `(${extractProgress.current}/${extractProgress.total})` : "…"}`
-                    : `⚡ Extract Pages (${pdfMeta.numPages})`}
+                    ? `${t.ps_extracting} ${extractProgress ? `(${extractProgress.current}/${extractProgress.total})` : "…"}`
+                    : fmt(t.ps_extract_btn, { count: pdfMeta.numPages })}
                 </button>
               </div>
             </section>
@@ -856,10 +858,10 @@ export default function PdfStudio() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "16px" }}>
                 <div>
                   <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.05rem" }}>
-                    ✓ Successfully Extracted {extractedReport.saved_count} Images!
+                    {fmt(t.ps_extracted_ok, { count: extractedReport.saved_count })}
                   </h4>
                   <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.85rem" }}>
-                    Saved {formatBytes(extractedReport.total_bytes)} to: <code>{extractedReport.target_dir}</code>
+                    {fmt(t.ps_saved_size_to, { size: formatBytes(extractedReport.total_bytes) })} <code>{extractedReport.target_dir}</code>
                   </p>
                 </div>
                 <button
@@ -868,7 +870,7 @@ export default function PdfStudio() {
                   onClick={() => openPath(extractedReport.target_dir)}
                   style={{ padding: "8px 18px", fontSize: "0.88rem" }}
                 >
-                  📁 Open Destination Folder
+                  {t.ps_open_dest}
                 </button>
               </div>
 
@@ -900,7 +902,7 @@ export default function PdfStudio() {
                     >
                       <img
                         src={thumb}
-                        alt={`Page ${i + 1}`}
+                        alt={fmt(t.ps_page_alt, { n: i + 1 })}
                         style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                       />
                     </div>
