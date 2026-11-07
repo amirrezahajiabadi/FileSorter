@@ -49,7 +49,7 @@ export default function OnboardingModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="glass modal-card onboarding-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card onboarding-card" onClick={(e) => e.stopPropagation()}>
         {/* Step Indicator */}
         <div className="onboarding-progress" role="navigation" aria-label={t.ob_steps_aria}>
           {[1, 2, 3, 4].map((i) => (
@@ -66,8 +66,7 @@ export default function OnboardingModal({
 
         {/* STEP 1: Welcome & Engine */}
         {step === 1 && (
-          <div className="onboarding-body animate-fade-in">
-            <div className="onboarding-icon">⚡</div>
+          <div className="onboarding-body">
             <h2 id="onboarding-modal-title">{t.ob_welcome_title}</h2>
             <p className="lead-text">
               {t.ob_welcome_lead_a}
@@ -76,14 +75,12 @@ export default function OnboardingModal({
             </p>
             <div className="features-grid-mini">
               <div className="feature-item">
-                <span className="feature-icon">🦀</span>
                 <div>
                   <strong>{t.ob_feature_engine_title}</strong>
                   <p>{t.ob_feature_engine_desc}</p>
                 </div>
               </div>
               <div className="feature-item">
-                <span className="feature-icon">🛡️</span>
                 <div>
                   <strong>{t.ob_feature_safe_title}</strong>
                   <p>{t.ob_feature_safe_desc}</p>
@@ -95,8 +92,7 @@ export default function OnboardingModal({
 
         {/* STEP 2: Theme & Design System */}
         {step === 2 && (
-          <div className="onboarding-body animate-fade-in">
-            <div className="onboarding-icon">✨</div>
+          <div className="onboarding-body">
             <h2>{t.ob_theme_title}</h2>
             <p className="lead-text">
               {t.ob_theme_lead}</p>
@@ -118,7 +114,6 @@ export default function OnboardingModal({
                     ))}
                   </div>
                   <div className="theme-pick-info">
-                    <span className="theme-pick-icon">{th.icon}</span>
                     <strong>{meta.name}</strong>
                     <small>{meta.desc}</small>
                   </div>
@@ -131,31 +126,30 @@ export default function OnboardingModal({
 
         {/* STEP 3: Suite Capabilities */}
         {step === 3 && (
-          <div className="onboarding-body animate-fade-in">
-            <div className="onboarding-icon">🚀</div>
+          <div className="onboarding-body">
             <h2>{t.ob_caps_title}</h2>
             <p className="lead-text">
               {t.ob_caps_lead}
             </p>
             <div className="capabilities-list">
               <div className="cap-row">
-                <span className="cap-badge">📁 {t.ob_cap1_title}</span>
+                <span className="cap-badge">{t.ob_cap1_title}</span>
                 <p>{t.ob_cap1_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">🗑️ {t.ob_cap2_title}</span>
+                <span className="cap-badge">{t.ob_cap2_title}</span>
                 <p>{t.ob_cap2_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">👥 {t.ob_cap3_title}</span>
+                <span className="cap-badge">{t.ob_cap3_title}</span>
                 <p>{t.ob_cap3_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">👁️ {t.ob_cap4_title}</span>
+                <span className="cap-badge">{t.ob_cap4_title}</span>
                 <p>{t.ob_cap4_desc}</p>
               </div>
               <div className="cap-row">
-                <span className="cap-badge">🎨 {t.ob_cap5_title}</span>
+                <span className="cap-badge">{t.ob_cap5_title}</span>
                 <p>{t.ob_cap5_desc}</p>
               </div>
             </div>
@@ -164,8 +158,7 @@ export default function OnboardingModal({
 
         {/* STEP 4: Ready to Start */}
         {step === 4 && (
-          <div className="onboarding-body animate-fade-in">
-            <div className="onboarding-icon">🎉</div>
+          <div className="onboarding-body">
             <h2>{t.ob_ready_title}</h2>
             <p className="lead-text">
               {t.ob_ready_lead_a}<strong>{t.ob_downloads}</strong>{t.ob_ready_lead_b}<strong>{t.ob_desktop}</strong>{t.ob_ready_lead_c}</p>

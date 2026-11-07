@@ -260,41 +260,37 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
   }, [images]);
 
   return (
-    <div className="image-studio-container" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="image-studio-container">
       {/* ── Top Header Section ────────────────────────────────────── */}
-      <section className="glass" style={{ padding: "20px 24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-          <div>
+      <section className="glass studio-header">
+        <div className="page-header">
+          <div className="page-heading">
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
-                {t.is_title}
-              </h2>
+              <h1>{t.is_title}</h1>
               <span className="capsule-badge">
                 {t.is_badge}
               </span>
             </div>
-            <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
-              {t.is_desc}
-            </p>
+            <p className="page-sub">{t.is_desc}</p>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <button
-              type="button"
-              className="hero-browse-btn"
-              onClick={pickImages}
-              disabled={processing}
-              style={{ padding: "8px 18px", fontSize: "0.9rem" }}
-            >
-              <span>{t.is_add_images}</span>
-            </button>
+          <div className="page-actions">
+            {images.length > 0 && (
+              <button
+                type="button"
+                className="hero-browse-btn"
+                onClick={pickImages}
+                disabled={processing}
+              >
+                <span>{t.is_add_images}</span>
+              </button>
+            )}
             {images.length > 0 && (
               <button
                 type="button"
                 className="btn btn-ghost"
                 onClick={clearAll}
                 disabled={processing}
-                style={{ padding: "8px 14px", fontSize: "0.85rem" }}
               >
                 {t.is_clear_all}
               </button>
@@ -306,44 +302,33 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
       {/* ── Error Banner ──────────────────────────────────────────── */}
       {error && (
         <div className="error-bar" role="alert" onClick={() => setError("")} style={{ margin: 0 }}>
-          <span>⚠️ {error}</span>
-          <span style={{ fontSize: "12px", opacity: 0.8, cursor: "pointer" }}>✕</span>
+          <span>{error}</span>
+          <span style={{ fontSize: "12px", opacity: 0.8, cursor: "pointer" }}>×</span>
         </div>
       )}
 
       {/* ── Success Banner ────────────────────────────────────────── */}
       {report && (
-        <section
-          className="glass"
-          style={{
-            padding: "20px 24px",
-            border: "1px solid rgba(34,197,94,0.3)",
-            background: "rgba(34,197,94,0.08)",
-            borderRadius: "16px",
-          }}
-        >
+        <section className="success-panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "1.4rem" }}>✨</span>
-                <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.1rem" }}>{t.is_success_title}</h4>
-              </div>
+              <h4>{t.is_success_title}</h4>
               <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.88rem" }}>
                 {fmt(t.is_saved_success, { count: report.saved_count })}
-                <code style={{ color: "inherit", fontWeight: 600 }}>{report.target_dir}</code>
+                <code style={{ fontWeight: 600 }}>{report.target_dir}</code>
               </p>
-              <div style={{ display: "flex", gap: "20px", marginTop: "12px" }}>
+              <div className="success-summary">
                 <div>
-                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>{t.is_original} </span>
+                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "none" }}>{t.is_original} </span>
                   <b>{formatBytes(report.original_total_bytes)}</b>
                 </div>
                 <div>
-                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>{t.is_optimized} </span>
-                  <b style={{ color: "#4ade80" }}>{formatBytes(report.new_total_bytes)}</b>
+                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "none" }}>{t.is_optimized} </span>
+                  <b style={{ color: "var(--positive)" }}>{formatBytes(report.new_total_bytes)}</b>
                 </div>
                 <div>
-                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "uppercase" }}>{t.is_saved_space} </span>
-                  <b style={{ color: report.saved_bytes > 0 ? "#4ade80" : "inherit" }}>
+                  <span className="muted" style={{ fontSize: "0.75rem", textTransform: "none" }}>{t.is_saved_space} </span>
+                  <b style={{ color: report.saved_bytes > 0 ? "var(--positive)" : "inherit" }}>
                     {report.saved_bytes > 0
                       ? `-${formatBytes(report.saved_bytes)} ${fmt(t.is_reduction, { pct: Math.round((report.saved_bytes / report.original_total_bytes) * 100) })}`
                       : "+0 B"}
@@ -367,20 +352,20 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
       )}
 
       {/* ── Main Work Area ────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "20px", alignItems: "start" }}>
+      <div className="studio-split">
         {/* ── Controls & Settings Panel ───────────────────────────── */}
-        <section className="glass" style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+        <section className="glass studio-controls">
           <div>
             <h3 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 600 }}>{t.is_step1}</h3>
             <p className="muted" style={{ margin: 0, fontSize: "0.8rem" }}>
               {t.is_step1_desc}
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginTop: "10px" }}>
+            <div className="format-tabs">
               <button
                 type="button"
                 className={`capsule-tab ${format === "webp" ? "active" : ""}`}
                 onClick={() => setFormat("webp")}
-                style={{ padding: "8px 0", borderRadius: "8px", justifyContent: "center" }}
+
               >
                 WebP
               </button>
@@ -388,7 +373,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
                 type="button"
                 className={`capsule-tab ${format === "jpeg" ? "active" : ""}`}
                 onClick={() => setFormat("jpeg")}
-                style={{ padding: "8px 0", borderRadius: "8px", justifyContent: "center" }}
+
               >
                 JPEG
               </button>
@@ -396,7 +381,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
                 type="button"
                 className={`capsule-tab ${format === "png" ? "active" : ""}`}
                 onClick={() => setFormat("png")}
-                style={{ padding: "8px 0", borderRadius: "8px", justifyContent: "center" }}
+
               >
                 PNG
               </button>
@@ -426,7 +411,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
               step="0.05"
               value={quality}
               onChange={(e) => setQuality(parseFloat(e.target.value))}
-              style={{ width: "100%", accentColor: "var(--theme-accent)", cursor: "pointer" }}
+              style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }}
             />
           </div>
 
@@ -453,7 +438,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
                     padding: "5px 10px",
                     fontSize: "0.78rem",
                     border: maxDimension === opt.val ? "1px solid var(--line-strong)" : undefined,
-                    background: maxDimension === opt.val ? "rgba(255,255,255,0.12)" : undefined,
+                    background: maxDimension === opt.val ? "var(--raised)" : undefined,
                   }}
                 >
                   {opt.label}
@@ -477,7 +462,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
                 width: "100%",
                 padding: "8px 12px",
                 borderRadius: "8px",
-                border: "1px solid rgba(255,255,255,0.12)",
+                border: "1px solid var(--raised)",
                 background: "rgba(0,0,0,0.2)",
                 color: "var(--text)",
                 boxSizing: "border-box",
@@ -500,7 +485,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
                   flex: 1,
                   padding: "8px 12px",
                   borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.12)",
+                  border: "1px solid var(--raised)",
                   background: "rgba(0,0,0,0.2)",
                   color: "var(--text)",
                   fontSize: "0.8rem",
@@ -543,152 +528,58 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
         </section>
 
         {/* ── Images Queue Grid / Empty State ──────────────────────── */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <section style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
           {images.length === 0 ? (
-            <div
-              className="glass"
-              onClick={pickImages}
-              style={{
-                padding: "60px 24px",
-                textAlign: "center",
-                cursor: "pointer",
-                border: "2px dashed rgba(255,255,255,0.15)",
-                borderRadius: "16px",
-              }}
-            >
-              <div style={{ fontSize: "3rem", marginBottom: "12px" }}>📸</div>
-              <h3 style={{ margin: "0 0 6px", fontSize: "1.2rem", fontWeight: 600 }}>{t.is_empty_title}</h3>
-              <p className="muted" style={{ margin: "0 0 16px", fontSize: "0.9rem" }}>
-                {t.is_empty_desc}
-              </p>
-              <button type="button" className="hero-browse-btn" style={{ padding: "8px 20px" }}>
-                Browse Images...
+            <div className="drop-panel" onClick={pickImages}>
+              <h3>{t.is_empty_title}</h3>
+              <p>{t.is_empty_desc}</p>
+              <button type="button" className="hero-browse-btn">
+                {t.is_add_images}
               </button>
             </div>
           ) : (
             <>
               {/* Queue Header summary */}
-              <div
-                className="glass"
-                style={{
-                  padding: "12px 20px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  borderRadius: "12px",
-                }}
-              >
-                <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                  <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
-                    <b>{images.length}</b> Image{images.length !== 1 ? "s" : ""}
-                  </span>
-                  <span className="muted" style={{ fontSize: "0.85rem" }}>
-                    Total Input Size: <b style={{ color: "var(--text)" }}>{formatBytes(totalRawSize)}</b>
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  <span className="muted" style={{ fontSize: "0.8rem" }}>
-                    Target: <b style={{ color: "var(--text)" }}>.{format === "jpeg" ? "jpg" : format}</b>
-                  </span>
-                </div>
+              <div className="queue-summary">
+                <span>
+                  <b>{images.length}</b> {images.length === 1 ? "image" : "images"}
+                </span>
+                <span className="muted">
+                  {formatBytes(totalRawSize)} total
+                </span>
+                <span className="muted">
+                  Target <b>.{format === "jpeg" ? "jpg" : format}</b>
+                </span>
               </div>
 
               {/* Grid of image cards */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                  gap: "14px",
-                  maxHeight: "680px",
-                  overflowY: "auto",
-                  paddingRight: "4px",
-                }}
-              >
+              <div className="image-queue">
                 {images.map((item) => {
                   const targetExt = format === "jpeg" ? "jpg" : format;
                   const targetName = `${item.stem}${suffix}.${targetExt}`;
 
                   return (
-                    <div
-                      key={item.id}
-                      className="glass"
-                      style={{
-                        padding: "10px",
-                        borderRadius: "12px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px",
-                        position: "relative",
-                        overflow: "hidden",
-                      }}
-                    >
+                    <div key={item.id} className="image-card">
                       {/* Image Thumbnail Container */}
-                      <div
-                        style={{
-                          height: "140px",
-                          width: "100%",
-                          borderRadius: "8px",
-                          overflow: "hidden",
-                          background: "rgba(0,0,0,0.3)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          position: "relative",
-                        }}
-                      >
-                        <img
-                          src={item.previewUrl}
-                          alt={item.name}
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: "100%",
-                            objectFit: "contain",
-                          }}
-                        />
-                        {/* Remove Button Badge */}
+                      <div className="image-card-thumb">
+                        <img src={item.previewUrl} alt={item.name} />
                         <button
                           type="button"
+                          className="thumb-remove"
                           onClick={() => removeImage(item.id)}
                           title={t.is_remove_queue}
-                          style={{
-                            position: "absolute",
-                            top: "6px",
-                            right: "6px",
-                            background: "rgba(0,0,0,0.6)",
-                            border: "none",
-                            color: "#fff",
-                            borderRadius: "50%",
-                            width: "24px",
-                            height: "24px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: "12px",
-                          }}
+                          aria-label={t.is_remove_queue}
                         >
-                          ✕
+                          ×
                         </button>
                       </div>
 
                       {/* Image Details */}
                       <div>
-                        <div
-                          className="ellipsis mono"
-                          style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)" }}
-                          title={item.name}
-                        >
+                        <div className="image-name" title={item.name}>
                           {item.name}
                         </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            marginTop: "4px",
-                            fontSize: "0.75rem",
-                          }}
-                          className="muted"
-                        >
+                        <div className="image-meta">
                           <span>{formatBytes(item.size)}</span>
                           <span>
                             {item.width && item.height ? `${item.width}×${item.height}` : ""}
@@ -697,18 +588,9 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
                       </div>
 
                       {/* Output Name Preview */}
-                      <div
-                        style={{
-                          background: "rgba(255,255,255,0.04)",
-                          padding: "4px 8px",
-                          borderRadius: "6px",
-                          fontSize: "0.75rem",
-                        }}
-                      >
+                      <div className="image-output">
                         <span className="muted">{t.is_to} </span>
-                        <span className="mono" style={{ color: "var(--text-muted)" }} title={targetName}>
-                          {targetName}
-                        </span>
+                        <span title={targetName}>{targetName}</span>
                       </div>
                     </div>
                   );

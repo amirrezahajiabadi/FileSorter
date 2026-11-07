@@ -22,6 +22,9 @@ export interface I18nStrings {
   app_title: string;
   app_subtitle: string;
   nav_aria: string;
+  nav_group_organize: string;
+  nav_group_clean: string;
+  nav_group_tools: string;
   sidebar_collapse: string;
   sidebar_expand: string;
   banner_tech: string;
@@ -61,6 +64,8 @@ export interface I18nStrings {
   // Sort tab
   hero_title: string;
   hero_subtitle: string;
+  sort_flow_title: string;
+  sort_flow_desc: string;
   hero_drop_btn: string;
   hero_selected: string;
   hero_scanning: string;
@@ -117,6 +122,7 @@ export interface I18nStrings {
   disk_col_path: string;
   disk_loading: string;
   disk_pick_first: string;
+  disk_empty_title: string;
   disk_drives_title: string;
   disk_drive_name: string;
   disk_free_short: string;
@@ -135,6 +141,7 @@ export interface I18nStrings {
   junk_cleaned_summary: string;
   junk_files_count: string;
   junk_empty_hint: string;
+  junk_empty_title: string;
   junk_purged_detail: string;
   junk_in_use_skipped: string;
 
@@ -159,6 +166,7 @@ export interface I18nStrings {
   sched_desc: string;
   sched_add_task: string;
   sched_no_tasks: string;
+  sched_empty_title: string;
   sched_run_now: string;
   sched_last_run: string;
   sched_interval: string;
@@ -197,6 +205,7 @@ export interface I18nStrings {
   notice_rule_deleted: string;
   settings_title: string;
   settings_desc: string;
+  settings_page_desc: string;
   settings_cat_title: string;
   settings_cat_desc: string;
   settings_btn_save: string;
@@ -431,6 +440,9 @@ const EN: I18nStrings = {
   app_title: "FileSorter",
   app_subtitle: "Ultra-fast file organizer powered by Rust & Tauri",
   nav_aria: "Main Navigation",
+  nav_group_organize: "Organize",
+  nav_group_clean: "Clean up",
+  nav_group_tools: "Tools",
   sidebar_collapse: "Collapse Sidebar",
   sidebar_expand: "Expand Sidebar",
   banner_tech: "Tauri 2 + Rust",
@@ -443,22 +455,17 @@ const EN: I18nStrings = {
   theme_light: "Switch to light theme",
   theme_title: "Theme & Appearance",
   theme_desc:
-    "Choose from liquid glass themes: pure dark, crystal light, or glowing chromatic glass combinations.",
+    "Five considered themes: warm graphite, true black, paper light, deep green and warm rose.",
   theme_name_fluent: "Liquid Smoke",
-  theme_desc_fluent:
-    "Smoked crystal glass with a soft prismatic edge and deep ambient depth",
+  theme_desc_fluent: "Warm graphite ground with a brass signal on data",
   theme_name_dark: "Obsidian",
-  theme_desc_dark:
-    "Near-black glass with restrained highlights and crisp white type",
+  theme_desc_dark: "True black, crisp white type and a steel signal",
   theme_name_light: "Crystal Frost",
-  theme_desc_light:
-    "Bright frosted glass with paper-white surfaces and quiet contrast",
+  theme_desc_light: "Paper-white surfaces, ink text and a single blue signal",
   theme_name_aurora: "Liquid Prism",
-  theme_desc_aurora:
-    "Iridescent glass with subtle cool and warm refraction at the edges",
+  theme_desc_aurora: "Deep green-black with a mint signal on data",
   theme_name_sunset: "Rose Quartz",
-  theme_desc_sunset:
-    "Warm pearl glass with a faint rose and amber shimmer",
+  theme_desc_sunset: "Warm paper surfaces with a rosewood signal",
 
   tab_sort: "File Sorter",
   tab_junk: "Junk Cleaner",
@@ -473,16 +480,18 @@ const EN: I18nStrings = {
 
   hero_title: "Select a folder to organize",
   hero_subtitle: "Scan, plan, and categorize your files instantly without UI freezing.",
-  hero_drop_btn: "Browse Folder",
+  sort_flow_title: "Where files go",
+  sort_flow_desc: "A folder is created only for the file types present.",
+  hero_drop_btn: "Choose Folder",
   hero_selected: "Selected folder:",
   hero_scanning: "Scanning and analyzing files…",
   hero_files_found: "files discovered so far",
   hero_stop: "Stop Scan",
-  dropzone_hint: "Click anywhere inside this liquid card to select folder",
+  dropzone_hint: "Drop a folder here, or choose one from disk. Nothing moves until you review the plan.",
   summary_files: "Total Files",
   summary_size: "Total Size",
   summary_categories: "Categories",
-  btn_sort_now: "⚡ Sort Files Now",
+  btn_sort_now: "Sort Files Now",
   btn_sorting: "Moving files…",
   btn_rescan: "Rescan",
   btn_show_moves: "Preview planned moves",
@@ -490,10 +499,10 @@ const EN: I18nStrings = {
   btn_undo: "↩ Undo Last Sort",
   undo_success: "files restored to their original locations",
   undo_skipped: "files skipped due to collision",
-  sort_done_title: "✓ Sorting completed successfully",
+  sort_done_title: "Sorting completed successfully",
   sort_done_desc: "files moved cleanly. Journal entry recorded.",
   preview_note:
-    "⚡ Showing preview of first {shown} of {total} planned moves. All files will be processed on sort.",
+    "Showing preview of first {shown} of {total} planned moves. All files will be processed on sort.",
   col_source: "Source File",
   col_destination: "Destination",
   col_category: "Category",
@@ -515,8 +524,8 @@ const EN: I18nStrings = {
   dupes_select_folder: "Select a folder first to analyze duplicates.",
   dupes_per_file: "{size} per file ({count} copies)",
   dupes_waste: "Waste: {size}",
-  dupes_keep_tag: "★ [Keep]",
-  dupes_move_tag: "✕ [Move]",
+  dupes_keep_tag: "[Keep]",
+  dupes_move_tag: "× [Move]",
 
   disk_title: "Disk Space Utilization",
   disk_desc: "Detailed breakdown of disk usage per category and largest files found.",
@@ -528,7 +537,8 @@ const EN: I18nStrings = {
   disk_col_size: "Size",
   disk_col_path: "Full Path",
   disk_loading: "Loading disk usage stats…",
-  disk_pick_first: "Select a folder or drive from below to analyze.",
+  disk_pick_first: "Choose a folder to analyze its disk usage.",
+  disk_empty_title: "No folder selected",
   disk_drives_title: "Detected Drives & Storage Volumes:",
   disk_drive_name: "Local Disk ({letter}:)",
   disk_free_short: "{size} free",
@@ -547,7 +557,8 @@ const EN: I18nStrings = {
   junk_cleaned_summary: "Cleaned files successfully.",
   junk_files_count: "{count} files",
   junk_empty_hint:
-    'Click "Scan Junk Locations" above to discover temporary files and caches.',
+    'Click "Scan Junk Locations" to discover temporary files and caches.',
+  junk_empty_title: "Nothing scanned yet",
   junk_purged_detail: "Purged {files} files ({size} freed).",
   junk_in_use_skipped: "({count} in-use files safely skipped)",
 
@@ -574,6 +585,7 @@ const EN: I18nStrings = {
     "Keep your system clean and organized on automated timers in the background.",
   sched_add_task: "+ Add Scheduled Task",
   sched_no_tasks: "No automated tasks scheduled yet.",
+  sched_empty_title: "No tasks yet",
   sched_run_now: "Run Now",
   sched_last_run: "Last run:",
   sched_interval: "Interval:",
@@ -612,6 +624,7 @@ const EN: I18nStrings = {
   notice_rule_added: "Smart rule added successfully",
   notice_rule_deleted: "Smart rule deleted",
   settings_title: "Settings",
+  settings_page_desc: "Categories, file types and rule-based sorting for the whole app.",
   settings_desc:
     "Customize categories, smart keyword rules, and file extension mappings.",
   settings_cat_title: "Categories & File Extensions",
@@ -636,7 +649,7 @@ const EN: I18nStrings = {
   um_latest: "Latest:",
   um_highlights: "Release Highlights:",
   um_later: "Remind Me Later",
-  um_download: "⚡ Download & Install Update",
+  um_download: "Download & Install Update",
 
   loader_renamer: "Loading Batch Renamer…",
   loader_images: "Loading Image Studio…",
@@ -660,13 +673,13 @@ const EN: I18nStrings = {
   ob_feature_safe_title: "Never Overwrites",
   ob_feature_safe_desc:
     "Smart collision resolver automatically renames conflicts (e.g. file (2).pdf).",
-  ob_theme_title: "Choose Your Liquid Glass Aesthetic",
+  ob_theme_title: "Choose your theme",
   ob_theme_lead:
-    "FileSorter features an ultra-refined Liquid Glass Design System. Select your preferred look:",
+    "Five flat themes share one type system. Pick the one that suits your desk:",
   ob_theme_select_aria: "Select {name}",
-  ob_caps_title: "All-In-One Desktop Utility",
+  ob_caps_title: "One window for the whole clean-up",
   ob_caps_lead:
-    "More than a simple sorter: everything you need to keep your workspace pristine and optimized.",
+    "Sort folders, purge caches, remove duplicates and compress images without leaving the app.",
   ob_cap1_title: "Smart Organize & Rules",
   ob_cap1_desc: "Categorize by extensions or create keyword rules matching filename tokens.",
   ob_cap2_title: "Junk & Cache Cleaner",
@@ -694,20 +707,20 @@ const EN: I18nStrings = {
   ob_back_aria: "Previous step",
   ob_continue: "Continue →",
   ob_continue_aria: "Next step",
-  ob_get_started: "Get Started ✓",
+  ob_get_started: "Get Started",
   ob_get_started_aria: "Get started",
 
   br_title: "Smart Batch Renamer",
   br_desc:
     "Rename multiple files and folders at once using search & replace, affixes, numbering, and case formatting.",
-  br_add_files: "➕ Add Files",
-  br_add_folder: "📁 Add Folder",
-  br_clear: "🗑️ Clear",
-  br_method_replace: "🔍 Find & Replace",
-  br_method_affix: "📌 Prefix & Suffix",
-  br_method_numbering: "🔢 Numbering Sequence",
-  br_method_case: "🔤 Case Converter",
-  br_method_extension: "🏷️ Extension",
+  br_add_files: "Add Files",
+  br_add_folder: "Add Folder",
+  br_clear: "Clear",
+  br_method_replace: "Find & Replace",
+  br_method_affix: "Prefix & Suffix",
+  br_method_numbering: "Numbering Sequence",
+  br_method_case: "Case Converter",
+  br_method_extension: "Extension",
   br_find_label: "Find text:",
   br_find_ph: "e.g. [1080p] or copy",
   br_replace_label: "Replace with:",
@@ -733,19 +746,19 @@ const EN: I18nStrings = {
   br_change_ext: "Change Extension to:",
   br_ext_ph: "e.g. jpg",
   br_force_lower_ext: "Force Lowercase Extension (e.g. .JPG → .jpg)",
-  br_renamed_ok: "✓ Successfully renamed {count} {unit}!",
-  br_failed: "⚠️ {count} failed ({errors})",
+  br_renamed_ok: "Successfully renamed {count} {unit}!",
+  br_failed: "{count} failed ({errors})",
   br_undo: "↩ Undo Rename",
   br_restored: "↩ Restored {count} {unit} to their original names.",
   br_conflict:
-    "⚠️ Name conflict detected: multiple files would have the same name ({names}). Please refine your rules before applying.",
+    "Name conflict detected: multiple files would have the same name ({names}). Please refine your rules before applying.",
   br_empty_title: "No files selected for renaming",
   br_empty_desc:
     "Add files or folders to test renaming rules with live real-time preview and safe undo protection.",
   br_choose_files: "Choose Files",
   br_selected_count: "{count} files selected · ",
   br_will_modify: "{count} will be modified",
-  br_apply: "⚡ Apply Rename ({count})",
+  br_apply: "Apply Rename ({count})",
   br_renaming: "⏳ Renaming…",
   br_col_original: "Original Name",
   br_col_new: "→ New Name",
@@ -769,29 +782,29 @@ const EN: I18nStrings = {
   is_optimized: "Optimized:",
   is_saved_space: "Saved Space:",
   is_reduction: "({pct}% reduction)",
-  is_open_folder: "📁 Open Destination Folder",
-  is_step1: "1. Target Format",
+  is_open_folder: "Open Destination Folder",
+  is_step1: "Target Format",
   is_step1_desc: "Select target format for conversion",
-  is_fmt_webp_desc: "🔥 WebP: Next-gen format, incredible compression with zero visible loss.",
-  is_fmt_jpeg_desc: "🌐 JPEG: Maximum cross-platform and device photo compatibility.",
-  is_fmt_png_desc: "💎 PNG: Lossless quality with full transparency support.",
-  is_step2: "2. Compression Quality",
+  is_fmt_webp_desc: "WebP: small files at high quality, well supported on the web.",
+  is_fmt_jpeg_desc: "JPEG: the widest compatibility across devices and platforms.",
+  is_fmt_png_desc: "PNG: lossless quality with full transparency support.",
+  is_step2: "Compression Quality",
   is_quality_pristine: "Pristine visual fidelity",
   is_quality_balanced: "Balanced high quality (Recommended)",
   is_quality_aggressive: "Aggressive compression",
-  is_step3: "3. Max Dimension Clamping",
+  is_step3: "Max Dimension Clamping",
   is_step3_desc: "Limit maximum width or height preserving aspect ratio",
   is_dim_original: "Original",
-  is_step4: "4. Filename Suffix",
+  is_step4: "Filename Suffix",
   is_step4_desc: "Appended to name (leave blank to keep name)",
   is_step4_ph: "e.g. _optimized or leave empty",
-  is_step5: "5. Destination Folder",
+  is_step5: "Destination Folder",
   is_choose_folder_ph: "Click to choose folder...",
-  is_optimize: "⚡ Optimize & Export",
+  is_optimize: "Optimize & Export",
   is_optimizing: "⏳ Optimizing",
   is_empty_title: "No Images Added Yet",
   is_empty_desc:
-    'Click here or use "Add Images" above to select photos or graphics for batch compression.',
+    "Click here to select photos or graphics for batch compression.",
   is_remove_queue: "Remove from queue",
   is_to: "To:",
 
@@ -801,7 +814,7 @@ const EN: I18nStrings = {
   ps_mode_img2pdf: "Images to PDF",
   ps_mode_pdf2img: "PDF to Images",
   ps_add_images: "Add Images",
-  ps_clear_all: "🗑️ Clear All",
+  ps_clear_all: "Clear All",
   ps_page_singular: "page",
   ps_page_plural: "pages",
   ps_total: "Total:",
@@ -814,11 +827,11 @@ const EN: I18nStrings = {
   ps_margin_small: "Small (15 pt)",
   ps_margin_normal: "Normal (30 pt)",
   ps_building: "⏳ Building PDF…",
-  ps_export: "⚡ Export to PDF",
-  ps_created: "✓ PDF Successfully Created!",
+  ps_export: "Export to PDF",
+  ps_created: "PDF Successfully Created!",
   ps_saved_to: "Saved to:",
-  ps_open_pdf: "👁️ Open PDF",
-  ps_reveal: "📁 Reveal in Folder",
+  ps_open_pdf: "Open PDF",
+  ps_reveal: "Reveal in Folder",
   ps_no_images_title: "No images added yet",
   ps_no_images_desc:
     "Click to browse JPG, PNG, WebP or BMP images to compile into a single PDF document.",
@@ -828,8 +841,8 @@ const EN: I18nStrings = {
   ps_select_pdf: "Select PDF Document",
   ps_select_pdf_desc:
     "Choose any PDF to render and extract each page as high-res PNG or JPEG image.",
-  ps_choose_pdf: "📂 Choose PDF",
-  ps_preview: "👁️ Preview",
+  ps_choose_pdf: "Choose PDF",
+  ps_preview: "Preview",
   ps_open_pdf_doc: "Open PDF Document",
   ps_extract_settings: "Extraction Settings",
   ps_image_format: "Image Format:",
@@ -842,10 +855,10 @@ const EN: I18nStrings = {
   ps_page_range_label: "Page Range (e.g. all or 1-3, 5):",
   ps_dest_folder: "Destination Folder:",
   ps_extracting: "⏳ Extracting",
-  ps_extract_btn: "⚡ Extract Pages ({count})",
-  ps_extracted_ok: "✓ Successfully Extracted {count} Images!",
+  ps_extract_btn: "Extract Pages ({count})",
+  ps_extracted_ok: "Successfully Extracted {count} Images!",
   ps_saved_size_to: "Saved {size} to:",
-  ps_open_dest: "📁 Open Destination Folder",
+  ps_open_dest: "Open Destination Folder",
   ps_page_alt: "Page {n}",
 
   footer_text:
@@ -857,6 +870,9 @@ const FA: I18nStrings = {
   app_title: "FileSorter",
   app_subtitle: "سازماندهی فوق‌العاده سریع فایل‌ها با قدرت Rust و Tauri",
   nav_aria: "ناوبری اصلی",
+  nav_group_organize: "سازمان‌دهی",
+  nav_group_clean: "پاک‌سازی",
+  nav_group_tools: "ابزارها",
   sidebar_collapse: "جمع‌کردن نوار کناری",
   sidebar_expand: "بازکردن نوار کناری",
   banner_tech: "Tauri 2 + Rust",
@@ -869,17 +885,17 @@ const FA: I18nStrings = {
   theme_light: "تغییر به پوسته روشن",
   theme_title: "پوسته و ظاهر",
   theme_desc:
-    "از میان پوسته‌های شیشه‌ای مایع انتخاب کنید: تاریک خالص، روشن کریستالی یا ترکیب‌های شیشه‌ای رنگی.",
+    "پنج پوسته سنجیده: گرافیت گرم، سیاه مطلق، کاغذ روشن، سبز عمیق و رز گرم.",
   theme_name_fluent: "دودِ شیشه‌ای",
-  theme_desc_fluent: "شیشه کریستالی دودی با لبه منشوری نرم و عمق محیطی زیاد",
+  theme_desc_fluent: "گرافیت گرم با نشان برنجی روی داده‌ها",
   theme_name_dark: "اُبسیدین",
-  theme_desc_dark: "شیشه تقریباً سیاه با برجستگی‌های ملایم و متن سفید شفاف",
+  theme_desc_dark: "سیاه مطلق با متن سفید و نشان فولادی",
   theme_name_light: "یخ کریستالی",
-  theme_desc_light: "شیشه مات روشن با سطوح سفید کاغذی و کنتراست آرام",
+  theme_desc_light: "سطوح کاغذی روشن، متن جوهری و یک نشان آبی",
   theme_name_aurora: "منشور مایع",
-  theme_desc_aurora: "شیشه رنگین‌کمانی با شکست سرد و گرم ملایم در لبه‌ها",
+  theme_desc_aurora: "سبز-سیاه عمیق با نشان نعنایی روی داده‌ها",
   theme_name_sunset: "کوارتز رُز",
-  theme_desc_sunset: "شیشه مرواریدی گرم با درخشش ملایم رُز و کهربایی",
+  theme_desc_sunset: "سطوح کاغذی گرم با نشان رزچوبی",
 
   tab_sort: "دسته‌بندی فایل‌ها",
   tab_junk: "پاک‌سازی زائدها",
@@ -894,16 +910,18 @@ const FA: I18nStrings = {
 
   hero_title: "پوشه‌ای را برای سازماندهی انتخاب کنید",
   hero_subtitle: "فایل‌ها را فوراً اسکن، برنامه‌ریزی و دسته‌بندی کنید، بدون قفل شدن رابط کاربری.",
+  sort_flow_title: "فایل‌ها کجا می‌روند",
+  sort_flow_desc: "پوشه فقط برای پسوندهایی ساخته می‌شود که واقعاً وجود دارند.",
   hero_drop_btn: "انتخاب پوشه",
   hero_selected: "پوشه انتخاب‌شده:",
   hero_scanning: "در حال اسکن و تحلیل فایل‌ها…",
   hero_files_found: "فایل تا این لحظه پیدا شد",
   hero_stop: "توقف اسکن",
-  dropzone_hint: "برای انتخاب پوشه، روی هر نقطه از این کارت شیشه‌ای کلیک کنید",
+  dropzone_hint: "پوشه را اینجا رها کنید یا از دیسک انتخاب کنید. تا بازبینی برنامه، هیچ فایلی جابه‌جا نمی‌شود.",
   summary_files: "کل فایل‌ها",
   summary_size: "حجم کل",
   summary_categories: "دسته‌ها",
-  btn_sort_now: "⚡ همین حالا دسته‌بندی کن",
+  btn_sort_now: "همین حالا دسته‌بندی کن",
   btn_sorting: "در حال جابه‌جایی فایل‌ها…",
   btn_rescan: "اسکن دوباره",
   btn_show_moves: "پیش‌نمایش جابه‌جایی‌های برنامه‌ریزی‌شده",
@@ -911,10 +929,10 @@ const FA: I18nStrings = {
   btn_undo: "↩ بازگردانی آخرین دسته‌بندی",
   undo_success: "فایل به مکان‌های اصلی بازگردانده شد",
   undo_skipped: "فایل به دلیل تداخل نادیده گرفته شد",
-  sort_done_title: "✓ دسته‌بندی با موفقیت انجام شد",
+  sort_done_title: "دسته‌بندی با موفقیت انجام شد",
   sort_done_desc: "فایل با موفقیت جابه‌جا شد. یادداشت در دفتر روزانه ثبت شد.",
   preview_note:
-    "⚡ پیش‌نمایش {shown} مورد نخست از {total} جابه‌جایی برنامه‌ریزی‌شده. هنگام دسته‌بندی همه فایل‌ها پردازش می‌شوند.",
+    "پیش‌نمایش {shown} مورد نخست از {total} جابه‌جایی برنامه‌ریزی‌شده. هنگام دسته‌بندی همه فایل‌ها پردازش می‌شوند.",
   col_source: "فایل مبدأ",
   col_destination: "مقصد",
   col_category: "دسته",
@@ -935,8 +953,8 @@ const FA: I18nStrings = {
   dupes_select_folder: "برای تحلیل تکراری‌ها ابتدا یک پوشه انتخاب کنید.",
   dupes_per_file: "{size} برای هر فایل ({count} نسخه)",
   dupes_waste: "هدررفت: {size}",
-  dupes_keep_tag: "★ [نگه‌داشتن]",
-  dupes_move_tag: "✕ [انتقال]",
+  dupes_keep_tag: "[نگه‌داشتن]",
+  dupes_move_tag: "× [انتقال]",
 
   disk_title: "میزان استفاده از فضای دیسک",
   disk_desc: "تفکیک دقیق مصرف دیسک بر اساس دسته و بزرگ‌ترین فایل‌های یافت‌شده.",
@@ -948,7 +966,8 @@ const FA: I18nStrings = {
   disk_col_size: "حجم",
   disk_col_path: "مسیر کامل",
   disk_loading: "در حال بارگذاری آمار فضای دیسک…",
-  disk_pick_first: "برای تحلیل، یک پوشه یا درایو را از پایین انتخاب کنید.",
+  disk_pick_first: "برای تحلیل میزان استفاده از دیسک، یک پوشه انتخاب کنید.",
+  disk_empty_title: "پوشه‌ای انتخاب نشده",
   disk_drives_title: "درایوها و حافظه‌های شناسایی‌شده:",
   disk_drive_name: "دیسک محلی ({letter}:)",
   disk_free_short: "{size} آزاد",
@@ -965,7 +984,8 @@ const FA: I18nStrings = {
   junk_empty: "هیچ فایل زائدی در مکان‌های اسکن‌شده یافت نشد.",
   junk_cleaned_summary: "فایل‌ها با موفقیت پاک‌سازی شدند.",
   junk_files_count: "{count} فایل",
-  junk_empty_hint: "برای یافتن فایل‌های موقت و کش‌ها، روی «اسکن مکان‌های زائد» در بالا کلیک کنید.",
+  junk_empty_hint: "برای یافتن فایل‌های موقت و کش‌ها، روی «اسکن مکان‌های زائد» کلیک کنید.",
+  junk_empty_title: "هنوز چیزی اسکن نشده",
   junk_purged_detail: "{files} فایل پاک شد ({size} آزاد شد).",
   junk_in_use_skipped: "({count} فایل در حال استفاده به‌صورت ایمن نادیده گرفته شد)",
 
@@ -988,6 +1008,7 @@ const FA: I18nStrings = {
   sched_desc: "سیستم خود را با تایمرهای خودکار در پس‌زمینه تمیز و مرتب نگه دارید.",
   sched_add_task: "+ افزودن وظیفه زمان‌بندی‌شده",
   sched_no_tasks: "هنوز وظیفه خودکاری زمان‌بندی نشده است.",
+  sched_empty_title: "هنوز وظیفه‌ای نیست",
   sched_run_now: "اجرای فوری",
   sched_last_run: "آخرین اجرا:",
   sched_interval: "بازه:",
@@ -1024,6 +1045,7 @@ const FA: I18nStrings = {
   notice_rule_added: "قانون هوشمند با موفقیت اضافه شد",
   notice_rule_deleted: "قانون هوشمند حذف شد",
   settings_title: "تنظیمات",
+  settings_page_desc: "دسته‌ها، پسوندهای فایل و قوانین دسته‌بندی کل برنامه.",
   settings_desc: "دسته‌ها، قوانین هوشمند کلیدواژه و نگاشت پسوند فایل‌ها را سفارشی کنید.",
   settings_cat_title: "دسته‌ها و پسوند فایل‌ها",
   settings_cat_desc: "قالب‌های فایل را به دسته‌ها اختصاص دهید یا پسوند سفارشی اضافه کنید.",
@@ -1047,7 +1069,7 @@ const FA: I18nStrings = {
   um_latest: "جدیدترین:",
   um_highlights: "نکات برجسته این انتشار:",
   um_later: "بعداً یادآوری کن",
-  um_download: "⚡ دانلود و نصب به‌روزرسانی",
+  um_download: "دانلود و نصب به‌روزرسانی",
 
   loader_renamer: "در حال بارگذاری تغییر نام گروهی…",
   loader_images: "در حال بارگذاری استودیوی تصویر…",
@@ -1071,12 +1093,12 @@ const FA: I18nStrings = {
   ob_feature_safe_title: "هرگز بازنویسی نمی‌کند",
   ob_feature_safe_desc:
     "حل‌کننده هوشمند تداخل، نام‌های تکراری را خودکار تغییر می‌دهد (مثلاً file (2).pdf).",
-  ob_theme_title: "ظاهر شیشه‌ای مایع خود را انتخاب کنید",
+  ob_theme_title: "پوسته خود را انتخاب کنید",
   ob_theme_lead:
-    "FileSorter از سامانه طراحی بی‌نظیر شیشه‌ای مایع بهره می‌برد. ظاهر دلخواه خود را انتخاب کنید:",
+    "پنج پوسته تخت با یک سامانه تایپوگرافی مشترک. پوسته‌ای را انتخاب کنید که به میز کار شما می‌آید:",
   ob_theme_select_aria: "انتخاب {name}",
-  ob_caps_title: "ابزار همه‌کاره رومیزی",
-  ob_caps_lead: "فراتر از یک دسته‌بندی ساده: هر آنچه برای تمیز و بهینه نگه‌داشتن فضای کاری نیاز دارید.",
+  ob_caps_title: "یک پنجره برای همه کارهای پاک‌سازی",
+  ob_caps_lead: "پوشه‌ها را مرتب کنید، کش‌ها را پاک کنید، تکراری‌ها را حذف کنید و تصاویر را فشرده کنید، همه در همین برنامه.",
   ob_cap1_title: "سازماندهی هوشمند و قوانین",
   ob_cap1_desc: "دسته‌بندی بر اساس پسوند یا ساخت قوانین کلیدواژه‌ای مطابق با بخش‌های نام فایل.",
   ob_cap2_title: "پاک‌کننده زائدها و کش",
@@ -1101,19 +1123,19 @@ const FA: I18nStrings = {
   ob_back_aria: "مرحله قبل",
   ob_continue: "← ادامه",
   ob_continue_aria: "مرحله بعد",
-  ob_get_started: "شروع کنید ✓",
+  ob_get_started: "شروع کنید",
   ob_get_started_aria: "شروع",
 
   br_title: "تغییر نام گروهی هوشمند",
   br_desc: "تغییر نام همزمان چندین فایل و پوشه با جست‌وجو و جایگذاری، پیشوند/پسوند، شماره‌گذاری و قالب‌بندی حروف.",
-  br_add_files: "➕ افزودن فایل‌ها",
-  br_add_folder: "📁 افزودن پوشه",
-  br_clear: "🗑️ پاک کردن",
-  br_method_replace: "🔍 جست‌وجو و جایگذاری",
-  br_method_affix: "📌 پیشوند و پسوند",
-  br_method_numbering: "🔢 دنباله شماره‌گذاری",
-  br_method_case: "🔤 تبدیل حروف",
-  br_method_extension: "🏷️ پسوند",
+  br_add_files: "افزودن فایل‌ها",
+  br_add_folder: "افزودن پوشه",
+  br_clear: "پاک کردن",
+  br_method_replace: "جست‌وجو و جایگذاری",
+  br_method_affix: "پیشوند و پسوند",
+  br_method_numbering: "دنباله شماره‌گذاری",
+  br_method_case: "تبدیل حروف",
+  br_method_extension: "پسوند",
   br_find_label: "متن جست‌وجو:",
   br_find_ph: "مثلاً [1080p] یا copy",
   br_replace_label: "جایگذاری با:",
@@ -1139,18 +1161,18 @@ const FA: I18nStrings = {
   br_change_ext: "تغییر پسوند به:",
   br_ext_ph: "مثلاً jpg",
   br_force_lower_ext: "اجبار پسوند به حروف کوچک (مثلاً .JPG → .jpg)",
-  br_renamed_ok: "✓ {count} {unit} با موفقیت تغییر نام یافت!",
-  br_failed: "⚠️ {count} ناموفق ({errors})",
+  br_renamed_ok: "{count} {unit} با موفقیت تغییر نام یافت!",
+  br_failed: "{count} ناموفق ({errors})",
   br_undo: "↩ بازگردانی تغییر نام",
   br_restored: "↩ {count} {unit} به نام اصلی خود بازگردانده شد.",
   br_conflict:
-    "⚠️ تداخل نام شناسایی شد: چند فایل نام یکسان خواهند داشت ({names}). لطفاً پیش از اعمال، قوانین را اصلاح کنید.",
+    "تداخل نام شناسایی شد: چند فایل نام یکسان خواهند داشت ({names}). لطفاً پیش از اعمال، قوانین را اصلاح کنید.",
   br_empty_title: "هیچ فایلی برای تغییر نام انتخاب نشده",
   br_empty_desc: "برای آزمایش قوانین تغییر نام با پیش‌نمایش زنده و بازگردانی ایمن، فایل یا پوشه اضافه کنید.",
   br_choose_files: "انتخاب فایل‌ها",
   br_selected_count: "{count} فایل انتخاب شده · ",
   br_will_modify: "{count} مورد تغییر خواهد کرد",
-  br_apply: "⚡ اعمال تغییر نام ({count})",
+  br_apply: "اعمال تغییر نام ({count})",
   br_renaming: "⏳ در حال تغییر نام…",
   br_col_original: "نام اصلی",
   br_col_new: "← نام جدید",
@@ -1173,29 +1195,29 @@ const FA: I18nStrings = {
   is_optimized: "بهینه‌شده:",
   is_saved_space: "فضای آزادشده:",
   is_reduction: "(کاهش {pct}٪)",
-  is_open_folder: "📁 بازکردن پوشه مقصد",
-  is_step1: "۱. قالب هدف",
+  is_open_folder: "بازکردن پوشه مقصد",
+  is_step1: "قالب هدف",
   is_step1_desc: "قالب هدف برای تبدیل را انتخاب کنید",
-  is_fmt_webp_desc: "🔥 WebP: قالب نسل جدید، فشرده‌سازی فوق‌العاده بدون افت محسوس کیفیت.",
-  is_fmt_jpeg_desc: "🌐 JPEG: بیشترین سازگاری با پلتفرم‌ها و دستگاه‌های مختلف.",
-  is_fmt_png_desc: "💎 PNG: کیفیت بدون اتلاف با پشتیبانی کامل از شفافیت.",
-  is_step2: "۲. کیفیت فشرده‌سازی",
+  is_fmt_webp_desc: "WebP: فایل کوچک با کیفیت بالا و پشتیبانی گسترده در وب.",
+  is_fmt_jpeg_desc: "JPEG: بیشترین سازگاری میان دستگاه‌ها و پلتفرم‌ها.",
+  is_fmt_png_desc: "PNG: کیفیت بدون اتلاف با پشتیبانی کامل از شفافیت.",
+  is_step2: "کیفیت فشرده‌سازی",
   is_quality_pristine: "کیفیت بصری دست‌نخورده",
   is_quality_balanced: "کیفیت بالا و متعادل (توصیه‌شده)",
   is_quality_aggressive: "فشرده‌سازی شدید",
-  is_step3: "۳. محدودسازی حداکثر ابعاد",
+  is_step3: "محدودسازی حداکثر ابعاد",
   is_step3_desc: "محدودسازی حداکثر عرض یا ارتفاع با حفظ نسبت ابعاد",
   is_dim_original: "اصلی",
-  is_step4: "۴. پسوند نام فایل",
+  is_step4: "پسوند نام فایل",
   is_step4_desc: "به نام اضافه می‌شود (برای حفظ نام، خالی بگذارید)",
   is_step4_ph: "مثلاً _optimized یا خالی بگذارید",
-  is_step5: "۵. پوشه مقصد",
+  is_step5: "پوشه مقصد",
   is_choose_folder_ph: "برای انتخاب پوشه کلیک کنید...",
-  is_optimize: "⚡ بهینه‌سازی و خروجی",
+  is_optimize: "بهینه‌سازی و خروجی",
   is_optimizing: "⏳ در حال بهینه‌سازی",
   is_empty_title: "هنوز تصویری اضافه نشده",
   is_empty_desc:
-    "برای انتخاب عکس یا گرافیک جهت فشرده‌سازی گروهی، اینجا کلیک کنید یا از «افزودن تصاویر» در بالا استفاده کنید.",
+    "برای انتخاب عکس یا گرافیک جهت فشرده‌سازی گروهی، اینجا کلیک کنید.",
   is_remove_queue: "حذف از فهرست",
   is_to: "به:",
 
@@ -1204,7 +1226,7 @@ const FA: I18nStrings = {
   ps_mode_img2pdf: "تصویر به PDF",
   ps_mode_pdf2img: "PDF به تصویر",
   ps_add_images: "افزودن تصاویر",
-  ps_clear_all: "🗑️ پاک کردن همه",
+  ps_clear_all: "پاک کردن همه",
   ps_page_singular: "صفحه",
   ps_page_plural: "صفحه",
   ps_total: "مجموع:",
@@ -1217,11 +1239,11 @@ const FA: I18nStrings = {
   ps_margin_small: "کوچک (۱۵ نقطه)",
   ps_margin_normal: "معمولی (۳۰ نقطه)",
   ps_building: "⏳ در حال ساخت PDF…",
-  ps_export: "⚡ خروجی به PDF",
-  ps_created: "✓ PDF با موفقیت ساخته شد!",
+  ps_export: "خروجی به PDF",
+  ps_created: "PDF با موفقیت ساخته شد!",
   ps_saved_to: "ذخیره شد در:",
-  ps_open_pdf: "👁️ بازکردن PDF",
-  ps_reveal: "📁 نمایش در پوشه",
+  ps_open_pdf: "بازکردن PDF",
+  ps_reveal: "نمایش در پوشه",
   ps_no_images_title: "هنوز تصویری اضافه نشده",
   ps_no_images_desc: "برای انتخاب تصاویر JPG، PNG، WebP یا BMP و ساخت یک سند PDF کلیک کنید.",
   ps_move_earlier: "انتقال به قبل",
@@ -1229,8 +1251,8 @@ const FA: I18nStrings = {
   ps_remove_image: "حذف تصویر",
   ps_select_pdf: "انتخاب سند PDF",
   ps_select_pdf_desc: "یک PDF انتخاب کنید تا هر صفحه به‌صورت تصویر PNG یا JPEG با کیفیت بالا استخراج شود.",
-  ps_choose_pdf: "📂 انتخاب PDF",
-  ps_preview: "👁️ پیش‌نمایش",
+  ps_choose_pdf: "انتخاب PDF",
+  ps_preview: "پیش‌نمایش",
   ps_open_pdf_doc: "بازکردن سند PDF",
   ps_extract_settings: "تنظیمات استخراج",
   ps_image_format: "قالب تصویر:",
@@ -1243,10 +1265,10 @@ const FA: I18nStrings = {
   ps_page_range_label: "محدوده صفحات (مثلاً all یا 1-3, 5):",
   ps_dest_folder: "پوشه مقصد:",
   ps_extracting: "⏳ در حال استخراج",
-  ps_extract_btn: "⚡ استخراج صفحات ({count})",
-  ps_extracted_ok: "✓ {count} تصویر با موفقیت استخراج شد!",
+  ps_extract_btn: "استخراج صفحات ({count})",
+  ps_extracted_ok: "{count} تصویر با موفقیت استخراج شد!",
   ps_saved_size_to: "{size} ذخیره شد در:",
-  ps_open_dest: "📁 بازکردن پوشه مقصد",
+  ps_open_dest: "بازکردن پوشه مقصد",
   ps_page_alt: "صفحه {n}",
 
   footer_text:

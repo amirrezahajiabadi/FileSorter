@@ -10,6 +10,47 @@ historical record only.
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Flat design pass across the shell (`index.css`, `App.tsx`, studio components):**
+  replaced the remaining glass depth with a flat, ruled surface system — hairline
+  card borders, a single divider between sidebar and canvas, and a 16px card /
+  10px panel radius.
+- **Accent-led hierarchy:** primary buttons now use each theme's accent
+  (`Liquid Smoke` gold, `Obsidian` steel, `Crystal Frost` blue, `Liquid Prism`
+  mint, `Rose Quartz` rose) instead of an inverted neutral; the active nav row,
+  theme chip and empty-state icon reuse the same accent tint.
+- **Sidebar navigation regrouped** into Organize / Clean up / Tools with labels,
+  Settings pinned to the foot, and a compact five-swatch theme row replacing the
+  old five-line list; the collapsed rail cycles themes from a palette button.
+- **Structured empty states:** Junk, Duplicates, Disk and Scheduler now share an
+  icon tile, title, explanation and one primary action; duplicated header CTAs
+  are hidden while a screen is empty. Sort, studio and renamer drop zones use
+  the same dashed-surface language.
+- **File-type colour coding:** category rows, chips and plan/rule tables carry a
+  small hue dot (documents, images, video, audio, archives, code, data, e-books,
+  executables, fonts, other) instead of another filled badge.
+- **Typography and rhythm:** 25px page titles, 13.5px section copy, balanced
+  headings, a page-header rule, a 1360px content max width and a topbar rule;
+  light-theme secondary text was darkened for WCAG AA contrast.
+- **Interaction polish:** one global `:focus-visible` ring, 150–200ms
+  transitions, accent hover on drop zones, a visible light-theme switch knob and
+  thin scrollbars.
+
+### Fixed
+- Category labels in the plan and smart-rule tables now follow the active
+  locale instead of showing the raw backend key.
+- The Image Studio empty-state copy no longer points at a header button that is
+  hidden while the queue is empty.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite).
+- Browser checks at 1440×900, 1920×1080, 1024×768 and 390×844; EN + FA (RTL);
+  all five themes.
+
+---
+
 ## [6.9.0] — 2026-10-23
 
 ### Added
@@ -57,25 +98,6 @@ historical record only.
   Crystal Frost, Liquid Prism and Rose Quartz, all built from the same
   translucent material system; the light theme receives full light-specific
   surface, border and shadow tokens.
-
-### Fixed
-- **Theme token collisions:** light-theme keys could be overridden by the dark
-  base selector depending on stylesheet order; dark tokens now explicitly
-  exclude the light theme and the sidebar’s legacy per-theme backgrounds are
-  overridden consistently.
-
-### Verification
-- `npm run build` passes (TypeScript + Vite).
-- `cargo test` passes: 25 tests.
-- Browser check at 1440×960, 1280×800 and 1100×760: no horizontal overflow;
-  Settings, Image Studio, PDF Studio and Batch Renamer render with no console
-  layout errors.
-
----
-
-## [Unreleased]
-
-### Changed
 - **Repository consolidation:** the Python edition (`app/`, `ui/`, `tests/`,
   `tools/`, PyInstaller spec, NSIS installer, `main_web.py`) was removed. The
   Tauri 2 app formerly in `v2/` now lives at the repository root (`src/`,
@@ -89,8 +111,21 @@ historical record only.
   edition.
 - **Naming:** with only one edition left, the window title, sidebar version
   line, onboarding heading, footer text and CSS header no longer say “v2”. The
-  crate name (`filesorter2`) and the `%APPDATA%\FileSorterV2` data folder are
+  crate name (`filesorter2`) and the `%APPDATA%\FileSorterV2` data folder stay
   unchanged so existing settings and undo journals still load.
+
+### Fixed
+- **Theme token collisions:** light-theme keys could be overridden by the dark
+  base selector depending on stylesheet order; dark tokens now explicitly
+  exclude the light theme and the sidebar’s legacy per-theme backgrounds are
+  overridden consistently.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite).
+- `cargo test` passes: 25 tests.
+- Browser check at 1440×960, 1280×800 and 1100×760: no horizontal overflow;
+  Settings, Image Studio, PDF Studio and Batch Renamer render with no console
+  layout errors.
 
 ---
 

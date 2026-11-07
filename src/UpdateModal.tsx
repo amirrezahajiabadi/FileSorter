@@ -45,11 +45,10 @@ export default function UpdateModal({ isOpen, onClose, updateData, lang }: Updat
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="glass modal-card update-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card update-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="update-modal-header">
-          <div className="update-icon-circle">🚀</div>
           <div>
-            <h3 id="update-modal-title">{t.um_title}</h3>
+            <h2 id="update-modal-title">{t.um_title}</h2>
             <p className="muted" style={{ margin: "2px 0 0" }}>
               {t.um_desc}
             </p>

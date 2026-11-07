@@ -141,19 +141,6 @@ export type CategoryMap = Record<string, string[]>;
 // Category display names are locale-dependent and live in `i18n.ts`
 // (`CATEGORY_LABELS` / `getCategoryLabel`) so both languages stay in one place.
 
-export const CATEGORY_ICONS: Record<string, string> = {
-  images: "◧",
-  documents: "≡",
-  videos: "▶",
-  audio: "♪",
-  archives: "▣",
-  code: "⌗",
-  data: "{}",
-  ebooks: "❑",
-  executables: "⚙",
-  fonts: "A",
-  others: "•",
-};
 
 export interface ExtractedImagePayload {
   filename: string;

@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNod
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
-  CATEGORY_ICONS,
   type CategoryMap,
   type CleanReport,
   type DiskStats,
@@ -39,35 +38,29 @@ export type Theme = "fluent" | "dark" | "light" | "aurora" | "sunset";
 
 export interface ThemeMeta {
   id: Theme;
-  icon: string;
   swatch: string[];
 }
 
 export const THEMES: ThemeMeta[] = [
   {
     id: "fluent",
-    icon: "◐",
-    swatch: ["#0b0b0d", "#2b2b31", "#d8d8df"],
+    swatch: ["#121316", "#191b1f", "#d6a153"],
   },
   {
     id: "dark",
-    icon: "●",
-    swatch: ["#070709", "#18181b", "#f4f4f5"],
+    swatch: ["#000000", "#161619", "#a9bdd4"],
   },
   {
     id: "light",
-    icon: "☀️",
-    swatch: ["#f4f4f5", "#ffffff", "#18181b"],
+    swatch: ["#f2f3f1", "#ffffff", "#2c5c9c"],
   },
   {
     id: "aurora",
-    icon: "◇",
-    swatch: ["#0a0b10", "#8ea8c9", "#d8b8c8"],
+    swatch: ["#0a1112", "#172425", "#6cc4b0"],
   },
   {
     id: "sunset",
-    icon: "◈",
-    swatch: ["#120d0f", "#d8b8b8", "#c8a890"],
+    swatch: ["#f4efed", "#fffbfa", "#a04752"],
   },
 ];
 
@@ -86,7 +79,7 @@ export function themeMeta(t: I18nStrings, id: Theme): { name: string; desc: stri
 type IconName =
   | "drop" | "folder" | "broom" | "search" | "chart" | "eye" | "clock"
   | "pen" | "image" | "pdf" | "settings" | "spark" | "home" | "refresh"
-  | "palette" | "chevronLeft" | "chevronRight" | "info" | "bolt";
+  | "palette" | "chevronLeft" | "chevronRight" | "info" | "bolt" | "menu";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -109,6 +102,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     chevronRight: <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />,
     info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 10.5v5" /><path d="M12 7.7h.01" /></>,
     bolt: <path d="m13.2 2.8-7 10.4h5.2l-.6 8 7-10.4h-5.2l.6-8Z" />,
+    menu: <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -117,8 +111,55 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   );
 }
 
+/* A panel whose only job is to name the next step. The icon carries the tool's
+   identity, the action is the same one the header would offer, and the hint
+   sits below the fold of the sentence so the copy never reads as a dead end. */
+function EmptyState({
+  icon,
+  title,
+  body,
+  hint,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  body?: string;
+  hint?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="empty-state">
+      <span className="empty-state-icon" aria-hidden="true"><Icon name={icon} size={20} /></span>
+      <h2>{title}</h2>
+      {body && <p>{body}</p>}
+      {children && <div className="empty-state-actions">{children}</div>}
+      {hint && <p className="empty-state-hint">{hint}</p>}
+    </div>
+  );
+}
+
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
 type ActiveTab = "sort" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "renamer" | "images" | "pdf" | "settings";
+
+/* The destination shelf falls back to the built-in categories until the backend answers. */
+const CATEGORY_ORDER = [
+  "documents", "images", "videos", "audio", "archives", "code", "data", "ebooks", "executables", "fonts", "others",
+];
+
+/* Shown until the settings map loads, so the shelf never reads as empty rows. */
+const CATEGORY_SAMPLE: Record<string, string[]> = {
+  documents: ["pdf", "docx", "txt"],
+  images: ["jpg", "png", "webp"],
+  videos: ["mp4", "mkv", "mov"],
+  audio: ["mp3", "flac", "wav"],
+  archives: ["zip", "rar", "7z"],
+  code: ["js", "ts", "py"],
+  data: ["csv", "json", "db"],
+  ebooks: ["epub", "mobi", "azw3"],
+  executables: ["exe", "dmg", "msi"],
+  fonts: ["ttf", "otf", "woff2"],
+  others: ["log", "bak", "tmp"],
+};
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -144,6 +185,7 @@ export default function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(() => {
     return localStorage.getItem("fs_sidebar_expanded") !== "false";
   });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [lang, setLang] = useState<Locale>(() => detectInitialLocale());
   const t = getStrings(lang);
@@ -227,6 +269,11 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("fs_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.body.classList.toggle("nav-open", mobileNavOpen);
+    return () => document.body.classList.remove("nav-open");
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     document.documentElement.setAttribute("lang", lang);
@@ -719,11 +766,17 @@ export default function App() {
         lang={lang}
       />
 
-      {/* Left Collapsible Glass Sidebar */}
+      {/* Left sidebar: one ground with the canvas, a single rule between. */}
+      <button
+        type="button"
+        className="nav-scrim"
+        aria-label={t.sidebar_collapse}
+        onClick={() => setMobileNavOpen(false)}
+      />
       <aside className="sidebar-glass" aria-label={t.nav_aria}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <span className="sidebar-brand-icon"><Icon name="drop" size={19} /></span>
+            <span className="sidebar-brand-icon"><Icon name="folder" size={17} /></span>
             {sidebarExpanded && (
               <div className="sidebar-title-group">
                 <span className="sidebar-title">{t.app_title}</span>
@@ -738,105 +791,129 @@ export default function App() {
             title={sidebarExpanded ? t.sidebar_collapse : t.sidebar_expand}
             aria-label={sidebarExpanded ? t.sidebar_collapse : t.sidebar_expand}
           >
-            {sidebarExpanded ? "◀" : "▶"}
+            <Icon name={sidebarExpanded ? "chevronLeft" : "chevronRight"} size={15} />
           </button>
         </div>
 
-        {/* Center: Vertical Navigation Tabs */}
-        <nav className="sidebar-nav">
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "sort" ? "active" : ""}`}
-            onClick={() => setActiveTab("sort")}
-            title={t.tab_sort}
-          >
-            <span className="sidebar-tab-icon"><Icon name="folder" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_sort}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "junk" ? "active" : ""}`}
-            onClick={() => setActiveTab("junk")}
-            title={t.tab_junk}
-          >
-            <span className="sidebar-tab-icon"><Icon name="broom" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_junk}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "dupes" ? "active" : ""}`}
-            onClick={() => setActiveTab("dupes")}
-            title={t.tab_dupes}
-          >
-            <span className="sidebar-tab-icon"><Icon name="search" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_dupes}</span>}
-            {dupes.length > 0 && <span className="sidebar-tab-badge">{dupes.length}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "disk" ? "active" : ""}`}
-            onClick={() => setActiveTab("disk")}
-            title={t.tab_disk}
-          >
-            <span className="sidebar-tab-icon"><Icon name="chart" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_disk}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "watch" ? "active" : ""}`}
-            onClick={() => setActiveTab("watch")}
-            title={t.tab_watch}
-          >
-            <span className="sidebar-tab-icon"><Icon name="eye" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_watch}</span>}
-            {watchActive && <span className="sidebar-tab-badge">ON</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "schedule" ? "active" : ""}`}
-            onClick={() => setActiveTab("schedule")}
-            title={t.tab_schedule}
-          >
-            <span className="sidebar-tab-icon"><Icon name="clock" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_schedule}</span>}
-            {tasks.length > 0 && <span className="sidebar-tab-badge">{tasks.length}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "renamer" ? "active" : ""}`}
-            onClick={() => setActiveTab("renamer")}
-            title={t.tab_renamer}
-          >
-            <span className="sidebar-tab-icon"><Icon name="pen" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_renamer}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "images" ? "active" : ""}`}
-            onClick={() => setActiveTab("images")}
-            title={t.tab_images}
-          >
-            <span className="sidebar-tab-icon"><Icon name="image" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_images}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "pdf" ? "active" : ""}`}
-            onClick={() => setActiveTab("pdf")}
-            title={t.tab_pdf}
-          >
-            <span className="sidebar-tab-icon"><Icon name="pdf" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_pdf}</span>}
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeTab === "settings" ? "active" : ""}`}
-            onClick={() => setActiveTab("settings")}
-            title={t.tab_settings}
-          >
-            <span className="sidebar-tab-icon"><Icon name="settings" /></span>
-            {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_settings}</span>}
-          </button>
+        {/* Navigation */}
+        <nav className="sidebar-nav" onClick={() => setMobileNavOpen(false)}>
+          <div className="nav-group" role="group" aria-label={t.nav_group_organize}>
+            <span className="nav-group-label">{t.nav_group_organize}</span>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "sort" ? "active" : ""}`}
+              onClick={() => setActiveTab("sort")}
+              title={t.tab_sort}
+              aria-current={activeTab === "sort" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="folder" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_sort}</span>}
+            </button>
+          </div>
+
+          <div className="nav-group" role="group" aria-label={t.nav_group_clean}>
+            <span className="nav-group-label">{t.nav_group_clean}</span>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "junk" ? "active" : ""}`}
+              onClick={() => setActiveTab("junk")}
+              title={t.tab_junk}
+              aria-current={activeTab === "junk" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="broom" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_junk}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "dupes" ? "active" : ""}`}
+              onClick={() => setActiveTab("dupes")}
+              title={t.tab_dupes}
+              aria-current={activeTab === "dupes" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="search" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_dupes}</span>}
+              {dupes.length > 0 && <span className="sidebar-tab-badge">{dupes.length}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "disk" ? "active" : ""}`}
+              onClick={() => setActiveTab("disk")}
+              title={t.tab_disk}
+              aria-current={activeTab === "disk" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="chart" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_disk}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "watch" ? "active" : ""}`}
+              onClick={() => setActiveTab("watch")}
+              title={t.tab_watch}
+              aria-current={activeTab === "watch" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="eye" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_watch}</span>}
+              {watchActive && <span className="sidebar-tab-badge">ON</span>}
+            </button>
+          </div>
+
+          <div className="nav-group" role="group" aria-label={t.nav_group_tools}>
+            <span className="nav-group-label">{t.nav_group_tools}</span>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "schedule" ? "active" : ""}`}
+              onClick={() => setActiveTab("schedule")}
+              title={t.tab_schedule}
+              aria-current={activeTab === "schedule" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="clock" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_schedule}</span>}
+              {tasks.length > 0 && <span className="sidebar-tab-badge">{tasks.length}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "renamer" ? "active" : ""}`}
+              onClick={() => setActiveTab("renamer")}
+              title={t.tab_renamer}
+              aria-current={activeTab === "renamer" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="pen" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_renamer}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "images" ? "active" : ""}`}
+              onClick={() => setActiveTab("images")}
+              title={t.tab_images}
+              aria-current={activeTab === "images" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="image" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_images}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "pdf" ? "active" : ""}`}
+              onClick={() => setActiveTab("pdf")}
+              title={t.tab_pdf}
+              aria-current={activeTab === "pdf" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="pdf" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_pdf}</span>}
+            </button>
+          </div>
+
+          <div className="nav-group nav-group-end">
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "settings" ? "active" : ""}`}
+              onClick={() => setActiveTab("settings")}
+              title={t.tab_settings}
+              aria-current={activeTab === "settings" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="settings" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_settings}</span>}
+            </button>
+          </div>
         </nav>
 
         {/* Bottom: Quick Action Controls & Theme Switcher */}
@@ -855,20 +932,22 @@ export default function App() {
                   {themeMeta(t, theme).name}
                 </span>
               </div>
-              <div className="theme-grid-selector">
+              <div className="theme-dots" role="group" aria-label={t.theme_title}>
                 {THEMES.map((th) => {
                   const meta = themeMeta(t, th.id);
                   return (
                     <button
                       key={th.id}
                       type="button"
-                      className={`theme-selector-btn ${theme === th.id ? "active" : ""}`}
+                      className={`theme-dot ${theme === th.id ? "active" : ""}`}
                       onClick={() => setTheme(th.id)}
-                      title={meta.desc}
+                      title={`${meta.name} — ${meta.desc}`}
                       aria-label={meta.name}
+                      aria-pressed={theme === th.id}
                     >
-                      <span className="theme-selector-icon">{th.icon}</span>
-                      <span className="theme-selector-label">{meta.name.split(" ")[0]}</span>
+                      <i className="theme-dot-ground" style={{ background: th.swatch[0] }} aria-hidden="true">
+                        <b style={{ background: th.swatch[2] }} />
+                      </i>
                     </button>
                   );
                 })}
@@ -893,8 +972,15 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="main-content-flow">
-        {/* Top Header Bar - Fluent Windows 11 Explorer style */}
-        <div className="top-banner-bar">
+        <header className="top-banner-bar">
+          <button
+            type="button"
+            className="mobile-nav-btn"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label={t.nav_aria}
+          >
+            <Icon name="menu" size={18} />
+          </button>
           <div className="banner-left">
             <div className="fluent-address-bar">
               <div className="fluent-nav-arrows">
@@ -931,73 +1017,119 @@ export default function App() {
                 )}
               </div>
             </div>
-            <span className="badge-tag fluent-badge">{t.banner_tech}</span>
           </div>
           <div className="banner-right">
             <button
               type="button"
-              className="btn btn-ghost fluent-banner-btn"
-              style={{ fontSize: "12px", padding: "5px 12px" }}
+              className="btn btn-ghost btn-sm fluent-banner-btn lang-btn"
               onClick={() => setLang(isRtl ? "en" : "fa")}
               title={t.lang_switch_title}
               aria-label={t.lang_switch_title}
             >
-              {t.lang_switch_label}
+              <span className="lang-label">{t.lang_switch_label}</span>
             </button>
             <button
               type="button"
-              className="btn btn-ghost fluent-banner-btn"
-              style={{ fontSize: "12px", padding: "5px 12px" }}
+              className="btn btn-ghost btn-sm fluent-banner-btn"
               onClick={() => setOnboardingOpen(true)}
             >
-              <Icon name="info" size={14} /> {t.onboarding_btn_tour}
+              <Icon name="info" size={14} /> <span className="banner-btn-label">{t.onboarding_btn_tour}</span>
             </button>
             <button
               type="button"
-              className="btn btn-ghost fluent-banner-btn"
-              style={{ fontSize: "12px", padding: "5px 12px" }}
+              className="btn btn-ghost btn-sm fluent-banner-btn"
               onClick={() => checkForUpdates(true)}
               disabled={checkingUpdate}
             >
               <Icon name="spark" size={14} />{" "}
-              {checkingUpdate ? t.update_checking : updateData?.has_update ? t.update_available : t.update_check_btn}
+              <span className="banner-btn-label">
+                {checkingUpdate ? t.update_checking : updateData?.has_update ? t.update_available : t.update_check_btn}
+              </span>
             </button>
           </div>
-        </div>
+        </header>
 
         <div className="content-body">
           {error && (
-            <div className="glass alert alert-error">
-              <span>⚠ {error}</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setError("")}>✕</button>
+            <div className="alert alert-error" role="alert">
+              <span className="alert-label">Error</span>
+              <span>{error}</span>
+              <button className="alert-close" onClick={() => setError("")} aria-label="Dismiss">×</button>
             </div>
           )}
 
           {/* TAB 1: Organize / File Sorter */}
           {activeTab === "sort" && (
           <>
-            <header className="hero glass">
-              <div className="hero-text">
-                <h2>{t.hero_title}</h2>
-                <p className="muted">{t.hero_subtitle}</p>
+            <section className="glass sort-hero">
+              <div className="page-header">
+                <div className="page-heading">
+                  <h1>{t.tab_sort}</h1>
+                  <p className="page-sub">{t.hero_subtitle}</p>
+                </div>
+                {folder && (
+                  <div className="page-actions">
+                    <button className="btn btn-primary" onClick={pickFolder}>
+                      {t.common_change}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {folder ? (
                 <div className="folder-chip">
-                  <span className="folder-icon"><Icon name="folder" size={16} /></span>
+                  <span className="folder-icon"><Icon name="folder" size={15} /></span>
                   <span className="mono folder-path" title={folder}>{folder}</span>
-                  <button className="btn btn-ghost" onClick={pickFolder}>{t.common_change}</button>
                 </div>
               ) : (
-                <div className="dropzone-liquid" onClick={pickFolder}>
-                  <div className="dropzone-icon"><Icon name="drop" size={30} /></div>
-                  <button className="btn btn-primary btn-large">{t.hero_drop_btn}</button>
-                  <p className="muted dropzone-hint">{t.dropzone_hint}</p>
+                <div className="sort-start">
+                  <div
+                    className="dropzone-liquid"
+                    onClick={pickFolder}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        pickFolder();
+                      }
+                    }}
+                  >
+                    <div className="dropzone-icon"><Icon name="folder" size={26} /></div>
+                    <h2>{t.hero_title}</h2>
+                    <p>{t.dropzone_hint}</p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        pickFolder();
+                      }}
+                    >
+                      {t.hero_drop_btn}
+                    </button>
+                  </div>
+                  <aside className="category-preview">
+                    <h2>{t.sort_flow_title}</h2>
+                    <p>{t.sort_flow_desc}</p>
+                    <div className="shelf-list">
+                      {(Object.keys(categories).length > 0 ? Object.keys(categories) : CATEGORY_ORDER).map((cat) => (
+                        <div key={cat} className="shelf-row">
+                          <span className="shelf-name">
+                            <span className="cat-dot" data-cat={cat} aria-hidden="true" />
+                            {getCatLabel(cat)}
+                          </span>
+                          <span className="shelf-ext">
+                            {((categories[cat]?.length ? categories[cat] : CATEGORY_SAMPLE[cat]) ?? []).slice(0, 3).map((e) => `.${e}`).join(" ")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </aside>
                 </div>
               )}
 
               {phase === "scanning" && scan && (
-                <div className="scan-status animate-fade-in">
+                <div className="scan-status">
                   <div className="scan-metrics">
                     <span className="pulse-dot" />
                     <span><b>{fmtNum(scan.total_so_far)}</b> {t.hero_files_found}</span>
@@ -1009,10 +1141,10 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </header>
+            </section>
 
             {plan && phase !== "done" && (
-              <section className="glass plan-review animate-fade-in">
+              <section className="glass plan-review">
                 <div className="summary">
                   <div className="stat"><b>{fmtNum(plan.total_moves ?? plan.moves.length)}</b><span>{t.summary_files}</span></div>
                   <div className="stat"><b>{formatBytes(plan.total_size)}</b><span>{t.summary_size}</span></div>
@@ -1022,7 +1154,7 @@ export default function App() {
                 <div className="category-chips">
                   {plan.counts.map(([cat, count]) => (
                     <span key={cat} className="cat-chip">
-                      <span className="cat-icon">{CATEGORY_ICONS[cat] ?? "•"}</span>
+                      <span className="cat-dot" data-cat={cat} aria-hidden="true" />
                       <span className="cat-name">{getCatLabel(cat)}</span>
                       <span className="cat-count mono">{fmtNum(count)}</span>
                     </span>
@@ -1064,7 +1196,7 @@ export default function App() {
                             <td className="mono ellipsis">{m.source.split(/[\\/]/).pop()}</td>
                             <td className="mono ellipsis">{m.destination.replace(plan.root, "")}</td>
                             <td>
-                              <span className="cat-cell">{m.category}</span>
+                              <span className="cat-cell" data-cat={m.category}>{getCatLabel(m.category)}</span>
                               {m.matched_rule && (
                                 <span className="badge-tag" style={{ marginLeft: "6px" }} title={t.matched_rule_title}>
                                   {fmt(t.matched_rule_badge, { rule: m.matched_rule })}
@@ -1082,8 +1214,8 @@ export default function App() {
             )}
 
             {phase === "done" && report && (
-              <section className="glass report-card animate-fade-in">
-                <h3>{t.sort_done_title}</h3>
+              <section className="glass report-card">
+                <h2>{t.sort_done_title}</h2>
                 <p className="muted">
                   <b>{fmtNum(report.moved)}</b> {t.sort_done_desc} ({formatBytes(report.bytes_moved)})
                 </p>
@@ -1095,8 +1227,9 @@ export default function App() {
             )}
 
             {undoReport && (
-              <div className="glass alert alert-success" style={{ marginTop: "16px" }}>
-                <span>✓ <b>{fmtNum(undoReport.restored)}</b> {t.undo_success}</span>
+              <div className="alert alert-success" style={{ marginTop: "16px" }}>
+                <span className="alert-label">Done</span>
+                <span><b>{fmtNum(undoReport.restored)}</b> {t.undo_success}</span>
               </div>
             )}
           </>
@@ -1107,25 +1240,26 @@ export default function App() {
           <section className="glass">
             <div className="dupes-header">
               <div>
-                <h3>{t.junk_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>{t.junk_desc}</p>
+                <h1>{t.junk_title}</h1>
+                <p>{t.junk_desc}</p>
               </div>
-              <div className="summary-actions">
-                <button className="btn btn-ghost" onClick={handleScanJunk} disabled={junkBusy}>
-                  {junkBusy ? t.junk_btn_scanning : t.junk_btn_scan}
-                </button>
-                {junkLocs.length > 0 && (
+              {junkLocs.length > 0 && (
+                <div className="summary-actions">
+                  <button className="btn btn-ghost" onClick={handleScanJunk} disabled={junkBusy}>
+                    {junkBusy ? t.junk_btn_scanning : t.junk_btn_scan}
+                  </button>
                   <button className="btn btn-primary" onClick={handleCleanJunk} disabled={junkBusy || selectedJunk.size === 0}>
                     {junkBusy ? t.junk_btn_cleaning : t.junk_btn_clean}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {cleanReport && (
-              <div className="glass alert alert-success" style={{ margin: "16px 0" }}>
+              <div className="alert alert-success" style={{ margin: "16px 0" }}>
+                <span className="alert-label">Done</span>
                 <span>
-                  ✓ {t.junk_cleaned_summary}{" "}
+                  {t.junk_cleaned_summary}{" "}
                   {fmt(t.junk_purged_detail, {
                     files: fmtNum(cleanReport.files_deleted),
                     size: formatBytes(cleanReport.bytes_freed),
@@ -1138,7 +1272,7 @@ export default function App() {
 
             {junkLocs.length > 0 ? (
               <>
-                <div style={{ display: "flex", gap: "10px", margin: "16px 0" }}>
+                <div className="actions" style={{ margin: "16px 0" }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setSelectedJunk(new Set(junkLocs.map((l) => l.id)))}>
                     {t.junk_select_all}
                   </button>
@@ -1167,9 +1301,15 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-                {t.junk_empty_hint}
-              </p>
+              <EmptyState
+                icon="broom"
+                title={t.junk_empty_title}
+                body={t.junk_empty_hint}
+              >
+                <button className="btn btn-primary" onClick={handleScanJunk} disabled={junkBusy}>
+                  {junkBusy ? t.junk_btn_scanning : t.junk_btn_scan}
+                </button>
+              </EmptyState>
             )}
           </section>
         )}
@@ -1179,19 +1319,22 @@ export default function App() {
           <section className="glass">
             <div className="dupes-header">
               <div>
-                <h3>{t.dupes_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>{t.dupes_desc}</p>
+                <h1>{t.dupes_title}</h1>
+                <p>{t.dupes_desc}</p>
               </div>
-              {folder && (
-                <button className="btn btn-primary" onClick={runDupes} disabled={dupeBusy || phase === "scanning"}>
-                  {dupeBusy ? t.dupes_btn_scanning : t.dupes_btn_scan}
-                </button>
+              {dupes.length > 0 && (
+                <div className="summary-actions">
+                  <button className="btn btn-primary" onClick={runDupes} disabled={dupeBusy || phase === "scanning"}>
+                    {dupeBusy ? t.dupes_btn_scanning : t.dupes_btn_scan}
+                  </button>
+                </div>
               )}
             </div>
 
             {quarantineReport && (
-              <div className="glass alert alert-success" style={{ margin: "16px 0" }}>
-                <span>✓ <b>{fmtNum(quarantineReport.moved)}</b> {t.dupes_quarantine_done}</span>
+              <div className="alert alert-success" style={{ margin: "16px 0" }}>
+                <span className="alert-label">Done</span>
+                <span><b>{fmtNum(quarantineReport.moved)}</b> {t.dupes_quarantine_done}</span>
               </div>
             )}
 
@@ -1245,9 +1388,21 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-                {folder ? t.dupes_empty : t.dupes_select_folder}
-              </p>
+              <EmptyState
+                icon="search"
+                title={folder ? t.dupes_empty : t.dupes_select_folder}
+                body={folder ? t.dupes_desc : undefined}
+              >
+                {folder ? (
+                  <button className="btn btn-primary" onClick={runDupes} disabled={dupeBusy || phase === "scanning"}>
+                    {dupeBusy ? t.dupes_btn_scanning : t.dupes_btn_scan}
+                  </button>
+                ) : (
+                  <button className="btn btn-primary" onClick={pickFolder}>
+                    {t.hero_drop_btn}
+                  </button>
+                )}
+              </EmptyState>
             )}
           </section>
         )}
@@ -1257,26 +1412,28 @@ export default function App() {
           <section className="glass disk-bars">
             <div className="dupes-header">
               <div>
-                <h3>{t.disk_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>{t.disk_desc}</p>
+                <h1>{t.disk_title}</h1>
+                <p>{t.disk_desc}</p>
               </div>
               {folder && (
-                <button className="btn btn-ghost" onClick={loadDiskStats} disabled={loadingDisk}>
-                  {loadingDisk ? t.disk_loading : <><Icon name="refresh" size={13} /> {t.btn_rescan}</>}
-                </button>
+                <div className="summary-actions">
+                  <button className="btn btn-ghost" onClick={loadDiskStats} disabled={loadingDisk}>
+                    {loadingDisk ? t.disk_loading : <><Icon name="refresh" size={13} /> {t.btn_rescan}</>}
+                  </button>
+                </div>
               )}
             </div>
 
             {/* Detected Drives Overview */}
             {drives.length > 0 && (
-              <div style={{ margin: "16px 0" }}>
-                <b>{t.disk_drives_title}</b>
+              <div style={{ margin: "4px 0 16px" }}>
+                <h2>{t.disk_drives_title}</h2>
                 <div className="fluent-drives-grid">
                   {drives.map((d) => {
                     const usagePct = pct(d.used_bytes, d.total_bytes);
                     return (
-                      <div key={d.letter} className="glass fluent-drive-card">
-                        <div className="fluent-drive-icon"><Icon name="chart" size={18} /></div>
+                      <div key={d.letter} className="fluent-drive-card">
+                        <div className="fluent-drive-icon"><Icon name="chart" size={16} /></div>
                         <div className="fluent-drive-info">
                           <div className="fluent-drive-header">
                             <span className="fluent-drive-name">
@@ -1308,32 +1465,34 @@ export default function App() {
 
             {diskStats ? (
               <>
-                <div className="summary" style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
+                <div className="summary">
                   <div className="stat"><b>{fmtNum(diskStats.total_files)}</b><span>{t.disk_total_files}</span></div>
                   <div className="stat"><b>{formatBytes(diskStats.total_bytes)}</b><span>{t.disk_total_size}</span></div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px", margin: "16px 0" }}>
-                  <b>{t.disk_category_breakdown}</b>
-                  {diskStats.category_breakdown.map(([cat, count, bytes]) => {
-                    const share = pct(bytes, diskStats.total_bytes);
-                    return (
-                      <div key={cat} className="disk-bar-row">
-                        <div className="disk-bar-header">
-                          <span>{CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)} ({fmtNum(count)} {t.settings_formats_count})</span>
-                          <span className="mono">{formatBytes(bytes)} ({share}%)</span>
+                <div className="disk-panel">
+                  <h2>{t.disk_category_breakdown}</h2>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "10px" }}>
+                    {diskStats.category_breakdown.map(([cat, count, bytes]) => {
+                      const share = pct(bytes, diskStats.total_bytes);
+                      return (
+                        <div key={cat} className="disk-bar-row">
+                          <div className="disk-bar-header">
+                            <span>{getCatLabel(cat)} ({fmtNum(count)} {t.settings_formats_count})</span>
+                            <span className="mono">{formatBytes(bytes)} ({share}%)</span>
+                          </div>
+                          <div className="meter">
+                            <div className="meter-fill" style={{ width: `${share}%` }} />
+                          </div>
                         </div>
-                        <div className="meter" style={{ width: "100%" }}>
-                          <div className="meter-fill" style={{ width: `${share}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div style={{ marginTop: "20px" }}>
-                  <b>{t.disk_largest_files}</b>
-                  <div className="table-container" style={{ marginTop: "10px" }}>
+                <div className="disk-panel">
+                  <h2>{t.disk_largest_files}</h2>
+                  <div className="table-container" style={{ marginTop: "6px" }}>
                     <table>
                       <thead>
                         <tr>
@@ -1356,9 +1515,17 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>
-                {folder ? t.disk_loading : t.disk_pick_first}
-              </p>
+              <EmptyState
+                icon="chart"
+                title={folder ? t.disk_loading : t.disk_empty_title}
+                body={!folder ? t.disk_pick_first : undefined}
+              >
+                {!folder && (
+                  <button className="btn btn-primary" onClick={pickFolder}>
+                    {t.hero_drop_btn}
+                  </button>
+                )}
+              </EmptyState>
             )}
           </section>
         )}
@@ -1368,15 +1535,15 @@ export default function App() {
           <section className="glass">
             <div className="dupes-header">
               <div>
-                <h3>{t.watch_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>{t.watch_desc}</p>
+                <h1>{t.watch_title}</h1>
+                <p>{t.watch_desc}</p>
               </div>
               <button className="btn btn-primary" onClick={handleAddWatchFolder}>
                 {t.watch_add_folder}
               </button>
             </div>
 
-            <div className="watch-toggle-box" style={{ marginTop: "16px" }}>
+            <div className="watch-toggle-box">
               <label className="watch-switch">
                 <input
                   type="checkbox"
@@ -1390,14 +1557,14 @@ export default function App() {
                   {t.watch_toggle_active}:{" "}
                   {watchActive ? t.watch_state_active : t.watch_state_paused}
                 </b>
-                <p className="muted" style={{ margin: 0, fontSize: "12px" }}>
+                <p className="muted" style={{ margin: 0, fontSize: "12.5px" }}>
                   {t.watch_active_hint}
                 </p>
               </div>
             </div>
 
-            <div style={{ marginTop: "16px" }}>
-              <b>{fmt(t.watch_monitored_folders, { count: fmtNum(watchFolders.length) })}:</b>
+            <div style={{ marginTop: "18px" }}>
+              <h2>{fmt(t.watch_monitored_folders, { count: fmtNum(watchFolders.length) })}</h2>
               {watchFolders.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                   {watchFolders.map((wf) => (
@@ -1408,12 +1575,12 @@ export default function App() {
                   ))}
                 </div>
               ) : (
-                <p className="muted" style={{ padding: "16px 0" }}>{t.watch_no_folders}</p>
+                <p className="panel-note" style={{ marginTop: "8px" }}>{t.watch_no_folders}</p>
               )}
             </div>
 
-            <div style={{ marginTop: "24px" }}>
-              <b>{t.watch_live_log}</b>
+            <div style={{ marginTop: "20px" }}>
+              <h2>{t.watch_live_log}</h2>
               <div className="feed-box">
                 {watchEvents.length > 0 ? (
                   watchEvents.map((ev, i) => {
@@ -1427,7 +1594,7 @@ export default function App() {
                     return (
                       <div key={i} className="feed-row">
                         <span>
-                          {failed ? "✕" : skipped ? "↷" : "✓"} {label}:{" "}
+                          {label}:{" "}
                           <b>{ev.filename}</b>
                           {ev.category ? <> → <i>{ev.category}</i></> : null}
                           {failed && ev.error ? (
@@ -1441,7 +1608,7 @@ export default function App() {
                     );
                   })
                 ) : (
-                  <p className="muted" style={{ padding: "24px 0", textAlign: "center" }}>{t.watch_empty_log}</p>
+                  <p className="panel-note">{t.watch_empty_log}</p>
                 )}
               </div>
             </div>
@@ -1453,18 +1620,20 @@ export default function App() {
           <section className="glass">
             <div className="dupes-header">
               <div>
-                <h3>{t.sched_title}</h3>
-                <p className="muted" style={{ margin: "4px 0 0" }}>{t.sched_desc}</p>
+                <h1>{t.sched_title}</h1>
+                <p>{t.sched_desc}</p>
               </div>
-              <button className="btn btn-primary" onClick={() => setShowAddTask(true)}>
-                {t.sched_add_task}
-              </button>
+              {tasks.length > 0 && (
+                <button className="btn btn-primary" onClick={() => setShowAddTask(true)}>
+                  {t.sched_add_task}
+                </button>
+              )}
             </div>
 
             {showAddTask && (
-              <div className="glass" style={{ padding: "16px", margin: "16px 0", border: "1px solid var(--line-strong)" }}>
+              <div className="new-task-panel">
                 <b>{t.sched_new_task}</b>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
+                <div className="form-grid">
                   <input
                     type="text"
                     placeholder={t.sched_task_name_ph}
@@ -1472,7 +1641,7 @@ export default function App() {
                     onChange={(e) => setNewTaskName(e.target.value)}
                   />
                   <select
-                    className="btn btn-ghost"
+                    className="select-input"
                     value={newTaskKind}
                     onChange={(e) => setNewTaskKind(e.target.value as "junk" | "sort")}
                   >
@@ -1481,7 +1650,7 @@ export default function App() {
                   </select>
                 </div>
                 {newTaskKind === "sort" && (
-                  <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                  <div className="form-row">
                     <input
                       type="text"
                       placeholder={t.sched_folder_ph}
@@ -1501,8 +1670,8 @@ export default function App() {
                     </button>
                   </div>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-                  <span>{t.sched_interval_label}</span>
+                <div className="form-row">
+                  <span className="muted" style={{ fontSize: "12.5px" }}>{t.sched_interval_label}</span>
                   <input
                     type="number"
                     min="1"
@@ -1510,7 +1679,7 @@ export default function App() {
                     onChange={(e) => setNewTaskInterval(Number(e.target.value))}
                     style={{ width: "100px" }}
                   />
-                  <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+                  <div style={{ marginInlineStart: "auto", display: "flex", gap: "8px" }}>
                     <button className="btn btn-ghost" onClick={() => setShowAddTask(false)}>{t.common_cancel}</button>
                     <button className="btn btn-primary" onClick={handleSaveTask}>{t.sched_save}</button>
                   </div>
@@ -1545,8 +1714,8 @@ export default function App() {
                               <button className="btn btn-ghost btn-sm" onClick={() => handleRunTaskNow(tk.id)}>
                                 {t.sched_run_now}
                               </button>
-                              <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteTask(tk.id)}>
-                                ✕
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteTask(tk.id)} aria-label={t.common_remove}>
+                                ×
                               </button>
                             </div>
                           </td>
@@ -1556,17 +1725,25 @@ export default function App() {
                   </table>
                 </div>
               ) : (
-                <p className="muted" style={{ padding: "36px 0", textAlign: "center" }}>{t.sched_no_tasks}</p>
+                <EmptyState
+                  icon="clock"
+                  title={t.sched_empty_title}
+                  body={t.sched_no_tasks}
+                >
+                  <button className="btn btn-primary" onClick={() => setShowAddTask(true)}>
+                    {t.sched_add_task}
+                  </button>
+                </EmptyState>
               )}
             </div>
 
             {taskHistory.length > 0 && (
-              <div style={{ marginTop: "24px" }}>
-                <b>{t.sched_recent_runs}</b>
+              <div style={{ marginTop: "22px" }}>
+                <h2>{t.sched_recent_runs}</h2>
                 <div className="feed-box">
                   {taskHistory.map((h, i) => (
                     <div key={i} className="feed-row">
-                      <span>{h.success ? "✓" : "⚠"} <b>{h.task_name}</b>: {h.summary}</span>
+                      <span><b>{h.task_name}</b>: {h.summary}</span>
                       <span className="muted mono" style={{ fontSize: "11px" }}>
                         {new Date(h.timestamp * 1000).toLocaleTimeString()}
                       </span>
@@ -1601,22 +1778,28 @@ export default function App() {
 
         {/* TAB 10: Settings */}
         {activeTab === "settings" && (
+          <>
+          <header className="page-header">
+            <div className="page-heading">
+              <h1>{t.tab_settings}</h1>
+              <p className="page-sub">{t.settings_page_desc}</p>
+            </div>
+          </header>
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {settingsNotice && (
-              <div className="glass alert alert-success">
-                <span>✓ {settingsNotice}</span>
+              <div className="alert alert-success">
+                <span className="alert-label">Saved</span>
+                <span>{settingsNotice}</span>
               </div>
             )}
 
             {/* Smart Keyword Rules Manager */}
-            <section className="glass" style={{ padding: "20px 24px" }}>
-              <div style={{ marginBottom: "16px" }}>
-                <h3 style={{ margin: "0 0 6px 0", fontSize: "16px", fontWeight: 700 }}>
-                  {t.rules_title}
-                </h3>
-                <p className="muted" style={{ margin: 0, fontSize: "13px" }}>
-                  {t.rules_desc}
-                </p>
+            <section className="glass settings-section">
+              <div className="settings-section-header">
+                <div>
+                  <h2>{t.rules_title}</h2>
+                  <p>{t.rules_desc}</p>
+                </div>
               </div>
 
               {smartRules.length > 0 ? (
@@ -1634,7 +1817,7 @@ export default function App() {
                       {smartRules.map((r) => (
                         <tr key={r.id}>
                           <td><b>{r.name}</b></td>
-                          <td><span className="cat-cell">{r.category}</span></td>
+                          <td><span className="cat-cell" data-cat={r.category}>{getCatLabel(r.category)}</span></td>
                           <td>
                             <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                               {r.keywords.map((kw, i) => (
@@ -1643,7 +1826,7 @@ export default function App() {
                             </div>
                           </td>
                           <td>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteSmartRule(r.id)}>✕</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteSmartRule(r.id)}>×</button>
                           </td>
                         </tr>
                       ))}
@@ -1651,11 +1834,11 @@ export default function App() {
                   </table>
                 </div>
               ) : (
-                <p className="muted" style={{ padding: "12px 0" }}>{t.rules_no_rules}</p>
+                <p className="panel-note" style={{ marginBottom: "14px" }}>{t.rules_no_rules}</p>
               )}
 
               {/* Add Rule Form */}
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              <div className="form-row">
                 <input
                   type="text"
                   placeholder={t.rules_name_ph}
@@ -1664,11 +1847,11 @@ export default function App() {
                   style={{ flex: 1, minWidth: "160px" }}
                 />
                 <select
-                  className="btn btn-ghost"
+                  className="select-input"
                   value={newRuleCategory}
                   onChange={(e) => setNewRuleCategory(e.target.value)}
                 >
-                  {Object.keys(categories).map((c) => (
+                  {(Object.keys(categories).length ? Object.keys(categories) : CATEGORY_ORDER).map((c) => (
                     <option key={c} value={c}>{getCatLabel(c)}</option>
                   ))}
                 </select>
@@ -1686,11 +1869,11 @@ export default function App() {
             </section>
 
             {/* Categories and File Formats */}
-            <section className="glass">
-              <div className="dupes-header" style={{ padding: "20px 24px 0" }}>
+            <section className="glass settings-section">
+              <div className="settings-section-header">
                 <div>
-                  <h3>{t.settings_cat_title}</h3>
-                  <p className="muted" style={{ margin: "4px 0 0" }}>{t.settings_cat_desc}</p>
+                  <h2>{t.settings_cat_title}</h2>
+                  <p>{t.settings_cat_desc}</p>
                 </div>
                 <div className="summary-actions">
                   <button className="btn btn-primary" onClick={saveSettings}>{t.settings_btn_save}</button>
@@ -1698,12 +1881,12 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="settings-grid" style={{ padding: "20px 24px" }}>
+              <div className="settings-grid">
                 {Object.entries(categories).map(([cat, exts]) => (
-                  <div key={cat} className="glass cat-box">
+                  <div key={cat} className="cat-box">
                     <div className="cat-box-header">
-                      <span>{CATEGORY_ICONS[cat] ?? "•"} {getCatLabel(cat)}</span>
-                      <span className="muted mono" style={{ fontSize: "11px" }}>
+                      <span>{getCatLabel(cat)}</span>
+                      <span className="muted mono" style={{ fontSize: "12px" }}>
                         {fmtNum(exts.length)} {t.settings_formats_count}
                       </span>
                     </div>
@@ -1711,7 +1894,7 @@ export default function App() {
                       {exts.map((e) => (
                         <span key={e} className="tag mono">
                           {e}
-                          <button onClick={() => removeExtension(cat, e)} title={t.ext_remove}>✕</button>
+                          <button onClick={() => removeExtension(cat, e)} title={t.ext_remove}>×</button>
                         </span>
                       ))}
                     </div>
@@ -1737,6 +1920,7 @@ export default function App() {
               </div>
             </section>
           </div>
+          </>
         )}
         </div>
       </main>

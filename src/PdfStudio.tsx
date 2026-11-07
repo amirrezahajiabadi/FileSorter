@@ -387,34 +387,28 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
   };
 
   return (
-    <div className="pdf-studio-container" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="pdf-studio-container">
       {/* Top Mode Selector Tabs */}
-      <section className="glass" style={{ padding: "18px 24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>{t.ps_title}</h2>
-            <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
-              {t.ps_desc}
-            </p>
+      <section className="glass studio-header">
+        <div className="page-header">
+          <div className="page-heading">
+            <h1>{t.ps_title}</h1>
+            <p className="page-sub">{t.ps_desc}</p>
           </div>
 
-          <div className="pdf-mode-switch" style={{ display: "flex", background: "rgba(255,255,255,0.06)", padding: "4px", borderRadius: "100px", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="pdf-mode-switch">
             <button
               type="button"
               className={`capsule-tab ${mode === "img2pdf" ? "active" : ""}`}
               onClick={() => { setMode("img2pdf"); setError(""); }}
-              style={{ padding: "8px 18px", borderRadius: "100px" }}
             >
-              <span className="tab-icon">🖼️</span>
               <span className="tab-label">{t.ps_mode_img2pdf}</span>
             </button>
             <button
               type="button"
               className={`capsule-tab ${mode === "pdf2img" ? "active" : ""}`}
               onClick={() => { setMode("pdf2img"); setError(""); }}
-              style={{ padding: "8px 18px", borderRadius: "100px" }}
             >
-              <span className="tab-icon">📄</span>
               <span className="tab-label">{t.ps_mode_pdf2img}</span>
             </button>
           </div>
@@ -423,8 +417,8 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
       {error && (
         <div className="error-bar" role="alert" onClick={() => setError("")} style={{ margin: 0 }}>
-          <span>⚠️ {error}</span>
-          <span style={{ fontSize: "12px", opacity: 0.8, cursor: "pointer" }}>✕</span>
+          <span>{error}</span>
+          <span style={{ fontSize: "12px", opacity: 0.8, cursor: "pointer" }}>×</span>
         </div>
       )}
 
@@ -434,16 +428,15 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
       {mode === "img2pdf" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {/* Header Action Card */}
-          <section className="glass" style={{ padding: "20px 24px" }}>
+          {images.length > 0 && (
+          <section className="glass">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <button
                   type="button"
                   className="hero-browse-btn"
                   onClick={pickImages}
-                  style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px" }}
                 >
-                  <span>➕</span>
                   <span>{t.ps_add_images}</span>
                 </button>
                 {images.length > 0 && (
@@ -472,7 +465,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
             {/* Layout Options */}
             {images.length > 0 && (
-              <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center" }}>
+              <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--rule)", display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>{t.ps_page_size}</span>
                   <select
@@ -501,7 +494,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                   </select>
                 </div>
 
-                <div style={{ marginLeft: "auto" }}>
+                <div style={{ marginInlineStart: "auto" }}>
                   <button
                     type="button"
                     className="hero-browse-btn"
@@ -519,13 +512,14 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
               </div>
             )}
           </section>
+          )}
 
           {/* Success Banner */}
           {pdfSuccess && (
-            <section className="glass" style={{ padding: "18px 24px", border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.08)" }}>
+            <section className="success-panel">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
                 <div>
-                  <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.05rem" }}>{t.ps_created}</h4>
+                  <h4>{t.ps_created}</h4>
                   <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.85rem", wordBreak: "break-all" }}>
                     {t.ps_saved_to} <code style={{ color: "inherit" }}>{pdfSuccess.path}</code> ({formatBytes(pdfSuccess.size)})
                   </p>
@@ -554,131 +548,63 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
           {/* Images Grid */}
           {images.length === 0 ? (
-            <section
-              className="glass"
-              onClick={pickImages}
-              style={{
-                padding: "60px 24px",
-                textAlign: "center",
-                cursor: "pointer",
-                border: "2px dashed rgba(255,255,255,0.12)",
-                borderRadius: "16px",
-              }}
-            >
-              <div style={{ fontSize: "3rem", marginBottom: "12px", opacity: 0.8 }}>🖼️</div>
-              <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 600 }}>{t.ps_no_images_title}</h3>
-              <p className="muted" style={{ margin: "6px auto 16px", maxWidth: "420px", fontSize: "0.88rem" }}>
-                {t.ps_no_images_desc}
-              </p>
-              <button type="button" className="hero-browse-btn" style={{ padding: "10px 22px" }}>
+            <section className="drop-panel" onClick={pickImages}>
+              <h3>{t.ps_no_images_title}</h3>
+              <p>{t.ps_no_images_desc}</p>
+              <button type="button" className="hero-browse-btn">
                 {t.ps_add_images}
               </button>
             </section>
           ) : (
-            <section className="glass" style={{ padding: "20px 24px" }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-                  gap: "16px",
-                }}
-              >
+            <section className="glass">
+              <div className="image-queue">
                 {images.map((img, idx) => (
-                  <div
-                    key={img.id}
-                    style={{
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: "12px",
-                      overflow: "hidden",
-                      display: "flex",
-                      flexDirection: "column",
-                      position: "relative",
-                    }}
-                  >
-                    {/* Page badge */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "8px",
-                        left: "8px",
-                        background: "rgba(0,0,0,0.65)",
-                        backdropFilter: "blur(4px)",
-                        color: "#fff",
-                        fontSize: "0.75rem",
-                        padding: "2px 8px",
-                        borderRadius: "100px",
-                        fontWeight: 600,
-                        zIndex: 2,
-                      }}
-                    >
-                      #{idx + 1}
+                  <div key={img.id} className="image-card">
+                    <div className="image-card-thumb">
+                      <span className="page-badge">{idx + 1}</span>
+                      <img src={img.previewUrl} alt={img.name} />
                     </div>
 
-                    {/* Image Preview Container */}
-                    <div style={{ width: "100%", height: "140px", background: "rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                      <img
-                        src={img.previewUrl}
-                        alt={img.name}
-                        style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                      />
-                    </div>
-
-                    {/* Details & Actions */}
-                    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: "8px", flex: 1, justifyContent: "space-between" }}>
-                      <div>
-                        <div
-                          title={img.name}
-                          style={{
-                            fontSize: "0.82rem",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {img.name}
-                        </div>
-                        <div style={{ fontSize: "0.75rem", opacity: 0.6, marginTop: "2px" }}>
-                          {formatBytes(img.size)}
-                        </div>
+                    <div>
+                      <div className="image-name" title={img.name}>{img.name}</div>
+                      <div className="image-meta">
+                        <span>{formatBytes(img.size)}</span>
                       </div>
+                    </div>
 
-                      {/* Reorder & Delete Buttons */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "6px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                        <div style={{ display: "flex", gap: "4px" }}>
-                          <button
-                            type="button"
-                            className="capsule-btn-icon"
-                            onClick={() => moveImage(idx, "up")}
-                            disabled={idx === 0}
-                            title={t.ps_move_earlier}
-                            style={{ width: "26px", height: "26px", fontSize: "0.75rem", opacity: idx === 0 ? 0.3 : 1 }}
-                          >
-                            ◀
-                          </button>
-                          <button
-                            type="button"
-                            className="capsule-btn-icon"
-                            onClick={() => moveImage(idx, "down")}
-                            disabled={idx === images.length - 1}
-                            title={t.ps_move_later}
-                            style={{ width: "26px", height: "26px", fontSize: "0.75rem", opacity: idx === images.length - 1 ? 0.3 : 1 }}
-                          >
-                            ▶
-                          </button>
-                        </div>
-
+                    <div className="pdf-image-actions">
+                      <div style={{ display: "flex", gap: "4px" }}>
                         <button
                           type="button"
                           className="capsule-btn-icon"
-                          onClick={() => removeImage(img.id)}
-                          title={t.ps_remove_image}
-                          style={{ width: "26px", height: "26px", fontSize: "0.8rem", color: "#f87171" }}
+                          onClick={() => moveImage(idx, "up")}
+                          disabled={idx === 0}
+                          title={t.ps_move_earlier}
+                          aria-label={t.ps_move_earlier}
                         >
-                          ✕
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          className="capsule-btn-icon"
+                          onClick={() => moveImage(idx, "down")}
+                          disabled={idx === images.length - 1}
+                          title={t.ps_move_later}
+                          aria-label={t.ps_move_later}
+                        >
+                          ›
                         </button>
                       </div>
+
+                      <button
+                        type="button"
+                        className="capsule-btn-icon"
+                        onClick={() => removeImage(img.id)}
+                        title={t.ps_remove_image}
+                        aria-label={t.ps_remove_image}
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -715,27 +641,11 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
             {/* Document Info Banner if chosen */}
             {pdfMeta && (
-              <div
-                style={{
-                  marginTop: "20px",
-                  padding: "16px 20px",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: "12px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "12px",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{ fontSize: "2rem" }}>📄</div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{pdfMeta.name}</div>
-                    <div style={{ fontSize: "0.8rem", opacity: 0.7, marginTop: "2px" }}>
-                      {pdfMeta.numPages} {pdfMeta.numPages === 1 ? t.ps_page_singular : t.ps_page_plural} · {formatBytes(pdfMeta.size)}
-                    </div>
+              <div className="pdf-meta-panel">
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "13.5px" }}>{pdfMeta.name}</div>
+                  <div className="muted" style={{ fontSize: "12px", marginTop: "2px" }}>
+                    {pdfMeta.numPages} {pdfMeta.numPages === 1 ? t.ps_page_singular : t.ps_page_plural} · {formatBytes(pdfMeta.size)}
                   </div>
                 </div>
 
@@ -756,8 +666,8 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
           {/* Extraction Settings */}
           {pdfMeta && (
-            <section className="glass" style={{ padding: "24px" }}>
-              <h4 style={{ margin: "0 0 16px", fontSize: "1rem", fontWeight: 600 }}>{t.ps_extract_settings}</h4>
+            <section className="glass">
+              <h2 style={{ margin: "0 0 16px" }}>{t.ps_extract_settings}</h2>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
                 {/* Format selection */}
@@ -769,7 +679,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                     className="select-input"
                     value={format}
                     onChange={(e) => setFormat(e.target.value as any)}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%" }}
                   >
                     <option value="png">{t.ps_fmt_png}</option>
                     <option value="jpeg">{t.ps_fmt_jpeg}</option>
@@ -785,7 +695,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                     className="select-input"
                     value={scale}
                     onChange={(e) => setScale(Number(e.target.value))}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%" }}
                   >
                     <option value={1.5}>{t.ps_res_150}</option>
                     <option value={2.0}>{t.ps_res_200}</option>
@@ -803,7 +713,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                     value={pageRange}
                     onChange={(e) => setPageRange(e.target.value)}
                     placeholder="all"
-                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%" }}
                   />
                 </div>
               </div>
@@ -818,7 +728,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                     type="text"
                     readOnly
                     value={outputFolder}
-                    style={{ flex: 1, background: "rgba(255,255,255,0.05)", color: "inherit", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ flex: 1 }}
                   />
                   <button
                     type="button"
@@ -838,11 +748,6 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                   className="hero-browse-btn"
                   onClick={extractPdfPages}
                   disabled={extracting}
-                  style={{
-                    
-                    padding: "11px 26px",
-                    fontWeight: 600,
-                  }}
                 >
                   {extracting
                     ? `${t.ps_extracting} ${extractProgress ? `(${extractProgress.current}/${extractProgress.total})` : "…"}`
@@ -854,12 +759,10 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
           {/* Success Banner & Extracted Gallery */}
           {extractedReport && (
-            <section className="glass" style={{ padding: "20px 24px", border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.06)" }}>
+            <section className="success-panel">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                  <h4 style={{ margin: 0, color: "#4ade80", fontSize: "1.05rem" }}>
-                    {fmt(t.ps_extracted_ok, { count: extractedReport.saved_count })}
-                  </h4>
+                  <h4>{fmt(t.ps_extracted_ok, { count: extractedReport.saved_count })}</h4>
                   <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.85rem" }}>
                     {fmt(t.ps_saved_size_to, { size: formatBytes(extractedReport.total_bytes) })} <code>{extractedReport.target_dir}</code>
                   </p>
@@ -883,7 +786,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                     gap: "12px",
                     marginTop: "16px",
                     paddingTop: "16px",
-                    borderTop: "1px solid rgba(255,255,255,0.08)",
+                    borderTop: "1px solid var(--rule)",
                   }}
                 >
                   {extractedThumbnails.map((thumb, i) => (
@@ -893,7 +796,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                         borderRadius: "8px",
                         overflow: "hidden",
                         background: "rgba(0,0,0,0.3)",
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        border: "1px solid var(--rule)",
                         height: "120px",
                         display: "flex",
                         alignItems: "center",

@@ -296,28 +296,26 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
   const changedCount = plannedList.filter((i) => i.isChanged).length;
 
   return (
-    <div className="batch-renamer-container" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="batch-renamer-container">
       {/* Header section */}
-      <section className="glass" style={{ padding: "20px 24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
-              {t.br_title}
-            </h2>
-            <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
-              {t.br_desc}
-            </p>
+      <section className="glass studio-header">
+        <div className="page-header">
+          <div className="page-heading">
+            <h1>{t.br_title}</h1>
+            <p className="page-sub">{t.br_desc}</p>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <button type="button" className="hero-browse-btn" onClick={addFiles} style={{ padding: "9px 18px" }}>
-              <span>{t.br_add_files}</span>
-            </button>
-            <button type="button" className="capsule-btn-pill" onClick={addFolder} style={{ padding: "9px 16px" }}>
+          <div className="page-actions">
+            {files.length > 0 && (
+              <button type="button" className="hero-browse-btn" onClick={addFiles}>
+                <span>{t.br_add_files}</span>
+              </button>
+            )}
+            <button type="button" className="capsule-btn-pill" onClick={addFolder}>
               <span>{t.br_add_folder}</span>
             </button>
             {files.length > 0 && (
-              <button type="button" className="capsule-btn-pill" onClick={clearAll} style={{ padding: "9px 16px" }}>
+              <button type="button" className="capsule-btn-pill" onClick={clearAll}>
                 <span>{t.br_clear}</span>
               </button>
             )}
@@ -325,21 +323,12 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
         </div>
 
         {/* Method Picker Tabs */}
-        <div
-          style={{
-            marginTop: "20px",
-            paddingTop: "16px",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            display: "flex",
-            gap: "8px",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="studio-toolbar">
+          <div className="capsule-tabs">
           <button
             type="button"
             className={`capsule-tab ${method === "replace" ? "active" : ""}`}
             onClick={() => setMethod("replace")}
-            style={{ borderRadius: "8px", padding: "6px 14px", fontSize: "0.85rem" }}
           >
             {t.br_method_replace}
           </button>
@@ -347,7 +336,6 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
             type="button"
             className={`capsule-tab ${method === "affix" ? "active" : ""}`}
             onClick={() => setMethod("affix")}
-            style={{ borderRadius: "8px", padding: "6px 14px", fontSize: "0.85rem" }}
           >
             {t.br_method_affix}
           </button>
@@ -355,7 +343,6 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
             type="button"
             className={`capsule-tab ${method === "numbering" ? "active" : ""}`}
             onClick={() => setMethod("numbering")}
-            style={{ borderRadius: "8px", padding: "6px 14px", fontSize: "0.85rem" }}
           >
             {t.br_method_numbering}
           </button>
@@ -363,7 +350,6 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
             type="button"
             className={`capsule-tab ${method === "case" ? "active" : ""}`}
             onClick={() => setMethod("case")}
-            style={{ borderRadius: "8px", padding: "6px 14px", fontSize: "0.85rem" }}
           >
             {t.br_method_case}
           </button>
@@ -371,14 +357,14 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
             type="button"
             className={`capsule-tab ${method === "extension" ? "active" : ""}`}
             onClick={() => setMethod("extension")}
-            style={{ borderRadius: "8px", padding: "6px 14px", fontSize: "0.85rem" }}
           >
             {t.br_method_extension}
           </button>
+          </div>
         </div>
 
         {/* Dynamic Controls per Method */}
-        <div style={{ marginTop: "16px", padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="control-panel">
           {method === "replace" && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center" }}>
               <div style={{ flex: 1, minWidth: "200px" }}>
@@ -390,7 +376,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={findText}
                   onChange={(e) => setFindText(e.target.value)}
                   placeholder={t.br_find_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
 
@@ -403,7 +389,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={replaceText}
                   onChange={(e) => setReplaceText(e.target.value)}
                   placeholder={t.br_replace_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
 
@@ -431,7 +417,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={prefix}
                   onChange={(e) => setPrefix(e.target.value)}
                   placeholder={t.br_prefix_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
               <div style={{ flex: 1, minWidth: "200px" }}>
@@ -443,7 +429,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={suffix}
                   onChange={(e) => setSuffix(e.target.value)}
                   placeholder={t.br_suffix_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
             </div>
@@ -460,7 +446,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={numberPrefix}
                   onChange={(e) => setNumberPrefix(e.target.value)}
                   placeholder={t.br_num_prefix_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
               <div style={{ flex: 1, minWidth: "150px" }}>
@@ -472,7 +458,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={numberSuffix}
                   onChange={(e) => setNumberSuffix(e.target.value)}
                   placeholder={t.br_num_suffix_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
               <div style={{ width: "110px" }}>
@@ -483,7 +469,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   type="number"
                   value={startNum}
                   onChange={(e) => setStartNum(Number(e.target.value))}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
               <div style={{ width: "130px" }}>
@@ -493,7 +479,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                 <select
                   value={padding}
                   onChange={(e) => setPadding(Number(e.target.value))}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 >
                   <option value={1}>1, 2, 3</option>
                   <option value={2}>01, 02, 03</option>
@@ -524,7 +510,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   onClick={() => setCaseType(ct)}
                   style={{
                     padding: "8px 16px",
-                    background: caseType === ct ? "rgba(255,255,255,0.12)" : undefined,
+                    background: caseType === ct ? "var(--raised)" : undefined,
                     border: caseType === ct ? "1px solid var(--line-strong)" : undefined,
                   }}
                 >
@@ -549,7 +535,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                   value={customExt}
                   onChange={(e) => setCustomExt(e.target.value)}
                   placeholder={t.br_ext_ph}
-                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                  style={{ width: "100%", padding: "8px 12px", outline: "none" }}
                 />
               </div>
               <div style={{ marginTop: "20px" }}>
@@ -570,23 +556,23 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
       {/* Error Bar */}
       {error && (
         <div className="error-bar" role="alert" onClick={() => setError("")} style={{ margin: 0 }}>
-          <span>⚠️ {error}</span>
-          <span style={{ fontSize: "12px", opacity: 0.8, cursor: "pointer" }}>✕</span>
+          <span>{error}</span>
+          <span style={{ fontSize: "12px", opacity: 0.8, cursor: "pointer" }}>×</span>
         </div>
       )}
 
       {/* Success / Report Banners */}
       {report && (
-        <section className="glass" style={{ padding: "16px 20px", border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <section className="glass" style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h4 style={{ margin: 0, color: "#4ade80" }}>
+            <h4 style={{ margin: 0, color: "var(--positive)" }}>
               {fmt(t.br_renamed_ok, {
                 count: report.successful,
                 unit: report.successful === 1 ? t.br_file_singular : t.br_file_plural,
               })}
             </h4>
             {report.failed > 0 && (
-              <p style={{ margin: "4px 0 0", color: "#f87171", fontSize: "0.85rem" }}>
+              <p style={{ margin: "4px 0 0", color: "var(--negative)", fontSize: "0.85rem" }}>
                 {fmt(t.br_failed, { count: report.failed, errors: report.errors.join(", ") })}
               </p>
             )}
@@ -598,8 +584,8 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
       )}
 
       {undoReport && (
-        <section className="glass" style={{ padding: "16px 20px", border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.08)" }}>
-          <h4 style={{ margin: 0, color: "#60a5fa" }}>
+        <section className="glass" style={{ padding: "16px 20px", background: "var(--accent-soft)" }}>
+          <h4 style={{ margin: 0, color: "var(--accent)" }}>
             {fmt(t.br_restored, {
               count: undoReport.restored,
               unit: undoReport.restored === 1 ? t.br_file_singular : t.br_file_plural,
@@ -610,7 +596,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
 
       {/* Conflict Warning */}
       {conflicts.size > 0 && (
-        <div className="error-bar" style={{ margin: 0, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
+        <div className="error-bar" style={{ margin: 0, border: "1px solid rgba(239,68,68,0.3)" }}>
           <span>
             {fmt(t.br_conflict, { names: Array.from(conflicts).join(", ") })}
           </span>
@@ -619,33 +605,20 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
 
       {/* File List Table */}
       {files.length === 0 ? (
-        <section
-          className="glass"
-          onClick={addFiles}
-          style={{
-            padding: "60px 24px",
-            textAlign: "center",
-            cursor: "pointer",
-            border: "2px dashed rgba(255,255,255,0.12)",
-            borderRadius: "16px",
-          }}
-        >
-          <div style={{ fontSize: "3rem", marginBottom: "12px", opacity: 0.8 }}>✏️</div>
-          <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 600 }}>{t.br_empty_title}</h3>
-          <p className="muted" style={{ margin: "6px auto 16px", maxWidth: "420px", fontSize: "0.88rem" }}>
-            {t.br_empty_desc}
-          </p>
-          <button type="button" className="hero-browse-btn" style={{ padding: "10px 22px" }}>
+        <section className="drop-panel" onClick={addFiles}>
+          <h3>{t.br_empty_title}</h3>
+          <p>{t.br_empty_desc}</p>
+          <button type="button" className="hero-browse-btn">
             {t.br_choose_files}
           </button>
         </section>
       ) : (
-        <section className="glass" style={{ padding: "20px 24px" }}>
+        <section className="glass">
           {/* Action Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div style={{ fontSize: "0.9rem" }}>
               <span>{fmt(t.br_selected_count, { count: files.length })}</span>
-              <span style={{ color: changedCount > 0 ? "#4ade80" : "inherit", fontWeight: 600 }}>
+              <span style={{ color: changedCount > 0 ? "var(--positive)" : "inherit", fontWeight: 600 }}>
                 {fmt(t.br_will_modify, { count: changedCount })}
               </span>
             </div>
@@ -689,7 +662,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                         className="disk-cell-name"
                         title={item.finalName}
                         style={{
-                          color: hasConflict ? "#f87171" : item.isChanged ? "#4ade80" : "inherit",
+                          color: hasConflict ? "var(--negative)" : item.isChanged ? "var(--positive)" : "inherit",
                           fontWeight: item.isChanged ? 600 : 400,
                         }}
                       >
@@ -697,11 +670,11 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                       </td>
                       <td>
                         {hasConflict ? (
-                          <span className="badge" style={{ background: "rgba(239,68,68,0.2)", color: "#f87171" }}>
+                          <span className="badge" style={{ background: "var(--negative-soft)", color: "var(--negative)" }}>
                             {t.br_status_conflict}
                           </span>
                         ) : item.isChanged ? (
-                          <span className="badge" style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}>
+                          <span className="badge" style={{ background: "var(--positive-soft)", color: "var(--positive)" }}>
                             {t.br_status_modified}
                           </span>
                         ) : (
@@ -714,9 +687,9 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
                           className="capsule-btn-icon"
                           onClick={() => removeFile(item.id)}
                           title={t.br_remove_file}
-                          style={{ width: "24px", height: "24px", fontSize: "0.75rem", color: "#f87171" }}
+                          style={{ width: "24px", height: "24px", fontSize: "0.75rem", color: "var(--negative)" }}
                         >
-                          ✕
+                          ×
                         </button>
                       </td>
                     </tr>
