@@ -1,12 +1,44 @@
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { PDFDocument, PageSizes } from "pdf-lib";
-import * as pdfjsLib from "pdfjs-dist";
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
+import type { PDFDocument } from "pdf-lib";
 import type { SaveImagesReport } from "./types";
 import { fmt, getStrings, type Locale } from "./i18n";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// pdf.js and pdf-lib are the two heavyweight PDF engines, and each one is only
+// needed by a single mode (pdf.js for PDF to images, pdf-lib for images to
+// PDF). They are fetched on first use so opening PDF Studio stays a few KB
+// instead of pulling either engine on mount.
+let pdfjsPromise: Promise<typeof import("pdfjs-dist")> | null = null;
+let pdfLibPromise: Promise<typeof import("pdf-lib")> | null = null;
+
+function loadPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = Promise.all([
+      import("pdfjs-dist"),
+      import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+    ])
+      .then(([pdfjsLib, worker]) => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = worker.default;
+        return pdfjsLib;
+      })
+      .catch((err) => {
+        // Allow a retry if the chunk download failed.
+        pdfjsPromise = null;
+        throw err;
+      });
+  }
+  return pdfjsPromise;
+}
+
+function loadPdfLib() {
+  if (!pdfLibPromise) {
+    pdfLibPromise = import("pdf-lib").catch((err) => {
+      pdfLibPromise = null;
+      throw err;
+    });
+  }
+  return pdfLibPromise;
+}
 
 interface ImageItem {
   id: string;
@@ -150,6 +182,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
         return;
       }
 
+      const { PDFDocument, PageSizes } = await loadPdfLib();
       const pdfDoc = await PDFDocument.create();
 
       for (const item of images) {
@@ -258,6 +291,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
       // pdf.js transfers whatever buffer it is handed to its worker, which
       // detaches it. Keeping `u8` pristine means the true size is shown and
       // "Extract Pages" can still read the document later.
+      const pdfjsLib = await loadPdfjs();
       const loadingTask = pdfjsLib.getDocument({ data: u8.slice() });
       const pdf = await loadingTask.promise;
 
@@ -299,6 +333,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
       const targetDir = outputFolder || pdfMeta.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
       // Same transfer/detach rule as pickPdf: work on a copy so extracting
       // twice (or re-extracting after changing the range) still works.
+      const pdfjsLib = await loadPdfjs();
       const loadingTask = pdfjsLib.getDocument({ data: pdfMeta.bytes.slice() });
       const pdf = await loadingTask.promise;
 
