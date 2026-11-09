@@ -10,6 +10,39 @@ historical record only.
 
 ---
 
+## [6.10.1] — 2026-11-09
+
+### Changed
+- **PDF engines load on demand (`PdfStudio.tsx`):** `pdfjs-dist` and `pdf-lib`
+  are imported only when the studio first needs them and the worker is fetched
+  through a dynamic `?url` import. The PdfStudio chunk drops from 865.72 kB to
+  15.92 kB, so Vite no longer reports a chunk-size warning.
+
+### Fixed
+- **Sort and Watch Mode can no longer overwrite a file.** A destination that
+  appeared after planning failed the Windows rename and fell through to
+  `fs::copy`, truncating the file already there. Moves now retry onto a free
+  `name (n)` and only copy when the rename failure is not a name collision;
+  Watch Mode uses the shared `execute::move_file_safely` helper instead of its
+  own inline copy.
+- **Saving a PDF over an existing file works.** `fs::rename` cannot replace an
+  existing path on Windows, so choosing Replace failed and left the old file in
+  place. `write_file_binary` now removes the target and retries, and cleans up
+  its temporary file when the write fails.
+- **Batch Renamer no longer reports false conflicts.** Conflicts were keyed on
+  the bare final name, so identically named files in different folders blocked
+  the whole operation; the key is now folder + name, case-insensitive.
+- **Image and PDF Studios cannot queue the same file twice.** Picked files are
+  merged through the state updater, because the duplicate check ran against a
+  stale closure, and previews of skipped duplicates are revoked.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite) with no chunk-size warnings.
+- `cargo test` passes: 28 tests, including new coverage for move collisions and
+  replacing an existing PDF.
+
+---
+
 ## [6.10.0] — 2026-11-07
 
 ### Changed
