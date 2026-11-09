@@ -135,7 +135,23 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
         }
       }
 
-      setImages((prev) => [...prev, ...newItems]);
+      // Merge through the updater: two quick picks read the same closed-over
+      // `images`, so the duplicate check above could miss a path and queue it
+      // twice. Previews built for paths already queued are revoked here so
+      // their object URLs do not leak.
+      setImages((prev) => {
+        const known = new Set(prev.map((im) => im.path));
+        const fresh: ImageItem[] = [];
+        for (const item of newItems) {
+          if (known.has(item.path)) {
+            URL.revokeObjectURL(item.previewUrl);
+            continue;
+          }
+          known.add(item.path);
+          fresh.push(item);
+        }
+        return [...prev, ...fresh];
+      });
     } catch (e) {
       setError(String(e));
     }

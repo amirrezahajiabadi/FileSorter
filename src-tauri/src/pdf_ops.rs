@@ -76,11 +76,44 @@ pub fn write_file_binary(path: String, data: Vec<u8>) -> Result<u64, String> {
     // existing PDF truncated.
     let tmp = p.with_extension("filesorter.tmp");
     fs::write(&tmp, &data).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, p).map_err(|e| {
+    // Windows refuses to rename onto an existing file, so replacing a PDF the
+    // user chose in the save dialog (which already asked to overwrite it)
+    // failed and left the old file in place. The plain rename stays atomic in
+    // the normal case; only an existing target is removed and retried.
+    let written = match fs::rename(&tmp, p) {
+        Ok(()) => Ok(()),
+        Err(_) if p.is_file() => fs::remove_file(p).and_then(|()| fs::rename(&tmp, p)),
+        Err(rename_err) => Err(rename_err),
+    };
+    written.map_err(|e| {
         let _ = fs::remove_file(&tmp);
-        e.to_string()
+        format!("could not write {}: {}", p.display(), e)
     })?;
     Ok(data.len() as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_file_binary_replaces_an_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("report.pdf");
+        fs::write(&path, b"old contents").unwrap();
+
+        let written = write_file_binary(path.to_string_lossy().into_owned(), vec![1, 2, 3]).unwrap();
+
+        assert_eq!(written, 3);
+        assert_eq!(fs::read(&path).unwrap(), vec![1, 2, 3]);
+        let temp_left: Vec<String> = fs::read_dir(tmp.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".tmp"))
+            .collect();
+        assert!(temp_left.is_empty(), "temporary file left behind: {:?}", temp_left);
+    }
 }
 
 #[tauri::command(async)]

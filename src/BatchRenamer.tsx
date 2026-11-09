@@ -14,6 +14,14 @@ interface FileEntry {
 
 type RenameMethod = "replace" | "affix" | "numbering" | "case" | "extension";
 
+/* Two files only clash when they land on the same name inside the same folder,
+   and Windows compares those names without case. Keying conflicts on the bare
+   file name flagged files from different folders and blocked valid renames. */
+function conflictKey(item: { parentDir: string; finalName: string }): string {
+  return `${item.parentDir.toLowerCase()}/${item.finalName.toLowerCase()}`;
+}
+
+
 export default function BatchRenamer({ lang }: { lang: Locale }) {
   const t = getStrings(lang);
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -204,15 +212,16 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
     lowercaseExt,
   ]);
 
-  // Conflict detection
+  // Conflict detection: same folder + same final name (case-insensitive).
   const conflicts = useMemo(() => {
-    const names = new Set<string>();
-    const dupes = new Set<string>();
+    const seen = new Set<string>();
+    const dupes = new Map<string, string>();
     for (const item of plannedList) {
-      if (names.has(item.finalName)) {
-        dupes.add(item.finalName);
+      const key = conflictKey(item);
+      if (seen.has(key) && !dupes.has(key)) {
+        dupes.set(key, item.finalName);
       }
-      names.add(item.finalName);
+      seen.add(key);
     }
     return dupes;
   }, [plannedList]);
@@ -598,7 +607,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
       {conflicts.size > 0 && (
         <div className="error-bar" style={{ margin: 0, border: "1px solid rgba(239,68,68,0.3)" }}>
           <span>
-            {fmt(t.br_conflict, { names: Array.from(conflicts).join(", ") })}
+            {fmt(t.br_conflict, { names: Array.from(conflicts.values()).join(", ") })}
           </span>
         </div>
       )}
@@ -651,7 +660,7 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
               </thead>
               <tbody>
                 {plannedList.map((item, idx) => {
-                  const hasConflict = conflicts.has(item.finalName);
+                  const hasConflict = conflicts.has(conflictKey(item));
                   return (
                     <tr key={item.id}>
                       <td className="muted">{idx + 1}</td>

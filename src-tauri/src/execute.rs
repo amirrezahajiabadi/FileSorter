@@ -57,29 +57,59 @@ pub fn take_unique_on_disk(candidate: PathBuf) -> PathBuf {
     candidate // practically unreachable
 }
 
-fn move_one(source: &Path, dest: &Path) -> Result<(), String> {
+/// Copy `source` onto `dest`, verify the bytes landed, then delete the source.
+/// Only for moves a rename cannot do (cross-volume, or a file held open).
+fn copy_then_delete(source: &Path, dest: &Path) -> Result<(), String> {
+    fs::copy(source, dest).map_err(|e| format!("copy: {}", e))?;
+    let src_len = fs::metadata(source).map(|m| m.len()).ok();
+    let dst_len = fs::metadata(dest).map(|m| m.len()).ok();
+    if src_len.is_none() || src_len != dst_len {
+        let _ = fs::remove_file(dest);
+        return Err("incomplete copy — source not removed".into());
+    }
+    fs::remove_file(source).map_err(|e| format!("delete after copy: {}", e))?;
+    Ok(())
+}
+
+/// Move one file without ever replacing a file that already exists.
+///
+/// `fs::rename` refuses to replace a file on Windows but silently clobbers it
+/// on Unix, and the copy fallback truncates the target on every platform. So a
+/// destination that appeared after the plan was built (a watch tick, another
+/// app, the user) is a collision, not a cross-volume move: take the next free
+/// `name (n)` and retry. Returns the path the file actually ended up at.
+pub fn move_file_safely(source: &Path, dest: &Path) -> Result<PathBuf, String> {
     if source == dest {
-        return Ok(());
+        return Ok(dest.to_path_buf());
     }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("create folder: {}", e))?;
     }
-    // Same volume → rename is atomic and instant.
-    match fs::rename(source, dest) {
-        Ok(()) => Ok(()),
-        Err(_) => {
-            // Cross-volume or locked-by-rename: copy + verify + delete.
-            fs::copy(source, dest).map_err(|e| format!("copy: {}", e))?;
-            let src_len = fs::metadata(source).map(|m| m.len()).ok();
-            let dst_len = fs::metadata(dest).map(|m| m.len()).ok();
-            if src_len.is_none() || src_len != dst_len {
-                let _ = fs::remove_file(dest);
-                return Err("incomplete copy — source not removed".into());
+    let mut target = dest.to_path_buf();
+    for _ in 0..32 {
+        if target.exists() {
+            target = take_unique_on_disk(target);
+        }
+        match fs::rename(source, &target) {
+            Ok(()) => return Ok(target),
+            Err(rename_err) => {
+                // A file can also appear between the check and the rename; on
+                // Windows that makes the rename fail rather than replace it.
+                if target.exists() {
+                    continue;
+                }
+                // No collision left: cross-volume or locked-by-rename.
+                return copy_then_delete(source, &target)
+                    .map(|()| target)
+                    .map_err(|e| format!("{} (rename: {})", e, rename_err));
             }
-            fs::remove_file(source).map_err(|e| format!("delete after copy: {}", e))?;
-            Ok(())
         }
     }
+    Err(format!("no free name for {}", dest.display()))
+}
+
+fn move_one(source: &Path, dest: &Path) -> Result<(), String> {
+    move_file_safely(source, dest).map(|_| ())
 }
 
 /// Execute `plan`, journaling each move into `data_dir/undo/`. The undo
@@ -189,4 +219,47 @@ pub fn quarantine_duplicates(
         report.op_id = journal.op_id;
     }
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write(dir: &Path, name: &str, bytes: &[u8]) -> PathBuf {
+        let p = dir.join(name);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(&p, bytes).unwrap();
+        p
+    }
+
+    #[test]
+    fn taken_destination_is_never_overwritten() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = write(tmp.path(), "in/note.txt", b"new");
+        let taken = write(tmp.path(), "out/note.txt", b"existing");
+
+        let moved = move_file_safely(&src, &taken).expect("move should succeed");
+
+        assert_eq!(
+            fs::read(&taken).unwrap(),
+            b"existing",
+            "the file already at the destination must survive"
+        );
+        assert_eq!(moved.file_name().unwrap().to_string_lossy(), "note (2).txt");
+        assert_eq!(fs::read(&moved).unwrap(), b"new");
+        assert!(!src.exists(), "source must be gone after a successful move");
+    }
+
+    #[test]
+    fn free_destination_keeps_its_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = write(tmp.path(), "in/a.txt", b"payload");
+        let dest = tmp.path().join("out").join("a.txt");
+
+        let moved = move_file_safely(&src, &dest).expect("move should succeed");
+
+        assert_eq!(moved, dest);
+        assert_eq!(fs::read(&dest).unwrap(), b"payload");
+        assert!(!src.exists());
+    }
 }

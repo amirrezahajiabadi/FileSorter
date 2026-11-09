@@ -116,7 +116,22 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
         }
       }
 
-      setImages((prev) => [...prev, ...newItems]);
+      // Same guard as PdfStudio: the closed-over `images` list can be stale
+      // when two picks land together, so merge against the previous state and
+      // drop (and revoke) any preview for a file that is already queued.
+      setImages((prev) => {
+        const known = new Set(prev.map((im) => im.path));
+        const fresh: StudioImageItem[] = [];
+        for (const item of newItems) {
+          if (known.has(item.path)) {
+            URL.revokeObjectURL(item.previewUrl);
+            continue;
+          }
+          known.add(item.path);
+          fresh.push(item);
+        }
+        return [...prev, ...fresh];
+      });
     } catch (e) {
       setError(String(e));
     }

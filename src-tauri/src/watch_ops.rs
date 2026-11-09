@@ -232,39 +232,15 @@ pub fn spawn_watch_loop(manager: Arc<WatchManager>, app: AppHandle) {
                             let mut action = "moved".to_string();
                             let mut err_msg = None;
 
-                            let dest = crate::execute::take_unique_on_disk(mv.destination.clone());
-                            if let Some(parent) = dest.parent() {
-                                let _ = fs::create_dir_all(parent);
-                            }
-
-                            if let Err(e) = fs::rename(&mv.source, &dest) {
-                                // Try copy & remove — but only delete the source
-                                // once the copy is verified to be complete.
-                                match fs::copy(&mv.source, &dest) {
-                                    Ok(_) => {
-                                        let src_len = fs::metadata(&mv.source).map(|m| m.len()).ok();
-                                        let dst_len = fs::metadata(&dest).map(|m| m.len()).ok();
-                                        if src_len.is_some() && src_len == dst_len {
-                                            match fs::remove_file(&mv.source) {
-                                                Ok(_) => moved_names.push(name.clone()),
-                                                Err(rm_err) => {
-                                                    action = "failed".to_string();
-                                                    err_msg = Some(format!("delete after copy: {}", rm_err));
-                                                }
-                                            }
-                                        } else {
-                                            let _ = fs::remove_file(&dest);
-                                            action = "failed".to_string();
-                                            err_msg = Some("incomplete copy — source kept".to_string());
-                                        }
-                                    }
-                                    Err(copy_err) => {
-                                        action = "failed".to_string();
-                                        err_msg = Some(format!("rename: {}, copy: {}", e, copy_err));
-                                    }
+                            // Shared with the sorter: never replace a file
+                            // that already exists, and delete the source only
+                            // after a verified copy.
+                            match crate::execute::move_file_safely(&mv.source, &mv.destination) {
+                                Ok(_) => moved_names.push(name.clone()),
+                                Err(e) => {
+                                    action = "failed".to_string();
+                                    err_msg = Some(e);
                                 }
-                            } else {
-                                moved_names.push(name.clone());
                             }
 
                             let event = WatchEventPayload {
