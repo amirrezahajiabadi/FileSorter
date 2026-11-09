@@ -10,7 +10,7 @@ historical record only.
 
 ---
 
-## [Unreleased]
+## [6.10.0] — 2026-11-07
 
 ### Changed
 - **Flat design pass across the shell (`index.css`, `App.tsx`, studio components):**
@@ -46,6 +46,7 @@ historical record only.
 
 ### Verification
 - `npm run build` passes (TypeScript + Vite).
+- `cargo test` passes: 25 tests.
 - Browser checks at 1440×900, 1920×1080, 1024×768 and 390×844; EN + FA (RTL);
   all five themes.
 
