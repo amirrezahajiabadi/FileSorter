@@ -26,6 +26,9 @@ the webview never blocks.
 | `dupes.rs` | Three-stage duplicate pipeline and persistent hash cache |
 | `cleanup_ops.rs` | Junk and cache cleaner (safe user-scope cleaning) |
 | `extras.rs` | Empty folders and zero-byte files: scan, journaled removal |
+| `search_ops.rs` | Global file search: substring / regex / glob, metadata filters |
+| `compare_ops.rs` | Two-folder SHA-256 comparison and difference grouping |
+| `zip_ops.rs` | Zip creation (write-then-rename) and safe extraction |
 | `disk_ops.rs` | System drive enumeration and capacity query |
 | `rename_ops.rs` | Batch renamer engine with journaled undo |
 | `image_ops.rs` | Native image optimization and format conversion |
@@ -47,6 +50,9 @@ cache and the undo journal).
 | `BatchRenamer.tsx` | Batch rename panel |
 | `ImageStudio.tsx` | Image optimization panel |
 | `PdfStudio.tsx` | PDF tools panel |
+| `SearchPanel.tsx` | Global search panel |
+| `ComparePanel.tsx` | Two-folder comparison panel |
+| `ArchivePanel.tsx` | Zip creation and extraction panel |
 | `OnboardingModal.tsx` | First-run guided tour |
 | `UpdateModal.tsx` | Update check and download UI |
 | `i18n.ts` | Bilingual UI string table (English + Persian) with locale helpers |

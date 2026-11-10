@@ -3521,3 +3521,35 @@ html[dir="rtl"] .badge-version {
 .extras-list > div {
   min-width: 0;
 }
+
+/* ── Phase 2 tools: global search, folder compare, archives ────── */
+
+.tool-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.tool-page .field input[type="text"] {
+  width: 100%;
+}
+
+.tool-page .extras-head h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.tool-page .extras-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tool-page .summary .stat b {
+  font-size: 22px;
+}
+
+.tool-page .extras-list {
+  max-height: 220px;
+  overflow-y: auto;
+}

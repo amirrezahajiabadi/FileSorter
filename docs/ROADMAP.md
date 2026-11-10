@@ -38,6 +38,19 @@ Shipped as v6.11.0:
 - Empty-folder / zero-byte-file cleanup, journaled so Undo recreates the paths.
 - `Ctrl+O` / `Ctrl+F` / `Ctrl+Z` / `Esc` shortcuts.
 
+## 0.6 Phase 2 — search, compare, archives — ✅ complete
+
+Shipped as v6.12.0:
+
+- Global search over a folder with substring / regex / glob matching, extension
+  and size filters, hidden-file opt-in and a cancellable walk.
+- Two-folder comparison by SHA-256: identical, changed, one-sided and
+  moved/renamed groups, with exact totals.
+- Zip creation and extraction, with a write-then-rename archive and zip-slip
+  protection on the way out.
+- Pattern-based batch rename from tokens (`{name}`, `{ext}`, `{index}`,
+  `{date}`, `{time}`, `{parent}`).
+
 ## 1. AI-powered photo analysis — 💡 idea stage
 
 Automatically group photos by face/content, similar to phone galleries.

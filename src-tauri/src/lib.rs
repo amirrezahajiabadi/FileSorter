@@ -8,6 +8,7 @@
 
 pub mod categories;
 pub mod cleanup_ops;
+pub mod compare_ops;
 pub mod disk_ops;
 pub mod dupes;
 pub mod execute;
@@ -18,10 +19,12 @@ pub mod pdf_ops;
 pub mod plan;
 pub mod rename_ops;
 pub mod schedule_ops;
+pub mod search_ops;
 pub mod undo;
 pub mod update_ops;
 pub mod walk;
 pub mod watch_ops;
+pub mod zip_ops;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -336,6 +339,49 @@ fn classify_dropped(paths: Vec<String>) -> DroppedPaths {
     DroppedPaths { directories, files, parent }
 }
 
+/// Cancellation for the search tab: a search over a whole drive must be
+/// interruptible, and the walk owns no other shared state to signal through.
+static SEARCH_STOP: Mutex<Option<StopFlag>> = Mutex::new(None);
+
+#[tauri::command(async)]
+fn search_files(req: search_ops::SearchRequest) -> Result<search_ops::SearchReport, String> {
+    let stop = StopFlag::new();
+    if let Ok(mut guard) = SEARCH_STOP.lock() {
+        *guard = Some(stop.clone());
+    }
+    let result = search_ops::search(&req, &stop);
+    if let Ok(mut guard) = SEARCH_STOP.lock() {
+        *guard = None;
+    }
+    result
+}
+
+#[tauri::command]
+fn stop_search() {
+    if let Ok(guard) = SEARCH_STOP.lock() {
+        if let Some(flag) = guard.as_ref() {
+            flag.stop();
+        }
+    }
+}
+
+#[tauri::command(async)]
+fn compare_folders(app: AppHandle, req: compare_ops::CompareRequest) -> Result<compare_ops::CompareReport, String> {
+    compare_ops::compare(&req, &StopFlag::new(), &mut |side, done| {
+        let _ = app.emit("compare-progress", serde_json::json!({ "side": side, "done": done }));
+    })
+}
+
+#[tauri::command(async)]
+fn create_zip(req: zip_ops::CreateRequest) -> Result<zip_ops::CreateReport, String> {
+    zip_ops::create(&req)
+}
+
+#[tauri::command(async)]
+fn extract_zip(req: zip_ops::ExtractRequest) -> Result<zip_ops::ExtractReport, String> {
+    zip_ops::extract(&req)
+}
+
 #[tauri::command]
 fn undo_last(app: AppHandle) -> Result<(), String> {
     let handle = app.clone();
@@ -593,6 +639,11 @@ pub fn run() {
             scan_extras,
             clean_extras,
             get_history,
+            search_files,
+            stop_search,
+            compare_folders,
+            create_zip,
+            extract_zip,
             classify_dropped,
             watch_get_status,
             watch_set_active,
@@ -620,7 +671,11 @@ pub fn run() {
             rename_ops::execute_batch_rename,
             rename_ops::undo_last_rename,
             image_ops::pick_images_for_studio,
-            image_ops::save_optimized_images
+            image_ops::save_optimized_images,
+            zip_ops::pick_files_for_zip,
+            zip_ops::pick_folder_for_zip,
+            zip_ops::pick_save_zip,
+            zip_ops::pick_zip_archive
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

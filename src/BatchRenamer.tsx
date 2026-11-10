@@ -12,7 +12,36 @@ interface FileEntry {
   parentDir: string;
 }
 
-type RenameMethod = "replace" | "affix" | "numbering" | "case" | "extension";
+type RenameMethod = "replace" | "affix" | "numbering" | "case" | "extension" | "pattern";
+
+/**
+ * Pattern placeholders, evaluated per file in the preview and in the final
+ * pass so what the user sees is exactly what is applied.
+ */
+function renderPattern(
+  template: string,
+  file: FileEntry,
+  index: number,
+  startNum: number,
+  padding: number,
+): string {
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+  const parent = file.parentDir.split(/[\\/]/).filter(Boolean).pop() ?? "";
+  const values: Record<string, string> = {
+    name: file.stem,
+    NAME: file.stem.toUpperCase(),
+    ext: file.ext ? `.${file.ext}` : "",
+    EXT: file.ext ? `.${file.ext.toUpperCase()}` : "",
+    index: String(startNum + index).padStart(padding, "0"),
+    date: `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`,
+    time: `${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}`,
+    parent,
+  };
+  return template.replace(/\{(name|NAME|ext|EXT|index|date|time|parent)\}/g, (match, key: string) =>
+    Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match,
+  );
+}
 
 /* Two files only clash when they land on the same name inside the same folder,
    and Windows compares those names without case. Keying conflicts on the bare
@@ -50,6 +79,9 @@ export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?
   // Options: Extension
   const [customExt, setCustomExt] = useState("");
   const [lowercaseExt, setLowercaseExt] = useState(false);
+
+  // Options: Pattern (tokens)
+  const [patternText, setPatternText] = useState("{name}_{index}{ext}");
 
   // State
   const [busy, setBusy] = useState(false);
@@ -196,7 +228,14 @@ export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?
         }
       }
 
-      const finalName = newExt ? `${newStem}.${newExt}` : newStem;
+      // A pattern carries its own extension placeholder, so it replaces the
+      // whole name rather than the stem.
+      const finalName =
+        method === "pattern"
+          ? renderPattern(patternText, file, idx, startNum, padding)
+          : newExt
+            ? `${newStem}.${newExt}`
+            : newStem;
       const isChanged = finalName !== file.originalName;
 
       return {
@@ -222,6 +261,7 @@ export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?
     caseType,
     customExt,
     lowercaseExt,
+    patternText,
   ]);
 
   // Conflict detection: same folder + same final name (case-insensitive).
@@ -380,6 +420,13 @@ export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?
             onClick={() => setMethod("extension")}
           >
             {t.br_method_extension}
+          </button>
+          <button
+            type="button"
+            className={`capsule-tab ${method === "pattern" ? "active" : ""}`}
+            onClick={() => setMethod("pattern")}
+          >
+            {t.br_method_pattern}
           </button>
           </div>
         </div>
@@ -542,6 +589,44 @@ export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?
                   {ct === "snake" && t.br_case_snake}
                 </button>
               ))}
+            </div>
+          )}
+
+          {method === "pattern" && (
+            <div>
+              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ flex: 1, minWidth: "240px" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", opacity: 0.8, marginBottom: "4px" }}>
+                    {t.br_pattern_label}
+                  </label>
+                  <input
+                    type="text"
+                    value={patternText}
+                    onChange={(e) => setPatternText(e.target.value)}
+                    placeholder={t.br_pattern_ph}
+                    className="mono"
+                    style={{ width: "100%", padding: "8px 12px", outline: "none" }}
+                  />
+                </div>
+                <div style={{ width: "150px" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", opacity: 0.8, marginBottom: "4px" }}>
+                    {t.br_padding}
+                  </label>
+                  <select
+                    value={padding}
+                    onChange={(e) => setPadding(Number(e.target.value))}
+                    style={{ width: "100%", padding: "8px 12px", outline: "none" }}
+                  >
+                    <option value={1}>1, 2, 3</option>
+                    <option value={2}>01, 02, 03</option>
+                    <option value={3}>001, 002, 003</option>
+                    <option value={4}>0001, 0002</option>
+                  </select>
+                </div>
+              </div>
+              <p className="panel-note" style={{ marginTop: "12px" }}>
+                {t.br_pattern_help}
+              </p>
             </div>
           )}
 

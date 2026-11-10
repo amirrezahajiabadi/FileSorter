@@ -37,6 +37,9 @@ import UpdateModal from "./UpdateModal";
 const BatchRenamer = lazy(() => import("./BatchRenamer"));
 const ImageStudio = lazy(() => import("./ImageStudio"));
 const PdfStudio = lazy(() => import("./PdfStudio"));
+const SearchPanel = lazy(() => import("./SearchPanel"));
+const ComparePanel = lazy(() => import("./ComparePanel"));
+const ArchivePanel = lazy(() => import("./ArchivePanel"));
 
 export type Theme = "fluent" | "dark" | "light" | "aurora" | "sunset";
 
@@ -83,7 +86,8 @@ export function themeMeta(t: I18nStrings, id: Theme): { name: string; desc: stri
 type IconName =
   | "drop" | "folder" | "broom" | "search" | "chart" | "eye" | "clock"
   | "pen" | "image" | "pdf" | "settings" | "spark" | "home" | "refresh"
-  | "palette" | "history" | "chevronLeft" | "chevronRight" | "info" | "bolt" | "menu";
+  | "palette" | "history" | "chevronLeft" | "chevronRight" | "info" | "bolt" | "menu"
+  | "compare" | "archive";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -108,6 +112,8 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 10.5v5" /><path d="M12 7.7h.01" /></>,
     bolt: <path d="m13.2 2.8-7 10.4h5.2l-.6 8 7-10.4h-5.2l.6-8Z" />,
     menu: <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>,
+    compare: <><path d="M4 7.5h11" /><path d="m12 4.5 3 3-3 3" /><path d="M20 16.5H9" /><path d="m12 13.5-3 3 3 3" /></>,
+    archive: <><rect x="3.5" y="4.5" width="17" height="4.6" rx="1.4" /><path d="M5.2 9.1V19a1.5 1.5 0 0 0 1.5 1.5h10.6A1.5 1.5 0 0 0 18.8 19V9.1" /><path d="M10 13.4h4" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -180,7 +186,8 @@ function SearchBox({
 }
 
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
-type ActiveTab = "sort" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "history" | "renamer" | "images" | "pdf" | "settings";
+type ActiveTab = "sort" | "search" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "history"
+  | "compare" | "archive" | "renamer" | "images" | "pdf" | "settings";
 
 /* The destination shelf falls back to the built-in categories until the backend answers. */
 const CATEGORY_ORDER = [
@@ -983,6 +990,18 @@ export default function App() {
       setDropped({ paths: files, seq: Date.now() });
       return;
     }
+    // These tools take a drop without taking over the scan flow: a folder
+    // dropped here must not jump the user back to the sort tab.
+    if (activeTab === "search" || activeTab === "compare") {
+      const folder = directories[0] ?? parent;
+      if (folder) setDropped({ paths: [folder], seq: Date.now() });
+      return;
+    }
+    if (activeTab === "archive") {
+      const items = [...directories, ...files];
+      if (items.length > 0) setDropped({ paths: items, seq: Date.now() });
+      return;
+    }
     const root = directories[0] ?? parent;
     if (root) startWithFolder(root);
   };
@@ -1124,6 +1143,16 @@ export default function App() {
               <span className="sidebar-tab-icon"><Icon name="folder" /></span>
               {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_sort}</span>}
             </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "search" ? "active" : ""}`}
+              onClick={() => setActiveTab("search")}
+              title={t.tab_search}
+              aria-current={activeTab === "search" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="search" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_search}</span>}
+            </button>
           </div>
 
           <div className="nav-group" role="group" aria-label={t.nav_group_clean}>
@@ -1194,6 +1223,26 @@ export default function App() {
             >
               <span className="sidebar-tab-icon"><Icon name="history" /></span>
               {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_history}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "compare" ? "active" : ""}`}
+              onClick={() => setActiveTab("compare")}
+              title={t.tab_compare}
+              aria-current={activeTab === "compare" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="compare" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_compare}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "archive" ? "active" : ""}`}
+              onClick={() => setActiveTab("archive")}
+              title={t.tab_archive}
+              aria-current={activeTab === "archive" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="archive" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_archive}</span>}
             </button>
             <button
               type="button"
@@ -1325,6 +1374,9 @@ export default function App() {
                 <span className="fluent-crumb-sep">›</span>
                 <span className="fluent-crumb-current">
                   {activeTab === "sort" ? t.tab_sort :
+                   activeTab === "search" ? t.tab_search :
+                   activeTab === "compare" ? t.tab_compare :
+                   activeTab === "archive" ? t.tab_archive :
                    activeTab === "junk" ? t.tab_junk :
                    activeTab === "dupes" ? t.tab_dupes :
                    activeTab === "disk" ? t.tab_disk :
@@ -1596,6 +1648,13 @@ export default function App() {
         )}
 
         {/* TAB 2: Junk & Cache Cleaner */}
+        {activeTab === "search" && (
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.gs_running}</p></div>}>
+            <SearchPanel lang={lang} dropped={dropped} />
+          </Suspense>
+        )}
+
+        {/* TAB 3: Junk Cleaner */}
         {activeTab === "junk" && (
           <section className="glass">
             <div className="dupes-header">
@@ -2301,6 +2360,18 @@ export default function App() {
               <EmptyState icon="history" title={t.hist_empty_title} body={t.hist_empty_body} />
             )}
           </section>
+        )}
+
+        {activeTab === "compare" && (
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.cmp_running}</p></div>}>
+            <ComparePanel lang={lang} dropped={dropped} />
+          </Suspense>
+        )}
+
+        {activeTab === "archive" && (
+          <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.arc_creating}</p></div>}>
+            <ArchivePanel lang={lang} dropped={dropped} />
+          </Suspense>
         )}
 
         {/* TAB 8: Smart Batch Renamer */}

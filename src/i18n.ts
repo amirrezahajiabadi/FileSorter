@@ -55,6 +55,97 @@ export interface I18nStrings {
   extras_undo_hint: string;
   extras_scanned: string;
 
+  // Global search, folder compare, archives and the renamer pattern method
+  tab_search: string;
+  tab_compare: string;
+  tab_archive: string;
+  gs_title: string;
+  gs_desc: string;
+  gs_root: string;
+  gs_root_ph: string;
+  gs_query: string;
+  gs_query_ph: string;
+  gs_mode_label: string;
+  gs_mode_contains: string;
+  gs_mode_regex: string;
+  gs_mode_glob: string;
+  gs_ext_label: string;
+  gs_ext_ph: string;
+  gs_min_label: string;
+  gs_max_label: string;
+  gs_hidden: string;
+  gs_case: string;
+  gs_run: string;
+  gs_running: string;
+  gs_stop: string;
+  gs_results: string;
+  gs_scanned: string;
+  gs_truncated: string;
+  gs_none_title: string;
+  gs_none_body: string;
+  gs_col_name: string;
+  gs_col_folder: string;
+  gs_col_size: string;
+  gs_col_date: string;
+  gs_reveal: string;
+  gs_hint: string;
+  cmp_title: string;
+  cmp_desc: string;
+  cmp_left: string;
+  cmp_right: string;
+  cmp_pick: string;
+  cmp_run: string;
+  cmp_running: string;
+  cmp_identical: string;
+  cmp_changed: string;
+  cmp_only_left: string;
+  cmp_only_right: string;
+  cmp_moved: string;
+  cmp_files: string;
+  cmp_elapsed: string;
+  cmp_hidden: string;
+  cmp_empty_title: string;
+  cmp_empty_body: string;
+  cmp_match: string;
+  cmp_truncated: string;
+  cmp_col_rel: string;
+  cmp_col_left: string;
+  cmp_col_right: string;
+  cmp_running_side: string;
+  cmp_side_left: string;
+  cmp_side_right: string;
+  arc_title: string;
+  arc_desc: string;
+  arc_create_title: string;
+  arc_create_desc: string;
+  arc_add_files: string;
+  arc_add_folder: string;
+  arc_clear: string;
+  arc_sources_empty: string;
+  arc_dest_label: string;
+  arc_dest_ph: string;
+  arc_choose_dest: string;
+  arc_create: string;
+  arc_creating: string;
+  arc_done: string;
+  arc_skipped: string;
+  arc_extract_title: string;
+  arc_extract_desc: string;
+  arc_archive_label: string;
+  arc_archive_ph: string;
+  arc_pick_archive: string;
+  arc_target_label: string;
+  arc_target_ph: string;
+  arc_extract: string;
+  arc_extracting: string;
+  arc_extracted: string;
+  arc_overwrite: string;
+  arc_reveal: string;
+  br_method_pattern: string;
+  br_pattern_label: string;
+  br_pattern_ph: string;
+  br_pattern_help: string;
+
   // Shell
   app_title: string;
   app_subtitle: string;
@@ -936,6 +1027,96 @@ const EN: I18nStrings = {
   ps_open_dest: "Open Destination Folder",
   ps_page_alt: "Page {n}",
 
+  tab_search: "Global Search",
+  tab_compare: "Folder Compare",
+  tab_archive: "Archives",
+  gs_title: "Global search",
+  gs_desc: "Search a folder (or a whole drive) by name, extension, size and modified date; every hit can be opened in its own folder.",
+  gs_root: "Search folder",
+  gs_root_ph: "No folder chosen",
+  gs_query: "Query",
+  gs_query_ph: "File name, or a path like invoices/2024",
+  gs_mode_label: "Mode",
+  gs_mode_contains: "Contains",
+  gs_mode_regex: "Regex",
+  gs_mode_glob: "Glob",
+  gs_ext_label: "Extensions (comma separated)",
+  gs_ext_ph: "jpg, png, pdf",
+  gs_min_label: "Min size (MB)",
+  gs_max_label: "Max size (MB)",
+  gs_hidden: "Include hidden files",
+  gs_case: "Match case",
+  gs_run: "Search",
+  gs_running: "⏳ Searching…",
+  gs_stop: "Stop",
+  gs_results: "{count} results",
+  gs_scanned: "{count} files checked in {ms} ms",
+  gs_truncated: "Showing the first {count} matches — narrow the filters to see the rest.",
+  gs_none_title: "Nothing matched",
+  gs_none_body: "Try a shorter query, or remove the extension and size filters.",
+  gs_col_name: "Name",
+  gs_col_folder: "Folder",
+  gs_col_size: "Size",
+  gs_col_date: "Modified",
+  gs_reveal: "Show in folder",
+  gs_hint: "Glob mode accepts * and ?; regex mode accepts patterns like (jpg|png)$.",
+  cmp_title: "Compare folders",
+  cmp_desc: "Compare two trees by SHA-256 to see what is identical, changed, moved, or only on one side.",
+  cmp_left: "First folder",
+  cmp_right: "Second folder",
+  cmp_pick: "Choose folder",
+  cmp_run: "Compare",
+  cmp_running: "⏳ Comparing…",
+  cmp_identical: "Identical",
+  cmp_changed: "Changed",
+  cmp_only_left: "Only in first",
+  cmp_only_right: "Only in second",
+  cmp_moved: "Moved / renamed",
+  cmp_files: "{count} files",
+  cmp_elapsed: "compared in {ms} ms",
+  cmp_hidden: "Include hidden files",
+  cmp_empty_title: "No comparison yet",
+  cmp_empty_body: "Pick two folders: every file is hashed on both sides and the differences are grouped for you.",
+  cmp_match: "The two folders match exactly",
+  cmp_truncated: "Some lists were shortened for speed; the counts above are still exact.",
+  cmp_col_rel: "Relative path",
+  cmp_col_left: "First",
+  cmp_col_right: "Second",
+  cmp_running_side: "{side}: {count} files hashed",
+  cmp_side_left: "First",
+  cmp_side_right: "Second",
+  arc_title: "Archives",
+  arc_desc: "Collect files and folders into a zip, or unpack one while keeping its folder structure.",
+  arc_create_title: "Create a zip",
+  arc_create_desc: "Folder structure is preserved; a chosen folder keeps its own name inside the archive.",
+  arc_add_files: "+ Add files",
+  arc_add_folder: "+ Add folder",
+  arc_clear: "Clear",
+  arc_sources_empty: "Nothing selected to compress yet.",
+  arc_dest_label: "Archive path",
+  arc_dest_ph: "e.g. D:\\backup\\photos.zip",
+  arc_choose_dest: "Choose path…",
+  arc_create: "Create archive",
+  arc_creating: "⏳ Creating…",
+  arc_done: "Archived {count} files ({size}) to:",
+  arc_skipped: "{count} items were skipped",
+  arc_extract_title: "Extract a zip",
+  arc_extract_desc: "Only safe entries are written to the destination folder; ../ paths are refused.",
+  arc_archive_label: "Zip file",
+  arc_archive_ph: "No archive chosen",
+  arc_pick_archive: "Choose zip",
+  arc_target_label: "Destination folder",
+  arc_target_ph: "No folder chosen",
+  arc_extract: "Extract",
+  arc_extracting: "⏳ Extracting…",
+  arc_extracted: "Extracted {count} files ({size}) to:",
+  arc_overwrite: "Replace existing files",
+  arc_reveal: "Open folder",
+  br_method_pattern: "Pattern",
+  br_pattern_label: "Name pattern",
+  br_pattern_ph: "{name}_{index}{ext}",
+  br_pattern_help: "Tokens: {name} {ext} {index} {date} {time} {parent} — {NAME} and {EXT} are upper-case.",
+
   footer_text:
     "FileSorter · Fast, non-blocking native architecture with Rust & Tauri · Journal:",
   footer_journal: "%APPDATA%\\FileSorterV2\\undo",
@@ -1383,6 +1564,101 @@ const FA: I18nStrings = {
   ps_saved_size_to: "{size} ذخیره شد در:",
   ps_open_dest: "بازکردن پوشه مقصد",
   ps_page_alt: "صفحه {n}",
+
+  tab_search: "جست‌وجوی سراسری",
+  tab_compare: "مقایسهٔ پوشه‌ها",
+  tab_archive: "آرشیوها",
+  gs_title: "جست‌وجوی سراسری",
+  gs_desc:
+    "در یک پوشه (یا کل درایو) بر اساس نام، پسوند، حجم و تاریخ تغییر جست‌وجو کنید؛ هر نتیجه را می‌توانید مستقیم در پوشه‌اش باز کنید.",
+  gs_root: "پوشهٔ جست‌وجو",
+  gs_root_ph: "پوشه‌ای انتخاب نشده",
+  gs_query: "عبارت جست‌وجو",
+  gs_query_ph: "نام فایل، یا مسیری مثل invoices/2024",
+  gs_mode_label: "حالت",
+  gs_mode_contains: "شامل",
+  gs_mode_regex: "Regex",
+  gs_mode_glob: "Glob",
+  gs_ext_label: "پسوندها (با کاما جدا کنید)",
+  gs_ext_ph: "jpg, png, pdf",
+  gs_min_label: "حداقل حجم (مگابایت)",
+  gs_max_label: "حداکثر حجم (مگابایت)",
+  gs_hidden: "فایل‌های مخفی هم باشند",
+  gs_case: "حساس به بزرگی و کوچکی حروف",
+  gs_run: "جست‌وجو",
+  gs_running: "در حال جست‌وجو…",
+  gs_stop: "توقف",
+  gs_results: "{count} نتیجه",
+  gs_scanned: "{count} فایل در {ms} میلی‌ثانیه بررسی شد",
+  gs_truncated: "فقط {count} نتیجهٔ اول نمایش داده شده؛ برای دیدن بقیه فیلترها را محدودتر کنید.",
+  gs_none_title: "چیزی پیدا نشد",
+  gs_none_body: "عبارت را کوتاه‌تر کنید یا فیلتر پسوند و حجم را بردارید.",
+  gs_col_name: "نام",
+  gs_col_folder: "پوشه",
+  gs_col_size: "حجم",
+  gs_col_date: "تاریخ تغییر",
+  gs_reveal: "نمایش در پوشه",
+  gs_hint: "در حالت Glob از * و ? استفاده کنید؛ در حالت Regex الگویی مثل (jpg|png)$ کار می‌کند.",
+  cmp_title: "مقایسهٔ دو پوشه",
+  cmp_desc:
+    "دو درخت را با SHA-256 مقایسه کنید تا بدانید چه چیزی یکسان، تغییرکرده، جابه‌جا شده یا فقط در یک طرف است.",
+  cmp_left: "پوشهٔ اول",
+  cmp_right: "پوشهٔ دوم",
+  cmp_pick: "انتخاب پوشه",
+  cmp_run: "مقایسه",
+  cmp_running: "در حال مقایسه…",
+  cmp_identical: "یکسان",
+  cmp_changed: "تغییرکرده",
+  cmp_only_left: "فقط در اولی",
+  cmp_only_right: "فقط در دومی",
+  cmp_moved: "جابه‌جا یا تغییرنام‌یافته",
+  cmp_files: "{count} فایل",
+  cmp_elapsed: "مقایسه در {ms} میلی‌ثانیه",
+  cmp_hidden: "فایل‌های مخفی هم باشند",
+  cmp_empty_title: "هنوز مقایسه‌ای انجام نشده",
+  cmp_empty_body:
+    "دو پوشه انتخاب کنید؛ هر فایل در دو طرف هش می‌شود و اختلاف‌ها دسته‌بندی می‌شوند.",
+  cmp_match: "دو پوشه کاملاً یکسان‌اند",
+  cmp_truncated: "برخی فهرست‌ها برای سرعت کوتاه شده‌اند؛ شمارش‌های بالا دقیق‌اند.",
+  cmp_col_rel: "مسیر نسبی",
+  cmp_col_left: "اولی",
+  cmp_col_right: "دومی",
+  cmp_running_side: "{side}: {count} فایل هش شد",
+  cmp_side_left: "اولی",
+  cmp_side_right: "دومی",
+  arc_title: "آرشیوها",
+  arc_desc: "فایل‌ها و پوشه‌ها را در یک zip جمع کنید یا یک zip را با حفظ ساختار پوشه‌ها باز کنید.",
+  arc_create_title: "ساخت zip",
+  arc_create_desc: "ساختار پوشه‌ها حفظ می‌شود؛ پوشهٔ انتخابی با نام خودش داخل آرشیو می‌آید.",
+  arc_add_files: "+ افزودن فایل",
+  arc_add_folder: "+ افزودن پوشه",
+  arc_clear: "پاک کردن",
+  arc_sources_empty: "هنوز چیزی برای فشرده‌سازی انتخاب نشده است.",
+  arc_dest_label: "مسیر آرشیو",
+  arc_dest_ph: "مثلاً D:\\backup\\photos.zip",
+  arc_choose_dest: "انتخاب مسیر…",
+  arc_create: "ساخت آرشیو",
+  arc_creating: "در حال ساخت…",
+  arc_done: "{count} فایل ({size}) در این مسیر آرشیو شد:",
+  arc_skipped: "{count} مورد رد شد",
+  arc_extract_title: "باز کردن zip",
+  arc_extract_desc:
+    "فقط مدخل‌های امن در پوشهٔ مقصد نوشته می‌شوند؛ مسیرهای ../ رد می‌شوند.",
+  arc_archive_label: "فایل zip",
+  arc_archive_ph: "آرشیوی انتخاب نشده",
+  arc_pick_archive: "انتخاب zip",
+  arc_target_label: "پوشهٔ مقصد",
+  arc_target_ph: "پوشه‌ای انتخاب نشده",
+  arc_extract: "باز کردن",
+  arc_extracting: "در حال باز کردن…",
+  arc_extracted: "{count} فایل ({size}) در این مسیر باز شد:",
+  arc_overwrite: "فایل‌های موجود جایگزین شوند",
+  arc_reveal: "باز کردن پوشه",
+  br_method_pattern: "الگو",
+  br_pattern_label: "الگوی نام",
+  br_pattern_ph: "{name}_{index}{ext}",
+  br_pattern_help:
+    "توکن‌ها: {name} {ext} {index} {date} {time} {parent} — {NAME} و {EXT} با حروف بزرگ.",
 
   footer_text:
     "FileSorter · معماری بومی و بی‌وقفه با Rust و Tauri · دفتر روزانه:",

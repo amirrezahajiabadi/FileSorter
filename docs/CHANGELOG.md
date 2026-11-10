@@ -10,6 +10,52 @@ historical record only.
 
 ---
 
+## [6.12.0] — 2026-11-10
+
+### Added
+- **Global search (`search_ops.rs`, `SearchPanel.tsx`):** a new Search tab
+  walks a folder (or a whole drive) and filters by name, extension, size and
+  modified date. Three matching modes share one walk — case-insensitive
+  substring, regular expression, and `*` / `?` glob — and a query containing a
+  separator matches the relative path instead of the name (`invoices/2024`).
+  Hidden files are opt-in, results stop at a configurable cap instead of
+  scanning the rest of the disk, the walk is cancellable (`stop_search`), and
+  every hit can be revealed in its own folder.
+- **Folder compare by checksum (`compare_ops.rs`, `ComparePanel.tsx`):** both
+  trees are walked once and every file is hashed with SHA-256, then joined on
+  the path relative to each root. The report separates identical, changed,
+  only-in-first, only-in-second and moved/renamed files, with exact totals even
+  when a list is capped for rendering. Identical or nested roots are refused,
+  and hashing progress streams through `compare-progress`.
+- **Archives (`zip_ops.rs`, `ArchivePanel.tsx`):** create a zip from any mix of
+  files and folders (structure preserved, the folder you picked keeps its own
+  name) or extract one. Creation writes a `.part` file and only renames it into
+  place once the central directory is complete, so a full disk cannot destroy
+  an existing archive; extraction refuses absolute paths, drive prefixes and
+  `..` entries (zip slip), and only replaces existing files when explicitly
+  allowed.
+- **Pattern rename (`BatchRenamer.tsx`):** a sixth rename method builds the
+  name from tokens — `{name}`, `{ext}`, `{index}`, `{date}`, `{time}`,
+  `{parent}`, plus `{NAME}` / `{EXT}` for upper case — with the shared padding
+  control and the existing live preview and conflict detection.
+- **Drop targets for the new tools:** dropping a folder on Search or Folder
+  Compare fills the search root / comparison side, and dropping files or
+  folders on Archives queues them, without jumping back to the sort tab.
+
+### Changed
+- Bilingual string table gains its phase-2 block (English + Persian), so the
+  three new tabs and the pattern method are fully translated.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite); each new tab ships as its own
+  lazy chunk (5.8–6.8 kB).
+- `cargo test` passes: 61 tests, including 11 search tests (modes, filters,
+  truncation, cancellation), 6 compare tests (classification, hidden files,
+  same-size-different-bytes, refused roots, list caps) and 7 archive tests
+  (roundtrip, structure, overwrite consent, traversal names, `.part` cleanup).
+
+---
+
 ## [6.11.0] — 2026-11-10
 
 ### Added

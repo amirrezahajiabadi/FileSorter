@@ -216,3 +216,114 @@ export interface DroppedPaths {
   seq: number;
 }
 
+// ── Global search, folder compare and archives (phase 2) ──────────────
+
+export type SearchMode = "contains" | "regex" | "glob";
+
+export interface SearchRequest {
+  root: string;
+  query: string;
+  mode: SearchMode;
+  extensions: string[];
+  min_bytes?: number | null;
+  max_bytes?: number | null;
+  modified_after_ms?: number | null;
+  modified_before_ms?: number | null;
+  include_hidden: boolean;
+  case_sensitive: boolean;
+  max_results?: number | null;
+}
+
+export interface SearchHit {
+  path: string;
+  name: string;
+  folder: string;
+  size: number;
+  modified_ms: number;
+  ext: string;
+}
+
+export interface SearchReport {
+  root: string;
+  hits: SearchHit[];
+  scanned: number;
+  truncated: boolean;
+  elapsed_ms: number;
+  mode: string;
+}
+
+export interface CompareRequest {
+  left: string;
+  right: string;
+  include_hidden: boolean;
+  list_limit?: number | null;
+}
+
+export interface CompareSide {
+  path: string;
+  files: number;
+  bytes: number;
+}
+
+export interface CompareFile {
+  rel: string;
+  size: number;
+}
+
+export interface ComparePair {
+  rel: string;
+  left_size: number;
+  right_size: number;
+}
+
+export interface CompareMoved {
+  left_rel: string;
+  right_rel: string;
+  size: number;
+}
+
+export interface CompareReport {
+  left: CompareSide;
+  right: CompareSide;
+  identical: number;
+  identical_bytes: number;
+  changed_count: number;
+  only_left_count: number;
+  only_right_count: number;
+  moved_count: number;
+  changed: ComparePair[];
+  only_left: CompareFile[];
+  only_right: CompareFile[];
+  moved: CompareMoved[];
+  truncated: boolean;
+  elapsed_ms: number;
+}
+
+export interface ZipCreateRequest {
+  sources: string[];
+  destination: string;
+  base?: string | null;
+  overwrite: boolean;
+}
+
+export interface ZipCreateReport {
+  files: number;
+  bytes: number;
+  destination: string;
+  skipped: number;
+}
+
+export interface ZipExtractRequest {
+  archive: string;
+  destination: string;
+  overwrite: boolean;
+}
+
+export interface ZipExtractReport {
+  files: number;
+  bytes: number;
+  skipped: number;
+  skipped_examples: string[];
+  destination: string;
+}
+
