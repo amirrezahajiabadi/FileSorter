@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { PDFDocument } from "pdf-lib";
-import type { SaveImagesReport } from "./types";
+import type { DroppedPaths, SaveImagesReport } from "./types";
 import { fmt, getStrings, type Locale } from "./i18n";
 
 // pdf.js and pdf-lib are the two heavyweight PDF engines, and each one is only
@@ -68,7 +68,7 @@ function formatBytes(n: number): string {
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`;
 }
 
-export default function PdfStudio({ lang }: { lang: Locale }) {
+export default function PdfStudio({ lang, dropped }: { lang: Locale; dropped?: DroppedPaths | null }) {
   const t = getStrings(lang);
   const [mode, setMode] = useState<"img2pdf" | "pdf2img">("img2pdf");
 
@@ -102,11 +102,13 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
   }, []);
 
   // ── Action: Pick Images ───────────────────────────────────────────
-  const pickImages = async () => {
+  const pickImages = async (incoming?: string[]) => {
     setError("");
     setPdfSuccess(null);
     try {
-      const paths = await invoke<string[] | null>("pick_image_files");
+      // Drag & drop hands the paths in; the dialog buttons pass their click
+      // event, which `Array.isArray` filters out.
+      const paths = Array.isArray(incoming) ? incoming : await invoke<string[] | null>("pick_image_files");
       if (!paths || paths.length === 0) return;
 
       const newItems: ImageItem[] = [];
@@ -156,6 +158,24 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
       setError(String(e));
     }
   };
+
+  // Files dropped on the window open here: a PDF switches to page extraction,
+  // images are queued for PDF creation.
+  const lastDrop = useRef(dropped?.seq ?? 0);
+  useEffect(() => {
+    if (!dropped || dropped.seq === lastDrop.current) return;
+    lastDrop.current = dropped.seq;
+    const pdfIndex = dropped.paths.findIndex((p) => p.toLowerCase().endsWith(".pdf"));
+    if (pdfIndex >= 0) {
+      setMode("pdf2img");
+      void pickPdf(dropped.paths[pdfIndex]);
+      return;
+    }
+    if (dropped.paths.length > 0) {
+      setMode("img2pdf");
+      void pickImages(dropped.paths);
+    }
+  }, [dropped]);
 
   const removeImage = (id: string) => {
     setImages((prev) => {
@@ -293,12 +313,13 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
   };
 
   // ── Action: Pick PDF ──────────────────────────────────────────────
-  const pickPdf = async () => {
+  const pickPdf = async (incoming?: string) => {
     setError("");
     setExtractedReport(null);
     setExtractedThumbnails([]);
     try {
-      const path = await invoke<string | null>("pick_pdf_file");
+      // A dropped PDF arrives as a string; the button passes its click event.
+      const path = typeof incoming === "string" ? incoming : await invoke<string | null>("pick_pdf_file");
       if (!path) return;
 
       const bytes = await invoke<number[]>("read_file_binary", { path });
@@ -486,7 +507,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
                 <button
                   type="button"
                   className="hero-browse-btn"
-                  onClick={pickImages}
+                  onClick={() => void pickImages()}
                 >
                   <span>{t.ps_add_images}</span>
                 </button>
@@ -599,7 +620,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
 
           {/* Images Grid */}
           {images.length === 0 ? (
-            <section className="drop-panel" onClick={pickImages}>
+            <section className="drop-panel" onClick={() => void pickImages()}>
               <h3>{t.ps_no_images_title}</h3>
               <p>{t.ps_no_images_desc}</p>
               <button type="button" className="hero-browse-btn">
@@ -683,7 +704,7 @@ export default function PdfStudio({ lang }: { lang: Locale }) {
               <button
                 type="button"
                 className="hero-browse-btn"
-                onClick={pickPdf}
+                onClick={() => void pickPdf()}
                 style={{ padding: "10px 22px" }}
               >
                 <span>{t.ps_choose_pdf}</span>

@@ -28,6 +28,16 @@ Shipped as v6.6.0:
 - Auto-update engine, four-theme Liquid Glass design system, first-run
   onboarding.
 
+## 0.5 Phase 1 — desktop ergonomics — ✅ complete
+
+Shipped as v6.11.0:
+
+- Drag & drop into the sort flow and into every tool panel.
+- Live filtering and sortable columns in each list, plus a History tab that is
+  read from the undo journal rather than a second log.
+- Empty-folder / zero-byte-file cleanup, journaled so Undo recreates the paths.
+- `Ctrl+O` / `Ctrl+F` / `Ctrl+Z` / `Esc` shortcuts.
+
 ## 1. AI-powered photo analysis — 💡 idea stage
 
 Automatically group photos by face/content, similar to phone galleries.

@@ -25,6 +25,7 @@ the webview never blocks.
 | `walk.rs` | Fast directory traversal with a cancellable `StopFlag` |
 | `dupes.rs` | Three-stage duplicate pipeline and persistent hash cache |
 | `cleanup_ops.rs` | Junk and cache cleaner (safe user-scope cleaning) |
+| `extras.rs` | Empty folders and zero-byte files: scan, journaled removal |
 | `disk_ops.rs` | System drive enumeration and capacity query |
 | `rename_ops.rs` | Batch renamer engine with journaled undo |
 | `image_ops.rs` | Native image optimization and format conversion |

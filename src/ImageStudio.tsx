@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { ProcessedImagePayload, ImageOptimizationReport } from "./types";
+import type { DroppedPaths, ProcessedImagePayload, ImageOptimizationReport } from "./types";
 import { fmt, getStrings, type Locale } from "./i18n";
 
 interface StudioImageItem {
@@ -29,7 +29,7 @@ function formatBytes(n: number): string {
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`;
 }
 
-export default function ImageStudio({ lang }: { lang: Locale }) {
+export default function ImageStudio({ lang, dropped }: { lang: Locale; dropped?: DroppedPaths | null }) {
   const t = getStrings(lang);
   const [images, setImages] = useState<StudioImageItem[]>([]);
   const [format, setFormat] = useState<TargetFormat>("webp");
@@ -53,11 +53,13 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
   }, []);
 
   // ── Action: Pick Images ───────────────────────────────────────────
-  const pickImages = async () => {
+  const pickImages = async (incoming?: string[]) => {
     setError("");
     setReport(null);
     try {
-      const paths = await invoke<string[] | null>("pick_images_for_studio");
+      // Drag & drop hands the paths in; the dialog buttons pass their click
+      // event, which `Array.isArray` filters out.
+      const paths = Array.isArray(incoming) ? incoming : await invoke<string[] | null>("pick_images_for_studio");
       if (!paths || paths.length === 0) return;
 
       const newItems: StudioImageItem[] = [];
@@ -145,6 +147,15 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
       setError(String(e));
     }
   };
+
+  // Files dropped on the window open here; `seq` keeps each drop distinct so a
+  // re-mounted panel cannot re-add an older selection.
+  const lastDrop = useRef(dropped?.seq ?? 0);
+  useEffect(() => {
+    if (!dropped || dropped.seq === lastDrop.current) return;
+    lastDrop.current = dropped.seq;
+    void pickImages(dropped.paths);
+  }, [dropped]);
 
   const removeImage = (id: string) => {
     setImages((prev) => {
@@ -294,7 +305,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
               <button
                 type="button"
                 className="hero-browse-btn"
-                onClick={pickImages}
+                onClick={() => void pickImages()}
                 disabled={processing}
               >
                 <span>{t.is_add_images}</span>
@@ -545,7 +556,7 @@ export default function ImageStudio({ lang }: { lang: Locale }) {
         {/* ── Images Queue Grid / Empty State ──────────────────────── */}
         <section style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
           {images.length === 0 ? (
-            <div className="drop-panel" onClick={pickImages}>
+            <div className="drop-panel" onClick={() => void pickImages()}>
               <h3>{t.is_empty_title}</h3>
               <p>{t.is_empty_desc}</p>
               <button type="button" className="hero-browse-btn">

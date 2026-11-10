@@ -119,6 +119,7 @@ pub fn execute(plan: &SortPlan, stop: &crate::walk::StopFlag, on_progress: &dyn 
     let mut report = ExecReport::default();
     let journal_path = undo::new_journal_path();
     let mut journal = undo::UndoJournal::new(plan.output_dir.clone());
+    journal.kind = "sort".to_string();
     let total = plan.moves.len() as u64;
     report.journal = journal_path.clone();
 
@@ -182,6 +183,7 @@ pub fn quarantine_duplicates(
     let mut report = ExecReport::default();
     let journal_path = undo::new_journal_path();
     let mut journal = undo::UndoJournal::new(base.clone());
+    journal.kind = "quarantine".to_string();
     report.journal = journal_path.clone();
     let total = files.len() as u64;
 

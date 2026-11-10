@@ -18,6 +18,43 @@ export function fmt(template: string, vars: Record<string, string | number>): st
 }
 
 export interface I18nStrings {
+  // Search, drag & drop, history and empty-entry cleanup (phase 1)
+  search_placeholder: string;
+  search_clear: string;
+  search_count: string;
+  drop_overlay_title: string;
+  drop_overlay_body: string;
+  drop_needs_files: string;
+  tab_history: string;
+  hist_title: string;
+  hist_desc: string;
+  hist_col_when: string;
+  hist_col_kind: string;
+  hist_col_files: string;
+  hist_col_size: string;
+  hist_col_action: string;
+  hist_kind_sort: string;
+  hist_kind_quarantine: string;
+  hist_kind_extras: string;
+  hist_empty_title: string;
+  hist_empty_body: string;
+  hist_undo: string;
+  hist_undo_hint: string;
+  hist_empty_entries: string;
+  extras_title: string;
+  extras_desc: string;
+  extras_btn_pick: string;
+  extras_btn_scanning: string;
+  extras_btn_rescan: string;
+  extras_dirs: string;
+  extras_files: string;
+  extras_none: string;
+  extras_clean: string;
+  extras_done: string;
+  extras_failed: string;
+  extras_undo_hint: string;
+  extras_scanned: string;
+
   // Shell
   app_title: string;
   app_subtitle: string;
@@ -437,6 +474,44 @@ export interface I18nStrings {
 }
 
 const EN: I18nStrings = {
+  search_placeholder: "Filter this list…",
+  search_clear: "Clear filter",
+  search_count: "{shown} of {total} shown",
+  drop_overlay_title: "Drop to load",
+  drop_overlay_body: "A folder starts a scan; files open in the current tool.",
+  drop_needs_files: "Drop files (not folders) into this tool.",
+  tab_history: "History",
+  hist_title: "Operation history",
+  hist_desc:
+    "Every sort, quarantine and cleanup this app performed, read from the undo journal. The newest row is the one Undo replays.",
+  hist_col_when: "When",
+  hist_col_kind: "Operation",
+  hist_col_files: "Files",
+  hist_col_size: "Size",
+  hist_col_action: "Action",
+  hist_kind_sort: "Sort",
+  hist_kind_quarantine: "Duplicates",
+  hist_kind_extras: "Cleanup",
+  hist_empty_title: "No operations yet",
+  hist_empty_body: "Sort a folder or quarantine duplicates and it will show up here.",
+  hist_undo: "Undo",
+  hist_undo_hint: "Undo restores the newest operation only.",
+  hist_empty_entries: "{count} empty entries",
+  extras_title: "Empty folders & zero-byte files",
+  extras_desc:
+    "Scanned inside a folder you choose. Every removal is journaled and can be undone.",
+  extras_btn_pick: "Choose folder…",
+  extras_btn_scanning: "Scanning…",
+  extras_btn_rescan: "Scan again",
+  extras_dirs: "Empty folders",
+  extras_files: "Zero-byte files",
+  extras_none: "Nothing to clean in this folder.",
+  extras_clean: "Remove {count}",
+  extras_done: "Removed {dirs} folders and {files} files.",
+  extras_failed: "{count} entries changed and were skipped.",
+  extras_undo_hint: "Undo recreates them as empty paths.",
+  extras_scanned: "Scanned {count} entries in {root}",
+
   app_title: "FileSorter",
   app_subtitle: "Ultra-fast file organizer powered by Rust & Tauri",
   nav_aria: "Main Navigation",
@@ -867,6 +942,44 @@ const EN: I18nStrings = {
 };
 
 const FA: I18nStrings = {
+  search_placeholder: "فیلتر این فهرست…",
+  search_clear: "پاک‌کردن فیلتر",
+  search_count: "{shown} از {total} نمایش داده شد",
+  drop_overlay_title: "رها کنید تا بارگذاری شود",
+  drop_overlay_body: "پوشه یک اسکن شروع می‌کند؛ فایل‌ها در ابزار فعلی باز می‌شوند.",
+  drop_needs_files: "فقط فایل را داخل این ابزار رها کنید، نه پوشه.",
+  tab_history: "تاریخچه",
+  hist_title: "تاریخچهٔ عملیات",
+  hist_desc:
+    "هر مرتب‌سازی، قرنطینه و پاک‌سازی که این برنامه انجام داده، از دفتر روزانهٔ undo خوانده می‌شود. جدیدترین ردیف همان چیزی است که Undo بازمی‌گرداند.",
+  hist_col_when: "زمان",
+  hist_col_kind: "عملیات",
+  hist_col_files: "فایل‌ها",
+  hist_col_size: "حجم",
+  hist_col_action: "اقدام",
+  hist_kind_sort: "مرتب‌سازی",
+  hist_kind_quarantine: "تکراری‌ها",
+  hist_kind_extras: "پاک‌سازی",
+  hist_empty_title: "هنوز عملیاتی انجام نشده",
+  hist_empty_body: "یک پوشه را مرتب کنید یا تکراری‌ها را قرنطینه کنید تا اینجا نمایش داده شود.",
+  hist_undo: "بازگردانی",
+  hist_undo_hint: "Undo فقط جدیدترین عملیات را بازمی‌گرداند.",
+  hist_empty_entries: "{count} مورد خالی",
+  extras_title: "پوشه‌های خالی و فایل‌های صفر بایت",
+  extras_desc:
+    "داخل پوشه‌ای که انتخاب می‌کنید جست‌وجو می‌شود. هر حذف در دفتر روزانه ثبت می‌شود و قابل بازگردانی است.",
+  extras_btn_pick: "انتخاب پوشه…",
+  extras_btn_scanning: "در حال بررسی…",
+  extras_btn_rescan: "بررسی دوباره",
+  extras_dirs: "پوشه‌های خالی",
+  extras_files: "فایل‌های صفر بایت",
+  extras_none: "در این پوشه چیزی برای پاک‌کردن نیست.",
+  extras_clean: "حذف {count} مورد",
+  extras_done: "{dirs} پوشه و {files} فایل حذف شد.",
+  extras_failed: "{count} مورد تغییر کرده بود و رد شد.",
+  extras_undo_hint: "بازگردانی آن‌ها را به‌صورت مسیر خالی بازمی‌سازد.",
+  extras_scanned: "{count} مورد در {root} بررسی شد",
+
   app_title: "FileSorter",
   app_subtitle: "سازماندهی فوق‌العاده سریع فایل‌ها با قدرت Rust و Tauri",
   nav_aria: "ناوبری اصلی",

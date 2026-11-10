@@ -117,6 +117,7 @@ export interface DuplicateGroup {
 
 export interface UndoReport {
   restored: number;
+  restored_empty: number;
   skipped: number;
   skipped_examples: string[];
   op_id: number;
@@ -184,5 +185,34 @@ export interface ImageOptimizationReport {
   original_total_bytes: number;
   new_total_bytes: number;
   saved_bytes: number;
+}
+
+export interface ExtrasScan {
+  root: string;
+  empty_dirs: string[];
+  empty_files: string[];
+  scanned_entries: number;
+}
+
+export interface ExtrasReport {
+  dirs_removed: number;
+  files_removed: number;
+  failed: number;
+  op_id: number;
+}
+
+export interface HistoryEntry {
+  op_id: number;
+  timestamp_ms: number;
+  files: number;
+  bytes: number;
+  kind: string;
+  empty_entries: number;
+}
+
+/** Paths handed to a tool by drag & drop; `seq` makes each drop unique. */
+export interface DroppedPaths {
+  paths: string[];
+  seq: number;
 }
 

@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { BatchRenameReport, RenamePair, UndoRenameReport } from "./types";
+import type { BatchRenameReport, DroppedPaths, RenamePair, UndoRenameReport } from "./types";
 import { fmt, getStrings, type Locale } from "./i18n";
 
 interface FileEntry {
@@ -22,7 +22,7 @@ function conflictKey(item: { parentDir: string; finalName: string }): string {
 }
 
 
-export default function BatchRenamer({ lang }: { lang: Locale }) {
+export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?: DroppedPaths | null }) {
   const t = getStrings(lang);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [method, setMethod] = useState<RenameMethod>("replace");
@@ -115,6 +115,18 @@ export default function BatchRenamer({ lang }: { lang: Locale }) {
       return [...prev, ...newItems];
     });
   };
+
+  // Files dropped on the window land here; `seq` keeps each drop distinct so a
+  // re-mounted panel cannot re-add an older selection.
+  const lastDrop = useRef(dropped?.seq ?? 0);
+  useEffect(() => {
+    if (!dropped || dropped.seq === lastDrop.current) return;
+    lastDrop.current = dropped.seq;
+    setError("");
+    setReport(null);
+    setUndoReport(null);
+    appendPaths(dropped.paths);
+  }, [dropped]);
 
   const removeFile = (id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));

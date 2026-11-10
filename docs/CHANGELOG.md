@@ -10,6 +10,45 @@ historical record only.
 
 ---
 
+## [6.11.0] — 2026-11-10
+
+### Added
+- **Drag & drop (`App.tsx`, `classify_dropped`):** dropping a folder anywhere
+  in the window starts a scan of it, and dropping files on Batch Renamer, Image
+  Studio or PDF Studio queues them in that tool (a dropped PDF switches PDF
+  Studio to page extraction). A labelled overlay appears while a drag hovers.
+- **Live filtering and column sorting:** the plan preview, the duplicate groups,
+  the largest-files table and the new history view each have a filter box
+  (`Ctrl+F`) and sortable headers, with an "x of y shown" count so a filter
+  never hides rows silently.
+- **Empty folders & zero-byte files (`extras.rs`):** a panel in the Junk tab
+  scans a folder you choose and removes folders that hold nothing and files that
+  hold no bytes. Every entry is re-checked at delete time, a file that grew is
+  skipped instead of removed, paths outside the scanned root are refused, and
+  the removal is journaled.
+- **Operation history (`get_history`):** a History tab lists every sort,
+  quarantine and extras cleanup, read straight from the undo journal so it can
+  never disagree with what Undo would replay. The newest row is undoable.
+- **Keyboard shortcuts:** `Ctrl+O` picks a folder, `Ctrl+F` focuses the filter,
+  `Ctrl+Z` undoes the newest operation (outside text fields), and `Esc` closes
+  the open panel.
+
+### Changed
+- Undo journals now carry a `kind` (`sort`, `quarantine`, `extras`) and a
+  `removed_empty` list. Both are `#[serde(default)]`, so journals written by an
+  earlier build still parse and undo; Undo recreates empty folders and
+  zero-byte files as empty paths.
+- The `UndoReport` payload gains `restored_empty`, and the success line counts
+  moves and recreated paths together.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite).
+- `cargo test` passes: 37 tests, including scan/clean/undo coverage for empty
+  entries, the "file grew after the scan" guard, path containment, and journal
+  compatibility with older builds.
+
+---
+
 ## [6.10.1] — 2026-11-09
 
 ### Changed

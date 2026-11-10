@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -7,7 +7,11 @@ import {
   type DiskStats,
   type DriveInfo,
   type DuplicateGroup,
+  type DroppedPaths,
   type ExecReport,
+  type ExtrasReport,
+  type ExtrasScan,
+  type HistoryEntry,
   type JunkLocation,
   type ScanProgress,
   type ScheduledTask,
@@ -79,7 +83,7 @@ export function themeMeta(t: I18nStrings, id: Theme): { name: string; desc: stri
 type IconName =
   | "drop" | "folder" | "broom" | "search" | "chart" | "eye" | "clock"
   | "pen" | "image" | "pdf" | "settings" | "spark" | "home" | "refresh"
-  | "palette" | "chevronLeft" | "chevronRight" | "info" | "bolt" | "menu";
+  | "palette" | "history" | "chevronLeft" | "chevronRight" | "info" | "bolt" | "menu";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -98,6 +102,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     home: <><path d="m3.5 11 8.5-7 8.5 7" /><path d="M5.5 9.7V20h13V9.7" /><path d="M9.7 20v-5.5h4.6V20" /></>,
     refresh: <><path d="M19.5 8.5A8 8 0 1 0 20 13" /><path d="M19.5 3.8v4.7h-4.7" /></>,
     palette: <><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 1.9-1 1.9-2 0-.7.5-1.2 1.2-1.2h1.1a4.3 4.3 0 0 0 4.3-4.3A8.5 8.5 0 0 0 12 3.5Z" /><circle cx="7.5" cy="10" r=".8" /><circle cx="10" cy="7.2" r=".8" /><circle cx="14" cy="7.2" r=".8" /><circle cx="16.4" cy="10" r=".8" /></>,
+    history: <><path d="M3.8 12a8.2 8.2 0 1 0 2.6-6" /><path d="M3.4 3.6v4.6h4.6" /><path d="M12 7.6V12l3 1.8" /></>,
     chevronLeft: <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />,
     chevronRight: <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />,
     info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 10.5v5" /><path d="M12 7.7h.01" /></>,
@@ -138,8 +143,44 @@ function EmptyState({
   );
 }
 
+/* One filter box shared by every list, so Ctrl+F always focuses the same
+   control no matter which tab is open. */
+function SearchBox({
+  value,
+  onChange,
+  placeholder,
+  clearLabel,
+  inputRef,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder: string;
+  clearLabel: string;
+  inputRef?: { current: HTMLInputElement | null };
+}) {
+  return (
+    <div className="search-box">
+      <Icon name="search" size={14} />
+      <input
+        ref={inputRef}
+        type="text"
+        className="search-input"
+        value={value}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {value && (
+        <button type="button" className="search-clear" onClick={() => onChange("")} aria-label={clearLabel}>
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
 type Phase = "idle" | "scanning" | "ready" | "sorting" | "done";
-type ActiveTab = "sort" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "renamer" | "images" | "pdf" | "settings";
+type ActiveTab = "sort" | "junk" | "dupes" | "disk" | "watch" | "schedule" | "history" | "renamer" | "images" | "pdf" | "settings";
 
 /* The destination shelf falls back to the built-in categories until the backend answers. */
 const CATEGORY_ORDER = [
@@ -171,6 +212,16 @@ function formatBytes(n: number): string {
     i++;
   } while (v >= 1024 && i < units.length - 1);
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`;
+}
+
+function baseName(path: string): string {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || path;
+}
+
+/** The undo journal is the single source of truth for the history view. */
+async function fetchHistory(): Promise<HistoryEntry[]> {
+  return invoke<HistoryEntry[]>("get_history", { limit: 50 });
 }
 
 export default function App() {
@@ -206,6 +257,16 @@ export default function App() {
   const [plan, setPlan] = useState<SortPlan | null>(null);
   const [showMoves, setShowMoves] = useState<boolean>(false);
 
+  // Filtering, column sorting and drag & drop
+  const [search, setSearch] = useState("");
+  const [planSortKey, setPlanSortKey] = useState<"source" | "destination" | "category" | "size">("source");
+  const [planSortDir, setPlanSortDir] = useState<"asc" | "desc">("asc");
+  const [diskSortKey, setDiskSortKey] = useState<"name" | "size" | "path">("size");
+  const [diskSortDir, setDiskSortDir] = useState<"asc" | "desc">("desc");
+  const [dragging, setDragging] = useState(false);
+  const [dropped, setDropped] = useState<DroppedPaths | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
   // Duplicates state
   const [dupes, setDupes] = useState<DuplicateGroup[]>([]);
   const [dupeBusy, setDupeBusy] = useState(false);
@@ -222,6 +283,16 @@ export default function App() {
   const [selectedJunk, setSelectedJunk] = useState<Set<string>>(new Set());
   const [junkBusy, setJunkBusy] = useState(false);
   const [cleanReport, setCleanReport] = useState<CleanReport | null>(null);
+
+  // Empty folders & zero-byte files
+  const [extrasRoot, setExtrasRoot] = useState("");
+  const [extrasScan, setExtrasScan] = useState<ExtrasScan | null>(null);
+  const [extrasBusy, setExtrasBusy] = useState(false);
+  const [extrasReport, setExtrasReport] = useState<ExtrasReport | null>(null);
+  const [extrasPick, setExtrasPick] = useState<{ dirs: boolean; files: boolean }>({ dirs: true, files: true });
+
+  // Operation history, read from the undo journal
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   // Watch Mode state
   const [watchActive, setWatchActive] = useState<boolean>(false);
@@ -264,6 +335,15 @@ export default function App() {
 
   const fmtNum = (n: number) => n.toLocaleString(isRtl ? "fa-IR" : "en-US");
   const getCatLabel = (cat: string) => getCategoryLabel(lang, cat);
+  const histKind = (kind: string) =>
+    kind === "quarantine" ? t.hist_kind_quarantine : kind === "extras" ? t.hist_kind_extras : t.hist_kind_sort;
+  const loadHistory = useCallback(async () => {
+    try {
+      setHistory(await fetchHistory());
+    } catch {
+      // The history view is informative; a read failure must not block the app.
+    }
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -335,6 +415,7 @@ export default function App() {
     invoke<DriveInfo[]>("list_system_drives")
       .then(setDrives)
       .catch(() => {});
+    fetchHistory().then(setHistory).catch(() => {});
   }, []);
 
   // Event Listeners (Scan, Dupes, Sort, Quarantine, Undo, Watch, Schedule)
@@ -395,6 +476,7 @@ export default function App() {
         } else if (ev.payload.report) {
           setReport(ev.payload.report);
           setPhase("done");
+          void fetchHistory().then(setHistory).catch(() => {});
         }
       }));
       keep(await listen<{ report?: ExecReport; error?: string }>("quarantine-done", (ev) => {
@@ -404,6 +486,7 @@ export default function App() {
         } else if (ev.payload.report) {
           setQuarantineReport(ev.payload.report);
           setDupes([]);
+          void fetchHistory().then(setHistory).catch(() => {});
         }
       }));
       keep(await listen<{ report?: UndoReport; error?: string }>("undo-done", (ev) => {
@@ -411,6 +494,7 @@ export default function App() {
           setError(ev.payload.error);
         } else if (ev.payload.report) {
           setUndoReport(ev.payload.report);
+          void fetchHistory().then(setHistory).catch(() => {});
         }
       }));
       keep(await listen<WatchEventPayload>("watch-event", (ev) => {
@@ -451,21 +535,28 @@ export default function App() {
     setError("");
   }, []);
 
-  const pickFolder = async () => {
-    setError("");
+  // Used by the dialog and by drag & drop: both end in the same scan.
+  const startWithFolder = useCallback(
+    (picked: string) => {
+      setError("");
+      reset();
+      setActiveTab("sort");
+      setFolder(picked);
+      setPhase("scanning");
+      setScan({ total_so_far: 0, bytes_so_far: 0, batch_files: 0, done: false });
+      invoke("scan_start", { root: picked }).catch((e) => {
+        setError(String(e));
+        setPhase("idle");
+      });
+    },
+    [reset]
+  );
+
+  const pickFolder = useCallback(async () => {
     const picked = await invoke<string | null>("pick_folder");
     if (!picked) return;
-    reset();
-    setFolder(picked);
-    setPhase("scanning");
-    setScan({ total_so_far: 0, bytes_so_far: 0, batch_files: 0, done: false });
-    try {
-      await invoke("scan_start", { root: picked });
-    } catch (e) {
-      setError(String(e));
-      setPhase("idle");
-    }
-  };
+    startWithFolder(picked);
+  }, [startWithFolder]);
 
   const stopScan = () => invoke("scan_stop").catch(() => {});
 
@@ -537,14 +628,14 @@ export default function App() {
     }
   };
 
-  const undoLast = async () => {
+  const undoLast = useCallback(async () => {
     setError("");
     try {
       await invoke("undo_last");
     } catch (e) {
       setError(String(e));
     }
-  };
+  }, []);
 
   // Junk Cleaner handlers
   // Refreshes the location list without touching the busy flag or the result
@@ -592,6 +683,47 @@ export default function App() {
       else next.add(id);
       return next;
     });
+  };
+
+  // ── Empty folders & zero-byte files ────────────────────────────────
+  const handleScanExtras = async () => {
+    setError("");
+    try {
+      const picked = await invoke<string | null>("pick_folder");
+      if (!picked) return;
+      setExtrasBusy(true);
+      setExtrasReport(null);
+      const scan = await invoke<ExtrasScan>("scan_extras", { root: picked });
+      setExtrasRoot(scan.root);
+      setExtrasScan(scan);
+      setExtrasPick({ dirs: true, files: true });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setExtrasBusy(false);
+    }
+  };
+
+  const handleCleanExtras = async () => {
+    if (!extrasScan || extrasCount === 0) return;
+    setError("");
+    setExtrasBusy(true);
+    try {
+      const result = await invoke<ExtrasReport>("clean_extras", {
+        root: extrasRoot,
+        dirs: extrasPick.dirs ? extrasScan.empty_dirs : [],
+        files: extrasPick.files ? extrasScan.empty_files : [],
+      });
+      setExtrasReport(result);
+      // Re-scan: removing a folder can leave its parent empty, and that parent
+      // now belongs on the list too.
+      setExtrasScan(await invoke<ExtrasScan>("scan_extras", { root: extrasRoot }));
+      await loadHistory();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setExtrasBusy(false);
+    }
   };
 
   // Watch Mode handlers
@@ -744,6 +876,179 @@ export default function App() {
     });
   };
 
+  // ── Filtered & sorted views ────────────────────────────────────────
+  const togglePlanSort = (key: typeof planSortKey) => {
+    if (planSortKey === key) setPlanSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setPlanSortKey(key);
+      setPlanSortDir("asc");
+    }
+  };
+
+  const planRows = useMemo(() => {
+    const rows = plan?.moves ?? [];
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? rows.filter((m) => `${m.source} ${m.destination} ${m.category}`.toLowerCase().includes(q))
+      : rows;
+    const sorted = [...filtered].sort((a, b) => {
+      const cmp =
+        planSortKey === "size"
+          ? a.size - b.size
+          : planSortKey === "category"
+            ? a.category.localeCompare(b.category)
+            : planSortKey === "destination"
+              ? a.destination.localeCompare(b.destination)
+              : a.source.localeCompare(b.source);
+      return planSortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted.slice(0, 100);
+  }, [plan, search, planSortKey, planSortDir]);
+
+  const dupeGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const rows = q ? dupes.filter((g) => g.files.some((f) => f.path.toLowerCase().includes(q))) : dupes;
+    return rows.slice(0, 50);
+  }, [dupes, search]);
+
+  const toggleDiskSort = (key: typeof diskSortKey) => {
+    if (diskSortKey === key) setDiskSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setDiskSortKey(key);
+      setDiskSortDir("asc");
+    }
+  };
+
+  const diskRows = useMemo(() => {
+    const rows = diskStats?.largest_files ?? [];
+    const q = search.trim().toLowerCase();
+    const filtered = q ? rows.filter(([filePath]) => filePath.toLowerCase().includes(q)) : rows;
+    const sorted = [...filtered].sort((a, b) => {
+      const cmp =
+        diskSortKey === "size"
+          ? a[1] - b[1]
+          : diskSortKey === "path"
+            ? a[0].localeCompare(b[0])
+            : baseName(a[0]).localeCompare(baseName(b[0]));
+      return diskSortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [diskStats, search, diskSortKey, diskSortDir]);
+
+  const historyRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return history;
+    // `histKind` follows the active locale, hence `lang` in the deps below.
+    return history.filter((h) => `${histKind(h.kind)} ${h.kind} ${h.op_id}`.toLowerCase().includes(q));
+  }, [history, search, lang]);
+
+  const extrasCount = extrasScan
+    ? (extrasPick.dirs ? extrasScan.empty_dirs.length : 0) + (extrasPick.files ? extrasScan.empty_files.length : 0)
+    : 0;
+
+  // A new tab starts with an empty filter; keeping it would silently hide rows.
+  useEffect(() => {
+    setSearch("");
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "history") void loadHistory();
+  }, [activeTab, loadHistory]);
+
+  // Drag & drop: a folder starts a scan, files go to the open tool. The handler
+  // lives in a ref so the Tauri listener is registered once per app lifetime.
+  const dropHandler = useRef<(paths: string[]) => void>(() => {});
+  dropHandler.current = async (paths: string[]) => {
+    if (paths.length === 0) return;
+    let directories: string[] = [];
+    let files: string[] = [];
+    let parent: string | null = null;
+    try {
+      const split = await invoke<{ directories: string[]; files: string[]; parent: string | null }>(
+        "classify_dropped",
+        { paths }
+      );
+      directories = split.directories;
+      files = split.files;
+      parent = split.parent;
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
+    if (activeTab === "renamer" || activeTab === "images" || activeTab === "pdf") {
+      if (files.length === 0) {
+        setError(t.drop_needs_files);
+        return;
+      }
+      setDropped({ paths: files, seq: Date.now() });
+      return;
+    }
+    const root = directories[0] ?? parent;
+    if (root) startWithFolder(root);
+  };
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: UnlistenFn | null = null;
+    (async () => {
+      try {
+        const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+        const un = await getCurrentWebview().onDragDropEvent((event) => {
+          const payload = event.payload;
+          if (payload.type === "over") {
+            setDragging(true);
+          } else if (payload.type === "leave") {
+            setDragging(false);
+          } else if (payload.type === "drop") {
+            setDragging(false);
+            dropHandler.current("paths" in payload ? payload.paths : []);
+          }
+        });
+        if (disposed) un();
+        else unlisten = un;
+      } catch (e) {
+        console.error("Drag & drop is unavailable", e);
+      }
+    })();
+    return () => {
+      disposed = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  // Keyboard: Ctrl+O picks a folder, Ctrl+F filters, Ctrl+Z undoes, Esc closes.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const el = event.target as HTMLElement | null;
+      const typing =
+        !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+      const mod = event.ctrlKey || event.metaKey;
+      if (mod && event.key.toLowerCase() === "o") {
+        event.preventDefault();
+        void pickFolder();
+        return;
+      }
+      if (mod && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
+      if (mod && event.key.toLowerCase() === "z" && !typing) {
+        event.preventDefault();
+        void undoLast();
+        return;
+      }
+      if (event.key === "Escape") {
+        if (showAddTask) setShowAddTask(false);
+        else if (onboardingOpen) closeOnboarding();
+        else if (mobileNavOpen) setMobileNavOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pickFolder, undoLast, showAddTask, onboardingOpen, mobileNavOpen]);
+
   const pct = (part: number, total: number) => (total > 0 ? ((part / total) * 100).toFixed(1) : "0");
 
   return (
@@ -765,6 +1070,16 @@ export default function App() {
         updateData={updateData}
         lang={lang}
       />
+
+      {dragging && (
+        <div className="drop-overlay" aria-hidden="true">
+          <div className="drop-overlay-card">
+            <Icon name="drop" size={26} />
+            <b>{t.drop_overlay_title}</b>
+            <span>{t.drop_overlay_body}</span>
+          </div>
+        </div>
+      )}
 
       {/* Left sidebar: one ground with the canvas, a single rule between. */}
       <button
@@ -869,6 +1184,16 @@ export default function App() {
               <span className="sidebar-tab-icon"><Icon name="clock" /></span>
               {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_schedule}</span>}
               {tasks.length > 0 && <span className="sidebar-tab-badge">{tasks.length}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-tab ${activeTab === "history" ? "active" : ""}`}
+              onClick={() => setActiveTab("history")}
+              title={t.tab_history}
+              aria-current={activeTab === "history" ? "page" : undefined}
+            >
+              <span className="sidebar-tab-icon"><Icon name="history" /></span>
+              {sidebarExpanded && <span className="sidebar-tab-label">{t.tab_history}</span>}
             </button>
             <button
               type="button"
@@ -1007,7 +1332,8 @@ export default function App() {
                    activeTab === "schedule" ? t.tab_schedule :
                    activeTab === "renamer" ? t.tab_renamer :
                    activeTab === "images" ? t.tab_images :
-                   activeTab === "pdf" ? t.tab_pdf : t.tab_settings}
+                   activeTab === "pdf" ? t.tab_pdf :
+                   activeTab === "history" ? t.tab_history : t.tab_settings}
                 </span>
                 {folder && (
                   <>
@@ -1173,10 +1499,22 @@ export default function App() {
 
                 {showMoves && (
                   <div className="table-container" style={{ marginTop: "16px" }}>
+                    <div className="list-toolbar">
+                      <SearchBox
+                        value={search}
+                        onChange={setSearch}
+                        placeholder={t.search_placeholder}
+                        clearLabel={t.search_clear}
+                        inputRef={searchRef}
+                      />
+                      <span className="muted" style={{ fontSize: "12px" }}>
+                        {fmt(t.search_count, { shown: fmtNum(planRows.length), total: fmtNum(plan.moves.length) })}
+                      </span>
+                    </div>
                     {plan.total_moves && plan.total_moves > plan.moves.length && (
                       <p className="muted" style={{ fontSize: "12px", margin: "0 0 10px 4px" }}>
                         {fmt(t.preview_note, {
-                          shown: fmtNum(plan.moves.length),
+                          shown: fmtNum(planRows.length),
                           total: fmtNum(plan.total_moves),
                         })}
                       </p>
@@ -1184,14 +1522,34 @@ export default function App() {
                     <table>
                       <thead>
                         <tr>
-                          <th>{t.col_source}</th>
-                          <th>{t.col_destination}</th>
-                          <th>{t.col_category}</th>
-                          <th>{t.col_size}</th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => togglePlanSort("source")}>
+                              {t.col_source}
+                              {planSortKey === "source" ? (planSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => togglePlanSort("destination")}>
+                              {t.col_destination}
+                              {planSortKey === "destination" ? (planSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => togglePlanSort("category")}>
+                              {t.col_category}
+                              {planSortKey === "category" ? (planSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => togglePlanSort("size")}>
+                              {t.col_size}
+                              {planSortKey === "size" ? (planSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {plan.moves.slice(0, 100).map((m, i) => (
+                        {planRows.map((m, i) => (
                           <tr key={i}>
                             <td className="mono ellipsis">{m.source.split(/[\\/]/).pop()}</td>
                             <td className="mono ellipsis">{m.destination.replace(plan.root, "")}</td>
@@ -1229,7 +1587,9 @@ export default function App() {
             {undoReport && (
               <div className="alert alert-success" style={{ marginTop: "16px" }}>
                 <span className="alert-label">Done</span>
-                <span><b>{fmtNum(undoReport.restored)}</b> {t.undo_success}</span>
+                <span>
+                  <b>{fmtNum(undoReport.restored + (undoReport.restored_empty ?? 0))}</b> {t.undo_success}
+                </span>
               </div>
             )}
           </>
@@ -1311,6 +1671,86 @@ export default function App() {
                 </button>
               </EmptyState>
             )}
+
+            <div className="extras-panel">
+              <div className="extras-head">
+                <div>
+                  <h2>{t.extras_title}</h2>
+                  <p>{t.extras_desc}</p>
+                </div>
+                <div className="summary-actions">
+                  <button className="btn btn-ghost" onClick={handleScanExtras} disabled={extrasBusy}>
+                    {extrasBusy ? t.extras_btn_scanning : extrasScan ? t.extras_btn_rescan : t.extras_btn_pick}
+                  </button>
+                  {extrasScan && extrasCount > 0 && (
+                    <button className="btn btn-primary" onClick={handleCleanExtras} disabled={extrasBusy}>
+                      {fmt(t.extras_clean, { count: fmtNum(extrasCount) })}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {extrasReport && (
+                <div className="alert alert-success" style={{ marginTop: "12px" }}>
+                  <span className="alert-label">Done</span>
+                  <span>
+                    {fmt(t.extras_done, {
+                      dirs: fmtNum(extrasReport.dirs_removed),
+                      files: fmtNum(extrasReport.files_removed),
+                    })}
+                    {extrasReport.failed > 0 &&
+                      " " + fmt(t.extras_failed, { count: fmtNum(extrasReport.failed) })}
+                  </span>
+                </div>
+              )}
+
+              {extrasScan && (
+                <>
+                  <p className="panel-note" style={{ marginTop: "12px" }}>
+                    {fmt(t.extras_scanned, { count: fmtNum(extrasScan.scanned_entries), root: extrasScan.root })}
+                  </p>
+                  {extrasCount === 0 ? (
+                    <p className="panel-note">{t.extras_none}</p>
+                  ) : (
+                    <>
+                      <div className="extras-kinds">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={extrasPick.dirs}
+                            onChange={(e) => setExtrasPick((p) => ({ ...p, dirs: e.target.checked }))}
+                          />
+                          {t.extras_dirs} <b>{fmtNum(extrasScan.empty_dirs.length)}</b>
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={extrasPick.files}
+                            onChange={(e) => setExtrasPick((p) => ({ ...p, files: e.target.checked }))}
+                          />
+                          {t.extras_files} <b>{fmtNum(extrasScan.empty_files.length)}</b>
+                        </label>
+                      </div>
+                      <div className="extras-list mono">
+                        {[
+                          ...(extrasPick.dirs ? extrasScan.empty_dirs : []),
+                          ...(extrasPick.files ? extrasScan.empty_files : []),
+                        ]
+                          .slice(0, 200)
+                          .map((p) => (
+                            <div key={p} className="ellipsis" title={p}>
+                              {p}
+                            </div>
+                          ))}
+                      </div>
+                      <p className="panel-note" style={{ marginTop: "8px" }}>
+                        {t.extras_undo_hint}
+                      </p>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </section>
         )}
 
@@ -1342,6 +1782,13 @@ export default function App() {
               <div style={{ marginTop: "20px" }}>
                 <div className="dupes-toolbar">
                   <span>{t.dupes_reclaimable} <b>{formatBytes(dupes.reduce((acc, g) => acc + g.wasted, 0))}</b></span>
+                  <SearchBox
+                    value={search}
+                    onChange={setSearch}
+                    placeholder={t.search_placeholder}
+                    clearLabel={t.search_clear}
+                    inputRef={searchRef}
+                  />
                   <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                     <select
                       className="btn btn-ghost"
@@ -1358,7 +1805,7 @@ export default function App() {
                 </div>
 
                 <div className="dupes-list">
-                  {dupes.slice(0, 50).map((g, i) => (
+                  {dupeGroups.map((g, i) => (
                     <div key={i} className="glass dupe-group">
                       <div className="dupe-group-header">
                         <span className="mono">
@@ -1492,17 +1939,44 @@ export default function App() {
 
                 <div className="disk-panel">
                   <h2>{t.disk_largest_files}</h2>
+                  <div className="list-toolbar" style={{ marginTop: "10px" }}>
+                    <SearchBox
+                      value={search}
+                      onChange={setSearch}
+                      placeholder={t.search_placeholder}
+                      clearLabel={t.search_clear}
+                      inputRef={searchRef}
+                    />
+                    <span className="muted" style={{ fontSize: "12px" }}>
+                      {fmt(t.search_count, { shown: fmtNum(diskRows.length), total: fmtNum(diskStats.largest_files.length) })}
+                    </span>
+                  </div>
                   <div className="table-container" style={{ marginTop: "6px" }}>
                     <table>
                       <thead>
                         <tr>
-                          <th>{t.disk_col_name}</th>
-                          <th>{t.disk_col_size}</th>
-                          <th>{t.disk_col_path}</th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => toggleDiskSort("name")}>
+                              {t.disk_col_name}
+                              {diskSortKey === "name" ? (diskSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => toggleDiskSort("size")}>
+                              {t.disk_col_size}
+                              {diskSortKey === "size" ? (diskSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
+                          <th>
+                            <button type="button" className="th-sort" onClick={() => toggleDiskSort("path")}>
+                              {t.disk_col_path}
+                              {diskSortKey === "path" ? (diskSortDir === "asc" ? " ▲" : " ▼") : ""}
+                            </button>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {diskStats.largest_files.map(([filePath, size], i) => (
+                        {diskRows.map(([filePath, size], i) => (
                           <tr key={i}>
                             <td className="mono ellipsis">{filePath.split(/[\\/]/).pop()}</td>
                             <td className="mono">{formatBytes(size)}</td>
@@ -1755,24 +2229,98 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB 7: Smart Batch Renamer */}
+        {/* TAB 7: Operation History */}
+        {activeTab === "history" && (
+          <section className="glass">
+            <div className="dupes-header">
+              <div>
+                <h1>{t.hist_title}</h1>
+                <p>{t.hist_desc}</p>
+              </div>
+              <div className="summary-actions">
+                <SearchBox
+                  value={search}
+                  onChange={setSearch}
+                  placeholder={t.search_placeholder}
+                  clearLabel={t.search_clear}
+                  inputRef={searchRef}
+                />
+                <button className="btn btn-ghost" onClick={loadHistory}>
+                  {t.btn_rescan}
+                </button>
+              </div>
+            </div>
+
+            {history.length > 0 ? (
+              <div className="table-container" style={{ marginTop: "18px" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t.hist_col_when}</th>
+                      <th>{t.hist_col_kind}</th>
+                      <th>{t.hist_col_files}</th>
+                      <th>{t.hist_col_size}</th>
+                      <th>{t.hist_col_action}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyRows.map((h) => (
+                      <tr key={h.op_id}>
+                        <td className="mono">{new Date(h.timestamp_ms).toLocaleString()}</td>
+                        <td>
+                          <span className="badge-tag">{histKind(h.kind)}</span>
+                        </td>
+                        <td>
+                          {fmtNum(h.files)}
+                          {h.empty_entries > 0 && (
+                            <span className="muted">
+                              {" · "}
+                              {fmt(t.hist_empty_entries, { count: fmtNum(h.empty_entries) })}
+                            </span>
+                          )}
+                        </td>
+                        <td className="mono">{formatBytes(h.bytes)}</td>
+                        <td>
+                          {history.length > 0 && h.op_id === history[0].op_id ? (
+                            <button className="btn btn-ghost btn-sm" onClick={undoLast}>
+                              {t.hist_undo}
+                            </button>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="panel-note" style={{ marginTop: "10px" }}>
+                  {t.hist_undo_hint}
+                </p>
+              </div>
+            ) : (
+              <EmptyState icon="history" title={t.hist_empty_title} body={t.hist_empty_body} />
+            )}
+          </section>
+        )}
+
+        {/* TAB 8: Smart Batch Renamer */}
         {activeTab === "renamer" && (
           <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_renamer}</p></div>}>
-            <BatchRenamer lang={lang} />
+            <BatchRenamer lang={lang} dropped={dropped} />
           </Suspense>
         )}
 
         {/* TAB 8: Image Studio */}
         {activeTab === "images" && (
           <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_images}</p></div>}>
-            <ImageStudio lang={lang} />
+            <ImageStudio lang={lang} dropped={dropped} />
           </Suspense>
         )}
 
         {/* TAB 9: PDF Studio */}
         {activeTab === "pdf" && (
           <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_pdf}</p></div>}>
-            <PdfStudio lang={lang} />
+            <PdfStudio lang={lang} dropped={dropped} />
           </Suspense>
         )}
 

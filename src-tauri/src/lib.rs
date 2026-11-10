@@ -11,6 +11,7 @@ pub mod cleanup_ops;
 pub mod disk_ops;
 pub mod dupes;
 pub mod execute;
+pub mod extras;
 pub mod image_ops;
 pub mod paths;
 pub mod pdf_ops;
@@ -290,6 +291,51 @@ fn quarantine_duplicates(app: AppHandle, keep: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command(async)]
+fn scan_extras(root: String) -> Result<extras::ExtrasScan, String> {
+    extras::scan(std::path::Path::new(&root))
+}
+
+#[tauri::command(async)]
+fn clean_extras(root: String, dirs: Vec<String>, files: Vec<String>) -> Result<extras::ExtrasReport, String> {
+    extras::clean(std::path::Path::new(&root), &dirs, &files)
+}
+
+#[tauri::command]
+fn get_history(limit: Option<usize>) -> Vec<undo::HistoryEntry> {
+    undo::history(limit.unwrap_or(50).min(500))
+}
+
+#[derive(Serialize)]
+struct DroppedPaths {
+    directories: Vec<String>,
+    files: Vec<String>,
+    /// Parent folder of the first dropped file, so a file dropped on a
+    /// folder-based view can still start a scan somewhere sensible.
+    parent: Option<String>,
+}
+
+/// Drag & drop hands the webview raw paths, and the webview cannot tell a
+/// folder from a file, so the split happens here.
+#[tauri::command(async)]
+fn classify_dropped(paths: Vec<String>) -> DroppedPaths {
+    let mut directories = Vec::new();
+    let mut files = Vec::new();
+    for raw in paths {
+        let path = std::path::Path::new(&raw);
+        if path.is_dir() {
+            directories.push(raw);
+        } else if path.is_file() {
+            files.push(raw);
+        }
+    }
+    let parent = files
+        .first()
+        .and_then(|p| std::path::Path::new(p).parent())
+        .map(|p| p.to_string_lossy().into_owned());
+    DroppedPaths { directories, files, parent }
+}
+
 #[tauri::command]
 fn undo_last(app: AppHandle) -> Result<(), String> {
     let handle = app.clone();
@@ -544,6 +590,10 @@ pub fn run() {
             save_smart_rules,
             scan_junk,
             clean_junk,
+            scan_extras,
+            clean_extras,
+            get_history,
+            classify_dropped,
             watch_get_status,
             watch_set_active,
             watch_add_folder,
