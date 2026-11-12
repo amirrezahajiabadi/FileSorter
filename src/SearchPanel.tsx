@@ -97,6 +97,7 @@ export default function SearchPanel({
     try {
       setReport(await invoke<SearchReport>("search_files", { req }));
       setSelected([]);
+      lastIndex.current = null;
     } catch (e) {
       setError(String(e));
     } finally {
@@ -108,15 +109,41 @@ export default function SearchPanel({
     void invoke("stop_search");
   };
 
-  const toggle = (path: string) =>
-    setSelected((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
+  // Remember the row a plain click landed on so a following Shift-click can
+  // select the whole run between the two, the way file managers do.
+  const lastIndex = useRef<number | null>(null);
+
+  const toggle = (path: string, index: number, range: boolean) => {
+    setSelected((prev) => {
+      if (range && lastIndex.current !== null && report) {
+        const from = Math.min(lastIndex.current, index);
+        const to = Math.max(lastIndex.current, index);
+        const next = new Set(prev);
+        for (let i = from; i <= to; i++) next.add(report.hits[i].path);
+        return [...next];
+      }
+      return prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path];
+    });
+    lastIndex.current = index;
+  };
 
   const allSelected = !!report && report.hits.length > 0 && selected.length === report.hits.length;
 
-  const toggleAll = () =>
+  const toggleAll = () => {
     setSelected((prev) =>
       report && prev.length === report.hits.length ? [] : (report?.hits.map((h) => h.path) ?? []),
     );
+    lastIndex.current = null;
+  };
+
+  const invert = () => {
+    setSelected((prev) => {
+      if (!report) return prev;
+      const picked = new Set(prev);
+      return report.hits.filter((h) => !picked.has(h.path)).map((h) => h.path);
+    });
+    lastIndex.current = null;
+  };
 
   const reveal = (folder: string) => {
     void invoke("open_in_file_manager", { path: folder });
@@ -248,6 +275,14 @@ export default function SearchPanel({
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
+                disabled={report.hits.length === 0}
+                onClick={invert}
+              >
+                {t.gs_invert}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
                 disabled={selected.length === 0}
                 onClick={() => onSend?.("archive", selected)}
               >
@@ -300,13 +335,15 @@ export default function SearchPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {report.hits.map((hit) => (
+                  {report.hits.map((hit, index) => (
                     <tr key={hit.path}>
                       <td>
                         <input
                           type="checkbox"
                           checked={selected.includes(hit.path)}
-                          onChange={() => toggle(hit.path)}
+                          onChange={(e) =>
+                            toggle(hit.path, index, (e.nativeEvent as MouseEvent).shiftKey === true)
+                          }
                           aria-label={hit.name}
                         />
                       </td>

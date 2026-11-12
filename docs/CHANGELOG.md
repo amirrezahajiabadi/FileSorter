@@ -10,6 +10,22 @@ historical record only.
 
 ---
 
+## [6.14.0] — 2026-11-12
+
+### Added
+- **Range and inverted selection in search results (`SearchPanel.tsx`):** a
+  plain click on a result checkbox still toggles that one row, Shift-clicking
+  selects every row between the last click and the one you land on (adding to
+  what was already ticked), and *Invert selection* in the result toolbar swaps
+  the ticked set for its complement. Both actions reset the anchor, so the next
+  Shift-click starts a fresh range, and a new search still clears everything.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite).
+- `cargo test` passes: 61 tests (the backend is unchanged).
+
+---
+
 ## [6.13.0] — 2026-11-12
 
 ### Added
