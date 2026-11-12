@@ -51,7 +51,18 @@ function conflictKey(item: { parentDir: string; finalName: string }): string {
 }
 
 
-export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?: DroppedPaths | null }) {
+export default function BatchRenamer({
+  lang,
+  dropped,
+  seed,
+  onSeedApplied,
+}: {
+  lang: Locale;
+  dropped?: DroppedPaths | null;
+  /** Files handed over from another tab, e.g. the ticked search results. */
+  seed?: { paths: string[]; seq: number } | null;
+  onSeedApplied?: (seq: number) => void;
+}) {
   const t = getStrings(lang);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [method, setMethod] = useState<RenameMethod>("replace");
@@ -159,6 +170,19 @@ export default function BatchRenamer({ lang, dropped }: { lang: Locale; dropped?
     setUndoReport(null);
     appendPaths(dropped.paths);
   }, [dropped]);
+
+  // Consumed once, then reported back so the sender clears it and a remount of
+  // this tab cannot re-queue the same files.
+  const lastSeed = useRef(0);
+  useEffect(() => {
+    if (!seed || seed.seq === lastSeed.current) return;
+    lastSeed.current = seed.seq;
+    setError("");
+    setReport(null);
+    setUndoReport(null);
+    appendPaths(seed.paths);
+    onSeedApplied?.(seed.seq);
+  }, [seed]);
 
   const removeFile = (id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));

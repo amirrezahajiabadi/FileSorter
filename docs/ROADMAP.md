@@ -50,6 +50,8 @@ Shipped as v6.12.0:
   protection on the way out.
 - Pattern-based batch rename from tokens (`{name}`, `{ext}`, `{index}`,
   `{date}`, `{time}`, `{parent}`).
+- Ticked search results hand off to Archives or the Renamer, so a search can
+  become a zip or a rename batch in one click.
 
 ## 1. AI-powered photo analysis — 💡 idea stage
 

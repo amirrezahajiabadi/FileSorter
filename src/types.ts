@@ -216,6 +216,13 @@ export interface DroppedPaths {
   seq: number;
 }
 
+/** Paths handed from one tab to another, e.g. search results sent to zip or rename. */
+export interface ToolSeed {
+  tab: "archive" | "renamer";
+  paths: string[];
+  seq: number;
+}
+
 // ── Global search, folder compare and archives (phase 2) ──────────────
 
 export type SearchMode = "contains" | "regex" | "glob";

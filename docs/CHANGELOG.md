@@ -10,6 +10,24 @@ historical record only.
 
 ---
 
+## [6.13.0] — 2026-11-12
+
+### Added
+- **Search results flow into the other tools (`SearchPanel.tsx`, `ArchivePanel.tsx`,
+  `BatchRenamer.tsx`):** every result row now has a checkbox, the header ticks
+  the whole list, and the result toolbar offers *Zip selected* and *Send to
+  Renamer*. The ticked paths travel to the target tab as a one-shot seed
+  (`ToolSeed` in `types.ts`) that the receiving panel consumes and reports back,
+  so coming back to that tab later never re-queues the same files; both queues
+  still de-duplicate. Archives keeps asking for a destination before writing,
+  and the renamer shows the files in its usual preview.
+
+### Verification
+- `npm run build` passes (TypeScript + Vite).
+- `cargo test` passes: 61 tests (the backend is unchanged).
+
+---
+
 ## [6.12.0] — 2026-11-10
 
 ### Added

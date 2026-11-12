@@ -89,6 +89,11 @@ export interface I18nStrings {
   gs_col_date: string;
   gs_reveal: string;
   gs_hint: string;
+  gs_select_all: string;
+  gs_selected: string;
+  gs_send_zip: string;
+  gs_send_rename: string;
+  gs_send_hint: string;
   cmp_title: string;
   cmp_desc: string;
   cmp_left: string;
@@ -1060,6 +1065,11 @@ const EN: I18nStrings = {
   gs_col_date: "Modified",
   gs_reveal: "Show in folder",
   gs_hint: "Glob mode accepts * and ?; regex mode accepts patterns like (jpg|png)$.",
+  gs_select_all: "Select all",
+  gs_selected: "{count} selected",
+  gs_send_zip: "Zip selected",
+  gs_send_rename: "Send to Renamer",
+  gs_send_hint: "Tick results to zip them together or send them to the renamer.",
   cmp_title: "Compare folders",
   cmp_desc: "Compare two trees by SHA-256 to see what is identical, changed, moved, or only on one side.",
   cmp_left: "First folder",
@@ -1599,6 +1609,11 @@ const FA: I18nStrings = {
   gs_col_date: "تاریخ تغییر",
   gs_reveal: "نمایش در پوشه",
   gs_hint: "در حالت Glob از * و ? استفاده کنید؛ در حالت Regex الگویی مثل (jpg|png)$ کار می‌کند.",
+  gs_select_all: "انتخاب همه",
+  gs_selected: "{count} مورد انتخاب‌شده",
+  gs_send_zip: "ساخت zip از انتخاب‌شده‌ها",
+  gs_send_rename: "ارسال به تغییر نام",
+  gs_send_hint: "نتیجه‌ها را تیک بزنید تا با هم zip شوند یا به تب تغییر نام بروند.",
   cmp_title: "مقایسهٔ دو پوشه",
   cmp_desc:
     "دو درخت را با SHA-256 مقایسه کنید تا بدانید چه چیزی یکسان، تغییرکرده، جابه‌جا شده یا فقط در یک طرف است.",

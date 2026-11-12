@@ -20,7 +20,18 @@ function baseName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export default function ArchivePanel({ lang, dropped }: { lang: Locale; dropped?: DroppedPaths | null }) {
+export default function ArchivePanel({
+  lang,
+  dropped,
+  seed,
+  onSeedApplied,
+}: {
+  lang: Locale;
+  dropped?: DroppedPaths | null;
+  /** Files handed over from another tab, e.g. the ticked search results. */
+  seed?: { paths: string[]; seq: number } | null;
+  onSeedApplied?: (seq: number) => void;
+}) {
   const t = getStrings(lang);
   const isRtl = lang === "fa";
   const fmtNum = (n: number) => n.toLocaleString(isRtl ? "fa-IR" : "en-US");
@@ -62,6 +73,17 @@ export default function ArchivePanel({ lang, dropped }: { lang: Locale; dropped?
     append(dropped.paths);
     setCreateError("");
   }, [dropped]);
+
+  // A seed is consumed once, then reported back so the sender can clear it and
+  // a later remount of this tab cannot re-add the same files.
+  const lastSeed = useRef(0);
+  useEffect(() => {
+    if (!seed || seed.seq === lastSeed.current) return;
+    lastSeed.current = seed.seq;
+    append(seed.paths);
+    setCreateError("");
+    onSeedApplied?.(seed.seq);
+  }, [seed]);
 
   const addFiles = async () => {
     setCreateError("");

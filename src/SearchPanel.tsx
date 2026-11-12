@@ -22,7 +22,16 @@ function mbToBytes(raw: string): number | null {
   return Math.round(value * 1024 * 1024);
 }
 
-export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?: DroppedPaths | null }) {
+export default function SearchPanel({
+  lang,
+  dropped,
+  onSend,
+}: {
+  lang: Locale;
+  dropped?: DroppedPaths | null;
+  /** Hands the ticked results to another tab: zip them, or rename them. */
+  onSend?: (tab: "archive" | "renamer", paths: string[]) => void;
+}) {
   const t = getStrings(lang);
   const isRtl = lang === "fa";
   const fmtNum = (n: number) => n.toLocaleString(isRtl ? "fa-IR" : "en-US");
@@ -39,6 +48,7 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<SearchReport | null>(null);
   const [error, setError] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
 
   // A drop on this tab means "search here"; `seq` keeps a re-mount from
   // re-applying an older drop.
@@ -86,6 +96,7 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
     };
     try {
       setReport(await invoke<SearchReport>("search_files", { req }));
+      setSelected([]);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -96,6 +107,16 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
   const stop = () => {
     void invoke("stop_search");
   };
+
+  const toggle = (path: string) =>
+    setSelected((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
+
+  const allSelected = !!report && report.hits.length > 0 && selected.length === report.hits.length;
+
+  const toggleAll = () =>
+    setSelected((prev) =>
+      report && prev.length === report.hits.length ? [] : (report?.hits.map((h) => h.path) ?? []),
+    );
 
   const reveal = (folder: string) => {
     void invoke("open_in_file_manager", { path: folder });
@@ -215,13 +236,32 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
 
       {report && (
         <section className="glass">
-          <div className="dupes-toolbar" style={{ marginBottom: "14px" }}>
+          <div className="dupes-toolbar" style={{ marginBottom: "14px", flexWrap: "wrap" }}>
             <span>
               {fmt(t.gs_results, { count: fmtNum(report.hits.length) })}
             </span>
             <span>
               {fmt(t.gs_scanned, { count: fmtNum(report.scanned), ms: fmtNum(report.elapsed_ms) })}
             </span>
+            <div className="summary-actions">
+              <span className="muted">{fmt(t.gs_selected, { count: fmtNum(selected.length) })}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={selected.length === 0}
+                onClick={() => onSend?.("archive", selected)}
+              >
+                {t.gs_send_zip}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={selected.length === 0}
+                onClick={() => onSend?.("renamer", selected)}
+              >
+                {t.gs_send_rename}
+              </button>
+            </div>
           </div>
 
           {report.truncated && (
@@ -229,6 +269,10 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
               {fmt(t.gs_truncated, { count: fmtNum(report.hits.length) })}
             </p>
           )}
+
+          <p className="panel-note" style={{ marginBottom: "12px" }}>
+            {t.gs_send_hint}
+          </p>
 
           {report.hits.length === 0 ? (
             <div className="empty-state">
@@ -240,6 +284,14 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: "34px" }}>
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        aria-label={t.gs_select_all}
+                      />
+                    </th>
                     <th>{t.gs_col_name}</th>
                     <th>{t.gs_col_folder}</th>
                     <th>{t.gs_col_size}</th>
@@ -250,6 +302,14 @@ export default function SearchPanel({ lang, dropped }: { lang: Locale; dropped?:
                 <tbody>
                   {report.hits.map((hit) => (
                     <tr key={hit.path}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(hit.path)}
+                          onChange={() => toggle(hit.path)}
+                          aria-label={hit.name}
+                        />
+                      </td>
                       <td className="ellipsis" title={hit.path}>
                         <b>{hit.name}</b>
                       </td>

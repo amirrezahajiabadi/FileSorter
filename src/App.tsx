@@ -18,6 +18,7 @@ import {
   type SmartRule,
   type SortPlan,
   type TaskRunResult,
+  type ToolSeed,
   type UndoReport,
   type UpdateCheckResult,
   type WatchEventPayload,
@@ -272,6 +273,9 @@ export default function App() {
   const [diskSortDir, setDiskSortDir] = useState<"asc" | "desc">("desc");
   const [dragging, setDragging] = useState(false);
   const [dropped, setDropped] = useState<DroppedPaths | null>(null);
+  // Search results handed to another tab; the target clears it once consumed.
+  const [toolSeed, setToolSeed] = useState<ToolSeed | null>(null);
+  const seedSeq = useRef(0);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   // Duplicates state
@@ -1006,6 +1010,14 @@ export default function App() {
     if (root) startWithFolder(root);
   };
 
+  // Ticked search results become a queued selection in the target tab.
+  const sendToTool = (tab: ToolSeed["tab"], paths: string[]) => {
+    if (paths.length === 0) return;
+    seedSeq.current += 1;
+    setToolSeed({ tab, paths, seq: seedSeq.current });
+    setActiveTab(tab);
+  };
+
   useEffect(() => {
     let disposed = false;
     let unlisten: UnlistenFn | null = null;
@@ -1650,7 +1662,7 @@ export default function App() {
         {/* TAB 2: Junk & Cache Cleaner */}
         {activeTab === "search" && (
           <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.gs_running}</p></div>}>
-            <SearchPanel lang={lang} dropped={dropped} />
+            <SearchPanel lang={lang} dropped={dropped} onSend={sendToTool} />
           </Suspense>
         )}
 
@@ -2370,14 +2382,24 @@ export default function App() {
 
         {activeTab === "archive" && (
           <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.arc_creating}</p></div>}>
-            <ArchivePanel lang={lang} dropped={dropped} />
+            <ArchivePanel
+              lang={lang}
+              dropped={dropped}
+              seed={toolSeed?.tab === "archive" ? toolSeed : null}
+              onSeedApplied={() => setToolSeed(null)}
+            />
           </Suspense>
         )}
 
         {/* TAB 8: Smart Batch Renamer */}
         {activeTab === "renamer" && (
           <Suspense fallback={<div className="glass" style={{ padding: "40px", textAlign: "center" }}><p className="muted">{t.loader_renamer}</p></div>}>
-            <BatchRenamer lang={lang} dropped={dropped} />
+            <BatchRenamer
+              lang={lang}
+              dropped={dropped}
+              seed={toolSeed?.tab === "renamer" ? toolSeed : null}
+              onSeedApplied={() => setToolSeed(null)}
+            />
           </Suspense>
         )}
 
